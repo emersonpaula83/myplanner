@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS sync_logs;
+DROP TABLE IF EXISTS disponibilidade;
+DROP TABLE IF EXISTS limites_alerta;
+DROP TABLE IF EXISTS tarefa_produtos;
+DROP TABLE IF EXISTS tarefas;
+DROP TABLE IF EXISTS produtos;
+DROP TABLE IF EXISTS sprints;
+DROP TABLE IF EXISTS projetos;
+DROP TABLE IF EXISTS membros;
+DROP TABLE IF EXISTS fonte_dados;
