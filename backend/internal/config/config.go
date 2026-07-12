@@ -12,6 +12,7 @@ type Config struct {
 	Jira   JiraConfig
 	Sync   SyncConfig
 	Log    LogConfig
+	Auth   AuthConfig
 }
 
 type DBConfig struct {
@@ -49,6 +50,12 @@ type LogConfig struct {
 	Level string
 }
 
+type AuthConfig struct {
+	JWTSecret          string
+	JWTExpirationHours int
+	AdminEmail         string
+}
+
 func Load() (*Config, error) {
 	viper.SetConfigFile(".env")
 	viper.AutomaticEnv()
@@ -64,6 +71,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("SYNC_INTERVAL_MINUTES", 30)
 	viper.SetDefault("SYNC_RATE_LIMIT_PER_SEC", 5)
 	viper.SetDefault("LOG_LEVEL", "debug")
+	viper.SetDefault("JWT_EXPIRATION_HOURS", 24)
+	viper.SetDefault("ADMIN_EMAIL", "admin@tcloud.local")
 
 	_ = viper.ReadInConfig()
 
@@ -92,6 +101,11 @@ func Load() (*Config, error) {
 		},
 		Log: LogConfig{
 			Level: viper.GetString("LOG_LEVEL"),
+		},
+		Auth: AuthConfig{
+			JWTSecret:          viper.GetString("JWT_SECRET"),
+			JWTExpirationHours: viper.GetInt("JWT_EXPIRATION_HOURS"),
+			AdminEmail:         viper.GetString("ADMIN_EMAIL"),
 		},
 	}, nil
 }
