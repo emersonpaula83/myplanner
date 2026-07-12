@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/totvs/tcloud-planner/backend/internal/auth"
 	"github.com/totvs/tcloud-planner/backend/internal/config"
 	"github.com/totvs/tcloud-planner/backend/internal/handler"
+	"github.com/totvs/tcloud-planner/backend/internal/middleware"
 	"github.com/totvs/tcloud-planner/backend/internal/repository"
 	"go.uber.org/zap"
 )
@@ -23,6 +25,11 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if cfg.Auth.JWTSecret == "" {
+		fmt.Fprintf(os.Stderr, "JWT_SECRET is required\n")
 		os.Exit(1)
 	}
 
@@ -52,8 +59,14 @@ func main() {
 	}
 	logger.Info("connected to database")
 
-	repo := repository.NewFonteDadosRepository(pool)
-	fonteDadosHandler := handler.NewFonteDadosHandler(repo, logger)
+	tokenService := auth.NewTokenService(cfg.Auth.JWTSecret, cfg.Auth.JWTExpirationHours)
+
+	fonteDadosRepo := repository.NewFonteDadosRepository(pool)
+	usuarioRepo := repository.NewUsuarioRepository(pool)
+
+	fonteDadosHandler := handler.NewFonteDadosHandler(fonteDadosRepo, logger)
+	authHandler := handler.NewAuthHandler(usuarioRepo, tokenService, logger)
+	usuarioHandler := handler.NewUsuarioHandler(usuarioRepo, logger)
 
 	r := chi.NewRouter()
 
@@ -65,9 +78,9 @@ func main() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.RequestID)
+	r.Use(chimw.Logger)
+	r.Use(chimw.Recoverer)
+	r.Use(chimw.RequestID)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -76,11 +89,26 @@ func main() {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/fontes", fonteDadosHandler.List)
-		r.Post("/fontes", fonteDadosHandler.Create)
-		r.Get("/fontes/{id}", fonteDadosHandler.GetByID)
-		r.Put("/fontes/{id}", fonteDadosHandler.Update)
-		r.Delete("/fontes/{id}", fonteDadosHandler.Delete)
+		r.Post("/auth/login", authHandler.Login)
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthJWT(tokenService))
+			r.Use(middleware.ProjetoFilter(usuarioRepo))
+
+			r.Get("/fontes", fonteDadosHandler.List)
+			r.Post("/fontes", fonteDadosHandler.Create)
+			r.Get("/fontes/{id}", fonteDadosHandler.GetByID)
+			r.Put("/fontes/{id}", fonteDadosHandler.Update)
+			r.Delete("/fontes/{id}", fonteDadosHandler.Delete)
+
+			r.Get("/usuarios", usuarioHandler.List)
+			r.Post("/usuarios", usuarioHandler.Create)
+			r.Get("/usuarios/{id}", usuarioHandler.GetByID)
+			r.Put("/usuarios/{id}", usuarioHandler.Update)
+			r.Put("/usuarios/{id}/senha", usuarioHandler.AlterarSenha)
+			r.Get("/usuarios/{id}/projetos", usuarioHandler.ListProjetos)
+			r.Put("/usuarios/{id}/projetos", usuarioHandler.UpdateProjetos)
+		})
 	})
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
