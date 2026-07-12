@@ -63,10 +63,12 @@ func main() {
 
 	fonteDadosRepo := repository.NewFonteDadosRepository(pool)
 	usuarioRepo := repository.NewUsuarioRepository(pool)
+	equipeRepo := repository.NewEquipeRepository(pool)
 
 	fonteDadosHandler := handler.NewFonteDadosHandler(fonteDadosRepo, logger)
 	authHandler := handler.NewAuthHandler(usuarioRepo, tokenService, logger)
 	usuarioHandler := handler.NewUsuarioHandler(usuarioRepo, logger)
+	equipeHandler := handler.NewEquipeHandler(equipeRepo, logger)
 
 	r := chi.NewRouter()
 
@@ -108,6 +110,10 @@ func main() {
 			r.Put("/usuarios/{id}/senha", usuarioHandler.AlterarSenha)
 			r.Get("/usuarios/{id}/projetos", usuarioHandler.ListProjetos)
 			r.Put("/usuarios/{id}/projetos", usuarioHandler.UpdateProjetos)
+
+			r.Get("/equipes", equipeHandler.List)
+			r.Get("/equipes/{team}/resumo", equipeHandler.GetResumo)
+			r.Get("/equipes/{team}/membros", equipeHandler.GetMembros)
 		})
 	})
 
