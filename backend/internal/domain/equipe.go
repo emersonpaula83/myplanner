@@ -16,7 +16,7 @@ type ResumoEquipe struct {
 type DetalhesIniciativas struct {
 	PercentualManutencao    float64 `json:"percentual_manutencao"`
 	PercentualMelhorias     float64 `json:"percentual_melhorias"`
-	PercentualNovasFeatures float64 `json:"percentual_novas_features"`
+	PercentualEvolucao float64 `json:"percentual_evolucao"`
 	PercentualSuporte       float64 `json:"percentual_suporte"`
 }
 
@@ -36,6 +36,6 @@ type HorasTarefasMembro struct {
 	SegundosIniciativas   int64
 	SegundosManutencao    int64
 	SegundosMelhorias     int64
-	SegundosNovasFeatures int64
+	SegundosEvolucao int64
 	SegundosSuporte       int64
 }
