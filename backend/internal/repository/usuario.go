@@ -63,7 +63,7 @@ func (r *UsuarioRepository) ListarTodos(ctx context.Context) ([]domain.Usuario, 
 	}
 	defer rows.Close()
 
-	var result []domain.Usuario
+	result := make([]domain.Usuario, 0)
 	for rows.Next() {
 		u, err := scanUsuarioRows(rows)
 		if err != nil {
@@ -139,7 +139,7 @@ func (r *UsuarioRepository) ListarProjetos(ctx context.Context, usuarioID uuid.U
 	}
 	defer rows.Close()
 
-	var result []domain.ProjetoResumo
+	result := make([]domain.ProjetoResumo, 0)
 	for rows.Next() {
 		var p domain.ProjetoResumo
 		if err := rows.Scan(&p.ID, &p.Chave, &p.Nome); err != nil {
@@ -187,7 +187,7 @@ func (r *UsuarioRepository) BuscarProjetoIDsPorUsuario(ctx context.Context, usua
 	}
 	defer rows.Close()
 
-	var ids []uuid.UUID
+	ids := make([]uuid.UUID, 0)
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {

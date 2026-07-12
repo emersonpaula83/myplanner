@@ -2,11 +2,13 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/mail"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/totvs/tcloud-planner/backend/internal/domain"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -75,6 +77,10 @@ func (h *UsuarioHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	usuario, err := h.store.Criar(r.Context(), &req, string(senhaHash))
 	if err != nil {
+		if isUniqueViolation(err) {
+			respondError(w, http.StatusConflict, "email ou apelido já existe")
+			return
+		}
 		h.logger.Error("failed to create usuario", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao criar usuário")
 		return
@@ -134,6 +140,10 @@ func (h *UsuarioHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	usuario, err := h.store.Atualizar(r.Context(), id, &req)
 	if err != nil {
+		if isUniqueViolation(err) {
+			respondError(w, http.StatusConflict, "email ou apelido já existe")
+			return
+		}
 		h.logger.Error("failed to update usuario", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao atualizar usuário")
 		return
@@ -234,4 +244,12 @@ func (h *UsuarioHandler) UpdateProjetos(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondJSON(w, http.StatusOK, map[string]any{"projetos": projetos})
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }
