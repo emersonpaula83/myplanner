@@ -70,21 +70,21 @@ func (r *EquipeRepository) GetMembrosEquipe(ctx context.Context, team string) ([
 
 func (r *EquipeRepository) GetDiasAusencia(ctx context.Context, membroIDs []uuid.UUID, inicio, fim time.Time) (map[uuid.UUID]int, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT membro_id,
-			COALESCE(SUM(
-				(SELECT COUNT(*)
-				 FROM generate_series(
-					 GREATEST(data_inicio, $2::date),
-					 LEAST(data_fim, $3::date),
-					 '1 day'::interval
-				 ) d
-				 WHERE EXTRACT(DOW FROM d) NOT IN (0, 6))
-			), 0)::int AS dias_ausencia
-		FROM disponibilidade
-		WHERE membro_id = ANY($1)
-		  AND tipo IN ('dayoff', 'ferias', 'licenca_medica', 'licenca_paternidade', 'licenca_maternidade')
-		  AND data_fim >= $2::date
-		  AND data_inicio <= $3::date
+		SELECT membro_id, COUNT(*)::int AS dias_ausencia
+		FROM (
+		    SELECT DISTINCT membro_id, d::date AS dia
+		    FROM disponibilidade,
+		         generate_series(
+		             GREATEST(data_inicio, $2::date),
+		             LEAST(data_fim, $3::date),
+		             '1 day'::interval
+		         ) d
+		    WHERE membro_id = ANY($1)
+		      AND tipo IN ('dayoff','ferias','licenca_medica','licenca_paternidade','licenca_maternidade')
+		      AND data_fim >= $2::date
+		      AND data_inicio <= $3::date
+		      AND EXTRACT(DOW FROM d) NOT IN (0, 6)
+		) sub
 		GROUP BY membro_id
 	`, membroIDs, inicio, fim)
 	if err != nil {

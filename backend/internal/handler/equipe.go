@@ -11,6 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// EquipeStore defines data access for team queries.
+// Team endpoints intentionally bypass ProjetoFilter scoping — teams span
+// projects, so visibility is by team membership, not project access.
 type EquipeStore interface {
 	ListEquipes(ctx context.Context) ([]string, error)
 	GetMembrosEquipe(ctx context.Context, team string) ([]domain.Membro, error)
@@ -40,7 +43,8 @@ func ParsePeriodo(p string) (time.Time, time.Time, bool) {
 	if !ok {
 		return time.Time{}, time.Time{}, false
 	}
-	fim := time.Now().Truncate(24 * time.Hour)
+	now := time.Now()
+	fim := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	inicio := fim.AddDate(0, -meses, 0)
 	return inicio, fim, true
 }
