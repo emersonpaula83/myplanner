@@ -13,6 +13,7 @@ type Config struct {
 	Sync   SyncConfig
 	Log    LogConfig
 	Auth   AuthConfig
+	Gemini GeminiConfig
 }
 
 type DBConfig struct {
@@ -56,6 +57,11 @@ type AuthConfig struct {
 	AdminEmail         string
 }
 
+type GeminiConfig struct {
+	APIKey string
+	Model  string
+}
+
 func Load() (*Config, error) {
 	viper.SetConfigFile(".env")
 	viper.AutomaticEnv()
@@ -72,6 +78,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("SYNC_RATE_LIMIT_PER_SEC", 5)
 	viper.SetDefault("LOG_LEVEL", "debug")
 	viper.SetDefault("JWT_EXPIRATION_HOURS", 24)
+	viper.SetDefault("GEMINI_MODEL", "gemini-2.0-flash")
 	viper.SetDefault("ADMIN_EMAIL", "admin@tcloud.local")
 
 	_ = viper.ReadInConfig()
@@ -106,6 +113,10 @@ func Load() (*Config, error) {
 			JWTSecret:          viper.GetString("JWT_SECRET"),
 			JWTExpirationHours: viper.GetInt("JWT_EXPIRATION_HOURS"),
 			AdminEmail:         viper.GetString("ADMIN_EMAIL"),
+		},
+		Gemini: GeminiConfig{
+			APIKey: viper.GetString("GEMINI_API_KEY"),
+			Model:  viper.GetString("GEMINI_MODEL"),
 		},
 	}, nil
 }
