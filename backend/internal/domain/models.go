@@ -109,6 +109,10 @@ type Tarefa struct {
 	CamposExtras      json.RawMessage   `json:"campos_extras" db:"campos_extras"`
 	CreatedAt         time.Time         `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time         `json:"updated_at" db:"updated_at"`
+
+	ParentID           *uuid.UUID `json:"parent_id" db:"parent_id"`
+	Apelido            *string    `json:"apelido" db:"apelido"`
+	DataInicioExecucao *time.Time `json:"data_inicio_execucao" db:"data_inicio_execucao"`
 }
 
 type Disponibilidade struct {
