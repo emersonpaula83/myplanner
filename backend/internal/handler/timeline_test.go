@@ -16,12 +16,13 @@ import (
 )
 
 type mockTimelineStore struct {
-	epicos       []domain.EpicoEquipe
-	membrosCount int
-	ausencias    []domain.AusenciaMensal
-	updateErr    error
-	epicoPorID   *domain.Tarefa
-	epicosList   []domain.ProjetoListItem
+	epicos          []domain.EpicoEquipe
+	membrosCount    int
+	ausencias       []domain.AusenciaMensal
+	updateErr       error
+	epicoPorID      *domain.Tarefa
+	epicosList      []domain.ProjetoListItem
+	capturedApelido *string
 }
 
 func (m *mockTimelineStore) BuscarEpicosEquipe(_ context.Context, _ string, _ int) ([]domain.EpicoEquipe, error) {
@@ -36,7 +37,8 @@ func (m *mockTimelineStore) BuscarAusenciasMensais(_ context.Context, _ string, 
 	return m.ausencias, nil
 }
 
-func (m *mockTimelineStore) AtualizarMetadataProjeto(_ context.Context, _ uuid.UUID, _ *string, _ *time.Time) error {
+func (m *mockTimelineStore) AtualizarMetadataProjeto(_ context.Context, _ uuid.UUID, apelido *string, _ *time.Time) error {
+	m.capturedApelido = apelido
 	return m.updateErr
 }
 
@@ -188,10 +190,11 @@ func TestUpdateProjetoMetadata_UppercaseConversion(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.UpdateProjetoMetadata(w, req)
 
-	// Can't directly test the uppercase conversion without a real store,
-	// but we verify the request succeeds (200) with a valid apelido
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", w.Code)
+	}
+	if store.capturedApelido == nil || *store.capturedApelido != "MIGRAÇÃO DB" {
+		t.Errorf("capturedApelido = %v, want MIGRAÇÃO DB", store.capturedApelido)
 	}
 }
 

@@ -3,10 +3,12 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -34,6 +36,53 @@ func NewTimelineHandler(store TimelineStore, analyzer service.AnalisadorCapacida
 	return &TimelineHandler{store: store, analyzer: analyzer, logger: logger}
 }
 
+// timelineData holds the raw data needed to compute team capacity for a
+// given equipe/ano, shared by ListTimeline and AnalisarCapacidade.
+type timelineData struct {
+	epicos             []domain.EpicoEquipe
+	membrosCount       int
+	ausencias          []domain.AusenciaMensal
+	projetosCapacidade []domain.ProjetoCapacidade
+}
+
+// fetchTimelineData fetches épicos, active member count and monthly
+// absences for the given equipe/ano, and builds the derived
+// projetosCapacidade slice used for capacity calculations.
+func (h *TimelineHandler) fetchTimelineData(ctx context.Context, equipe string, ano int) (*timelineData, error) {
+	epicos, err := h.store.BuscarEpicosEquipe(ctx, equipe, ano)
+	if err != nil {
+		return nil, fmt.Errorf("buscando épicos: %w", err)
+	}
+
+	membrosCount, err := h.store.ContarMembrosAtivosEquipe(ctx, equipe)
+	if err != nil {
+		return nil, fmt.Errorf("contando membros ativos: %w", err)
+	}
+
+	ausencias, err := h.store.BuscarAusenciasMensais(ctx, equipe, ano)
+	if err != nil {
+		return nil, fmt.Errorf("buscando ausências mensais: %w", err)
+	}
+
+	projetosCapacidade := make([]domain.ProjetoCapacidade, 0)
+	for _, e := range epicos {
+		if e.DataInicioExecucao != nil && e.DataLimite != nil {
+			projetosCapacidade = append(projetosCapacidade, domain.ProjetoCapacidade{
+				DataInicioExecucao: *e.DataInicioExecucao,
+				DataLimite:         *e.DataLimite,
+				HorasEquipe:        float64(e.TotalSegundosEquipe) / 3600.0,
+			})
+		}
+	}
+
+	return &timelineData{
+		epicos:             epicos,
+		membrosCount:       membrosCount,
+		ausencias:          ausencias,
+		projetosCapacidade: projetosCapacidade,
+	}, nil
+}
+
 func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 	equipe := r.URL.Query().Get("equipe")
 	if equipe == "" {
@@ -52,31 +101,15 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	epicos, err := h.store.BuscarEpicosEquipe(r.Context(), equipe, ano)
+	data, err := h.fetchTimelineData(r.Context(), equipe, ano)
 	if err != nil {
-		h.logger.Error("failed to fetch epicos", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "falha ao buscar épicos")
+		h.logger.Error("failed to fetch timeline data", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
 		return
 	}
 
-	membrosCount, err := h.store.ContarMembrosAtivosEquipe(r.Context(), equipe)
-	if err != nil {
-		h.logger.Error("failed to count membros", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "falha ao contar membros")
-		return
-	}
-
-	ausencias, err := h.store.BuscarAusenciasMensais(r.Context(), equipe, ano)
-	if err != nil {
-		h.logger.Error("failed to fetch ausencias", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "falha ao buscar ausências")
-		return
-	}
-
-	projetos := make([]domain.ProjetoTimeline, len(epicos))
-	projetosCapacidade := make([]domain.ProjetoCapacidade, 0)
-
-	for i, e := range epicos {
+	projetos := make([]domain.ProjetoTimeline, len(data.epicos))
+	for i, e := range data.epicos {
 		var dataLimite *string
 		if e.DataLimite != nil {
 			s := e.DataLimite.Format("2006-01-02")
@@ -96,17 +129,9 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 			ProjetoCI:          e.ProjetoCI,
 			ProjetoCITicket:    e.ProjetoCITicket,
 		}
-
-		if e.DataInicioExecucao != nil && e.DataLimite != nil {
-			projetosCapacidade = append(projetosCapacidade, domain.ProjetoCapacidade{
-				DataInicioExecucao: *e.DataInicioExecucao,
-				DataLimite:         *e.DataLimite,
-				HorasEquipe:        float64(e.TotalSegundosEquipe) / 3600.0,
-			})
-		}
 	}
 
-	capacidade := CalcularCapacidadeMensal(ano, membrosCount, ausencias, projetosCapacidade)
+	capacidade := CalcularCapacidadeMensal(ano, data.membrosCount, data.ausencias, data.projetosCapacidade)
 
 	respondJSON(w, http.StatusOK, domain.TimelineResponse{
 		Equipe:           equipe,
@@ -145,12 +170,12 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 	}
 
 	if req.Apelido != nil {
-		if len(*req.Apelido) > 15 {
+		upper := strings.ToUpper(*req.Apelido)
+		req.Apelido = &upper
+		if utf8.RuneCountInString(*req.Apelido) > 15 {
 			respondError(w, http.StatusBadRequest, "apelido deve ter no máximo 15 caracteres")
 			return
 		}
-		upper := strings.ToUpper(*req.Apelido)
-		req.Apelido = &upper
 	}
 
 	if err := h.store.AtualizarMetadataProjeto(r.Context(), id, req.Apelido, req.DataInicioExecucao); err != nil {
@@ -159,7 +184,33 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"message": "metadados atualizados"})
+	atualizado, err := h.store.BuscarEpicoPorID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to fetch updated epico", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar épico atualizado")
+		return
+	}
+	if atualizado == nil {
+		respondError(w, http.StatusNotFound, "tarefa não encontrada")
+		return
+	}
+
+	var dataLimite *string
+	if atualizado.DataLimite != nil && atualizado.DataLimite.Valid {
+		s := atualizado.DataLimite.Time.Format("2006-01-02")
+		dataLimite = &s
+	}
+
+	respondJSON(w, http.StatusOK, domain.ProjetoListItem{
+		ID:                 atualizado.ID,
+		NumeroTicket:       atualizado.NumeroTicket,
+		Resumo:             atualizado.Resumo,
+		Apelido:            atualizado.Apelido,
+		DataInicioExecucao: atualizado.DataInicioExecucao,
+		DataLimite:         dataLimite,
+		TipoDemanda:        atualizado.TipoDemanda,
+		Status:             atualizado.Status,
+	})
 }
 
 func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
@@ -203,39 +254,14 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	epicos, err := h.store.BuscarEpicosEquipe(r.Context(), req.Equipe, req.Ano)
+	data, err := h.fetchTimelineData(r.Context(), req.Equipe, req.Ano)
 	if err != nil {
-		h.logger.Error("failed to fetch epicos for analysis", zap.Error(err))
+		h.logger.Error("failed to fetch timeline data for analysis", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
 		return
 	}
 
-	membrosCount, err := h.store.ContarMembrosAtivosEquipe(r.Context(), req.Equipe)
-	if err != nil {
-		h.logger.Error("failed to count membros for analysis", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
-		return
-	}
-
-	ausencias, err := h.store.BuscarAusenciasMensais(r.Context(), req.Equipe, req.Ano)
-	if err != nil {
-		h.logger.Error("failed to fetch ausencias for analysis", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
-		return
-	}
-
-	projetosCapacidade := make([]domain.ProjetoCapacidade, 0)
-	for _, e := range epicos {
-		if e.DataInicioExecucao != nil && e.DataLimite != nil {
-			projetosCapacidade = append(projetosCapacidade, domain.ProjetoCapacidade{
-				DataInicioExecucao: *e.DataInicioExecucao,
-				DataLimite:         *e.DataLimite,
-				HorasEquipe:        float64(e.TotalSegundosEquipe) / 3600.0,
-			})
-		}
-	}
-
-	capacidade := CalcularCapacidadeMensal(req.Ano, membrosCount, ausencias, projetosCapacidade)
+	capacidade := CalcularCapacidadeMensal(req.Ano, data.membrosCount, data.ausencias, data.projetosCapacidade)
 
 	var mesCap domain.CapacidadeMes
 	for _, c := range capacidade {
@@ -246,7 +272,7 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 	}
 
 	projetosAnalise := make([]domain.ProjetoAnalise, 0)
-	for _, e := range epicos {
+	for _, e := range data.epicos {
 		if e.DataInicioExecucao == nil || e.DataLimite == nil {
 			continue
 		}
