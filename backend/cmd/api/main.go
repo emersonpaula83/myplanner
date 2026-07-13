@@ -18,6 +18,7 @@ import (
 	"github.com/totvs/tcloud-planner/backend/internal/handler"
 	"github.com/totvs/tcloud-planner/backend/internal/middleware"
 	"github.com/totvs/tcloud-planner/backend/internal/repository"
+	"github.com/totvs/tcloud-planner/backend/internal/service"
 	"go.uber.org/zap"
 )
 
@@ -70,6 +71,18 @@ func main() {
 	usuarioHandler := handler.NewUsuarioHandler(usuarioRepo, logger)
 	equipeHandler := handler.NewEquipeHandler(equipeRepo, logger)
 
+	timelineRepo := repository.NewTimelineRepository(pool)
+
+	var analyzer service.AnalisadorCapacidade
+	if cfg.Gemini.APIKey != "" {
+		analyzer = service.NewGeminiAnalyzer(cfg.Gemini.APIKey, cfg.Gemini.Model)
+		logger.Info("gemini analyzer configured", zap.String("model", cfg.Gemini.Model))
+	} else {
+		logger.Warn("GEMINI_API_KEY not set, AI analysis disabled")
+	}
+
+	timelineHandler := handler.NewTimelineHandler(timelineRepo, analyzer, logger)
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -114,6 +127,11 @@ func main() {
 			r.Get("/equipes", equipeHandler.List)
 			r.Get("/equipes/{team}/resumo", equipeHandler.GetResumo)
 			r.Get("/equipes/{team}/membros", equipeHandler.GetMembros)
+
+			r.Get("/timeline-capacidade", timelineHandler.ListTimeline)
+			r.Post("/timeline-capacidade/analisar", timelineHandler.AnalisarCapacidade)
+			r.Get("/projetos", timelineHandler.ListProjetos)
+			r.Put("/projetos/{id}/metadata", timelineHandler.UpdateProjetoMetadata)
 		})
 	})
 
