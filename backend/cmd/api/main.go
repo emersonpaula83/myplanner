@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"os/signal"
 	"syscall"
 	"time"
@@ -16,9 +18,11 @@ import (
 	"github.com/totvs/tcloud-planner/backend/internal/auth"
 	"github.com/totvs/tcloud-planner/backend/internal/config"
 	"github.com/totvs/tcloud-planner/backend/internal/handler"
+	"github.com/totvs/tcloud-planner/backend/internal/jira"
 	"github.com/totvs/tcloud-planner/backend/internal/middleware"
 	"github.com/totvs/tcloud-planner/backend/internal/repository"
 	"github.com/totvs/tcloud-planner/backend/internal/service"
+	"github.com/totvs/tcloud-planner/backend/internal/worker"
 	"go.uber.org/zap"
 )
 
@@ -83,6 +87,19 @@ func main() {
 
 	timelineHandler := handler.NewTimelineHandler(timelineRepo, analyzer, logger)
 
+	syncRepo := repository.NewSyncRepository(pool)
+	clientFactory := func(baseURL, email, apiToken string, rateLimit int, logger *zap.Logger) jira.Client {
+		return jira.NewHTTPClient(baseURL, email, apiToken, rateLimit, logger)
+	}
+	syncService := service.NewSyncService(syncRepo, fonteDadosRepo, clientFactory, cfg.Sync.RateLimitPerSec, logger)
+	syncHandler := handler.NewSyncHandler(syncService, logger)
+
+	syncWorker := worker.NewSyncWorker(func(ctx context.Context) error {
+		_, err := syncService.SyncAll(ctx)
+		return err
+	}, cfg.Sync.IntervalMinutes, logger)
+	go syncWorker.Start(ctx)
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -132,8 +149,33 @@ func main() {
 			r.Post("/timeline-capacidade/analisar", timelineHandler.AnalisarCapacidade)
 			r.Get("/projetos", timelineHandler.ListProjetos)
 			r.Put("/projetos/{id}/metadata", timelineHandler.UpdateProjetoMetadata)
+
+			r.Post("/sync/trigger", syncHandler.TriggerSync)
+			r.Get("/sync/status", syncHandler.GetSyncStatus)
+			r.Get("/sync/logs", syncHandler.ListSyncLogs)
 		})
 	})
+
+	frontendDir := filepath.Join("..", "frontend")
+	if _, err := os.Stat(frontendDir); err == nil {
+		indexPath := filepath.Join(frontendDir, "index.html")
+		serveIndex := func(w http.ResponseWriter, req *http.Request) {
+			http.ServeFile(w, req, indexPath)
+		}
+		r.Get("/", serveIndex)
+		r.Get("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(filepath.Join(frontendDir, "static")))).ServeHTTP)
+		r.NotFound(func(w http.ResponseWriter, req *http.Request) {
+			if len(req.URL.Path) > 1 {
+				filePath := req.URL.Path[1:]
+				if _, err := fs.Stat(os.DirFS(frontendDir), filePath); err == nil {
+					http.ServeFile(w, req, filepath.Join(frontendDir, filePath))
+					return
+				}
+			}
+			serveIndex(w, req)
+		})
+		logger.Info("serving frontend", zap.String("dir", frontendDir))
+	}
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
@@ -155,6 +197,8 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-quit
 	logger.Info("shutting down server", zap.String("signal", sig.String()))
+
+	syncWorker.Stop()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
