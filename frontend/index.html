@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tCloud Planner</title>
+<style>
+:root {
+  --accent: #0D7C66;
+  --accent-hover: #0A6B58;
+  --accent-soft: #0D7C6618;
+  --red: #D4483B;
+  --red-soft: #D4483B18;
+  --amber: #C78D2E;
+  --amber-soft: #C78D2E18;
+  --blue: #5B7FBF;
+  --blue-soft: #5B7FBF18;
+
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-raised: #FFFFFF;
+  --sidebar-bg: #1C1D20;
+  --sidebar-icon: #9496A1;
+  --sidebar-active: #0D7C66;
+  --border: #E4E5E9;
+  --border-subtle: #EDEDEF;
+  --text-primary: #1C1D20;
+  --text-secondary: #6B6D76;
+  --text-tertiary: #9496A1;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+  --chip-bg: #EDEDEF;
+  --chip-active-bg: #0D7C66;
+  --chip-active-text: #FFFFFF;
+  --chip-text: #6B6D76;
+  --stacked-bar-bg: #EDEDEF;
+  --overlay: rgba(0,0,0,.4);
+  --modal-bg: #FFFFFF;
+  --input-bg: #F7F7F5;
+  --input-border: #E4E5E9;
+  --input-focus: #0D7C66;
+  --member-bar-bg: #EDEDEF;
+  --tooltip-bg: #1C1D20;
+  --tooltip-text: #F0F0F2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131416; --surface: #1C1D22; --surface-raised: #24252B;
+    --sidebar-bg: #0E0F11; --border: #2E2F36; --border-subtle: #26272D;
+    --text-primary: #E8E8EC; --text-secondary: #9496A1; --text-tertiary: #6B6D76;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.2), 0 1px 2px rgba(0,0,0,.15);
+    --shadow-card-hover: 0 4px 12px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+    --member-bar-bg: #2E2F36; --tooltip-bg: #E8E8EC; --tooltip-text: #1C1D20;
+    --chip-bg: #2E2F36; --chip-text: #9496A1;
+    --accent-soft: #0D7C6625; --red-soft: #D4483B25; --amber-soft: #C78D2E25; --blue-soft: #5B7FBF25;
+    --stacked-bar-bg: #2E2F36; --overlay: rgba(0,0,0,.6);
+    --modal-bg: #24252B; --input-bg: #1C1D22; --input-border: #2E2F36;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131416; --surface: #1C1D22; --surface-raised: #24252B;
+  --sidebar-bg: #0E0F11; --border: #2E2F36; --border-subtle: #26272D;
+  --text-primary: #E8E8EC; --text-secondary: #9496A1; --text-tertiary: #6B6D76;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.2), 0 1px 2px rgba(0,0,0,.15);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+  --member-bar-bg: #2E2F36; --tooltip-bg: #E8E8EC; --tooltip-text: #1C1D20;
+  --chip-bg: #2E2F36; --chip-text: #9496A1;
+  --accent-soft: #0D7C6625; --red-soft: #D4483B25; --amber-soft: #C78D2E25; --blue-soft: #5B7FBF25;
+  --stacked-bar-bg: #2E2F36; --overlay: rgba(0,0,0,.6);
+  --modal-bg: #24252B; --input-bg: #1C1D22; --input-border: #2E2F36;
+}
+:root[data-theme="light"] {
+  --bg: #F7F7F5; --surface: #FFFFFF; --surface-raised: #FFFFFF;
+  --sidebar-bg: #1C1D20; --border: #E4E5E9; --border-subtle: #EDEDEF;
+  --text-primary: #1C1D20; --text-secondary: #6B6D76; --text-tertiary: #9496A1;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+  --member-bar-bg: #EDEDEF; --tooltip-bg: #1C1D20; --tooltip-text: #F0F0F2;
+  --chip-bg: #EDEDEF; --chip-active-bg: #0D7C66; --chip-active-text: #FFFFFF; --chip-text: #6B6D76;
+  --stacked-bar-bg: #EDEDEF; --overlay: rgba(0,0,0,.4);
+  --modal-bg: #FFFFFF; --input-bg: #F7F7F5; --input-border: #E4E5E9;
+  --accent-soft: #0D7C6618; --red-soft: #D4483B18; --amber-soft: #C78D2E18; --blue-soft: #5B7FBF18;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, sans-serif; background: var(--bg); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 40px; width: 100%; max-width: 400px; box-shadow: var(--shadow-card); }
+.login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; justify-content: center; }
+.login-logo-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; }
+.login-logo-text { font-size: 20px; font-weight: 650; color: var(--text-primary); letter-spacing: -.3px; }
+.login-error { background: var(--red-soft); color: var(--red); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+
+.app-shell { display: flex; min-height: 100vh; }
+.app-shell.hidden { display: none; }
+
+.sidebar { width: 56px; background: var(--sidebar-bg); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 4px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,.06); }
+.sidebar-logo { width: 32px; height: 32px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; font-weight: 700; font-size: 14px; color: #fff; letter-spacing: -.5px; }
+.sidebar-item { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; position: relative; border: none; background: none; padding: 0; }
+.sidebar-item svg { width: 20px; height: 20px; stroke: var(--sidebar-icon); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sidebar-item:hover { background: rgba(255,255,255,.08); }
+.sidebar-item.active { background: rgba(13,124,102,.2); }
+.sidebar-item.active svg { stroke: var(--sidebar-active); }
+.sidebar-item.active::before { content: ''; position: absolute; left: -10px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 2px 2px 0; background: var(--sidebar-active); }
+.sidebar-spacer { flex: 1; }
+@media (max-width: 700px) { .sidebar { display: none; } }
+
+.main { flex: 1; min-width: 0; padding: 28px 36px 48px; max-width: 1100px; overflow-y: auto; height: 100vh; }
+@media (max-width: 700px) { .main { padding: 20px 16px 40px; } }
+
+.page { display: none; }
+.page.active { display: block; }
+
+.page-header-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.page-title { font-size: 22px; font-weight: 650; letter-spacing: -.3px; color: var(--text-primary); }
+.page-badge { font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 3px 8px; border-radius: 4px; }
+
+.period-filter { display: flex; align-items: center; gap: 6px; margin-bottom: 22px; }
+.period-label { font-size: 12px; color: var(--text-tertiary); margin-right: 4px; font-weight: 500; letter-spacing: .2px; text-transform: uppercase; }
+.period-chip { padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 550; cursor: pointer; background: var(--chip-bg); color: var(--chip-text); border: none; transition: all .15s; font-family: inherit; }
+.period-chip:hover { background: var(--border); color: var(--text-primary); }
+.period-chip.active { background: var(--chip-active-bg); color: var(--chip-active-text); }
+
+.filter-select { padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-primary); font-size: 13px; font-family: inherit; cursor: pointer; appearance: auto; }
+.filter-select:focus { outline: none; border-color: var(--accent); }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+@media (max-width: 800px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .metrics-grid { grid-template-columns: 1fr; } }
+.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 18px 16px; box-shadow: var(--shadow-card); transition: box-shadow .2s, transform .2s; }
+.metric-card:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
+.metric-label { font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+.metric-value { font-size: 32px; font-weight: 300; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1; margin-bottom: 10px; }
+.metric-value .unit { font-size: 18px; font-weight: 400; color: var(--text-secondary); }
+.metric-bar { height: 4px; border-radius: 2px; background: var(--member-bar-bg); overflow: hidden; }
+.metric-bar-fill { height: 100%; border-radius: 2px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.metric-card.accent .metric-value { color: var(--accent); }
+.metric-card.accent .metric-bar-fill { background: var(--accent); }
+.metric-card.neutral .metric-value { color: var(--text-primary); }
+.metric-card.neutral .metric-bar-fill { background: var(--text-tertiary); }
+
+.breakdown-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 28px; box-shadow: var(--shadow-card); }
+.breakdown-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+.breakdown-title { font-size: 13px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--text-secondary); }
+.breakdown-total { font-size: 15px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.stacked-bar { height: 28px; border-radius: 6px; background: var(--stacked-bar-bg); display: flex; overflow: hidden; margin-bottom: 16px; }
+.stacked-segment { height: 100%; transition: width .5s cubic-bezier(.4,0,.2,1); position: relative; min-width: 2px; }
+.stacked-segment:first-child { border-radius: 6px 0 0 6px; }
+.stacked-segment:last-child { border-radius: 0 6px 6px 0; }
+.breakdown-legend { display: flex; gap: 20px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-label { font-size: 13px; color: var(--text-secondary); font-weight: 450; }
+.legend-value { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); margin-left: 2px; }
+
+.members-section { margin-top: 4px; }
+.members-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
+.members-title { font-size: 13px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--text-secondary); }
+.members-count { font-size: 12px; color: var(--text-tertiary); font-weight: 500; }
+.members-list { display: flex; flex-direction: column; gap: 2px; }
+.member-row { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 8px; background: var(--surface); border: 1px solid transparent; transition: all .15s; cursor: pointer; }
+.member-row:hover { background: var(--surface-raised); border-color: var(--border-subtle); }
+.member-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.member-info { min-width: 0; }
+.member-name { font-size: 14px; font-weight: 550; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.member-email { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.member-metric-wrap { display: flex; align-items: center; gap: 12px; }
+.member-bar-wrap { flex: 1; }
+.member-bar { height: 6px; border-radius: 3px; background: var(--member-bar-bg); overflow: hidden; min-width: 80px; }
+.member-bar-fill { height: 100%; border-radius: 3px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.member-bar-fill.low { background: var(--red); }
+.member-bar-fill.mid { background: var(--amber); }
+.member-bar-fill.high { background: var(--accent); }
+.member-pct { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); text-align: right; width: 54px; flex-shrink: 0; }
+
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 6px; }
+.form-input, .form-select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 14px; font-family: inherit; transition: border-color .15s; outline: none; }
+.form-input:focus, .form-select:focus { border-color: var(--input-focus); }
+.btn-primary { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: var(--accent); color: #fff; transition: all .15s; font-family: inherit; width: 100%; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-tertiary); }
+.empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: .5; }
+.empty-state-text { font-size: 15px; font-weight: 500; }
+.empty-state-sub { font-size: 13px; margin-top: 6px; }
+
+.loading { display: flex; align-items: center; justify-content: center; padding: 60px; }
+.spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.users-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; box-shadow: var(--shadow-card); }
+.users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.users-table th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-tertiary); border-bottom: 1px solid var(--border); background: var(--surface); }
+.users-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.users-table tr:last-child td { border-bottom: none; }
+.users-table tr:hover td { background: var(--surface-raised); }
+.status-pill { display: inline-flex; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 550; }
+.status-pill.active { background: #0D7C6618; color: #0D7C66; }
+.status-pill.inactive { background: var(--red-soft); color: var(--red); }
+
+.timeline-filters { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+.timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-card); margin-bottom: 20px; }
+.timeline-card-title { font-size: 13px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 16px; }
+.capacity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.capacity-month { padding: 14px; border-radius: 8px; text-align: center; border: 1px solid var(--border-subtle); position: relative; cursor: pointer; transition: transform .1s; }
+.capacity-month:hover { transform: scale(1.03); }
+.capacity-month-name { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+.capacity-month-delta { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.capacity-month-hours { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+.capacity-month-btn { margin-top: 8px; padding: 4px 10px; border-radius: 5px; font-size: 10px; font-weight: 600; cursor: pointer; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); font-family: inherit; transition: all .15s; }
+.capacity-month-btn:hover { background: var(--accent); color: #fff; }
+.capacity-over { background: var(--red-soft); }
+.capacity-over .capacity-month-delta { color: var(--red); }
+.capacity-under { background: var(--accent-soft); }
+.capacity-under .capacity-month-delta { color: var(--accent); }
+.capacity-zero .capacity-month-delta { color: var(--text-tertiary); }
+
+.fonte-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.fonte-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-card); transition: box-shadow .2s; }
+.fonte-card:hover { box-shadow: var(--shadow-card-hover); }
+.fonte-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.fonte-card-name { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.fonte-card-type { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 4px; }
+.fonte-card-url { font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px; word-break: break-all; }
+.fonte-card-sync { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; color: var(--text-secondary); }
+.fonte-card-sync-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fonte-card-sync-dot.never { background: var(--text-tertiary); }
+.fonte-card-sync-dot.success { background: var(--accent); }
+.fonte-card-sync-dot.running { background: var(--amber); animation: pulse 1s infinite; }
+.fonte-card-sync-dot.partial { background: var(--amber); }
+.fonte-card-sync-dot.error { background: var(--red); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.fonte-card-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px; font-variant-numeric: tabular-nums; }
+.fonte-card-stat b { color: var(--text-primary); font-weight: 600; }
+.fonte-card-actions { display: flex; gap: 8px; }
+.btn-sm { padding: 7px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); transition: all .15s; font-family: inherit; }
+.btn-sm:hover { background: var(--surface-raised); border-color: var(--accent); color: var(--accent); }
+.btn-sm:disabled { opacity: .5; cursor: not-allowed; }
+.btn-sm.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-sm.primary:hover { filter: brightness(1.1); }
+.btn-sm.danger { color: var(--red); border-color: var(--red-soft); }
+.btn-sm.danger:hover { background: var(--red-soft); }
+.btn-add { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px dashed var(--border); background: var(--surface); color: var(--accent); transition: all .15s; font-family: inherit; }
+.btn-add:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+.modal-overlay { position: fixed; inset: 0; background: var(--overlay); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--modal-bg); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,.2); max-height: 90vh; overflow-y: auto; }
+.modal-title { font-size: 18px; font-weight: 650; letter-spacing: -.3px; color: var(--text-primary); margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+.btn-cancel { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; transition: all .15s; }
+.btn-cancel:hover { background: var(--surface-raised); }
+
+.sync-logs { margin-top: 16px; }
+.sync-log-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 12px; }
+.sync-log-row:last-child { border-bottom: none; }
+.sync-log-status { padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; }
+.sync-log-status.success { background: var(--accent-soft); color: var(--accent); }
+.sync-log-status.partial { background: var(--amber-soft); color: var(--amber); }
+.sync-log-status.running { background: var(--blue-soft); color: var(--blue); }
+.sync-log-status.error { background: var(--red-soft); color: var(--red); }
+.sync-log-time { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.sync-log-totals { color: var(--text-secondary); flex: 1; }
+
+/* Gantt */
+.gantt-wrap { overflow-x: auto; }
+.gantt { position: relative; min-height: 40px; }
+.gantt-header { display: flex; border-bottom: 1px solid var(--border); }
+.gantt-header-cell { flex: 1; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; padding: 6px 0; min-width: 70px; letter-spacing: .3px; }
+.gantt-rows { position: relative; }
+.gantt-row { display: flex; align-items: center; height: 36px; border-bottom: 1px solid var(--border-subtle); }
+.gantt-label { width: 140px; flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--text-primary); padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+.gantt-bar-area { flex: 1; position: relative; height: 100%; display: flex; align-items: center; min-width: 840px; }
+.gantt-bar { position: absolute; height: 22px; border-radius: 4px; background: var(--accent); opacity: .85; display: flex; align-items: center; padding: 0 6px; cursor: pointer; transition: opacity .15s; overflow: hidden; }
+.gantt-bar:hover { opacity: 1; }
+.gantt-bar-text { font-size: 10px; color: #fff; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gantt-tooltip { position: fixed; background: var(--tooltip-bg); color: var(--tooltip-text); padding: 10px 14px; border-radius: 8px; font-size: 12px; z-index: 200; pointer-events: none; max-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,.2); line-height: 1.6; }
+.gantt-star { color: var(--amber); font-size: 14px; flex-shrink: 0; }
+
+/* Analysis popup */
+.analysis-popup { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 16px; box-shadow: var(--shadow-card); white-space: pre-wrap; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn .35s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) { .fade-in, .spinner { animation: none; } .metric-bar-fill, .stacked-segment, .member-bar-fill { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="login-page" id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">tC</div>
+      <span class="login-logo-text">tCloud Planner</span>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <form id="login-form" onsubmit="return handleLogin(event)">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="login-email" placeholder="seu@email.com" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <input class="form-input" type="password" id="login-senha" placeholder="••••••••" required>
+      </div>
+      <button class="btn-primary" type="submit" id="login-btn">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<div class="app-shell hidden" id="app-shell">
+  <nav class="sidebar" aria-label="Navegação">
+    <div class="sidebar-logo">tC</div>
+    <button class="sidebar-item active" data-page="equipes" title="Equipes" onclick="navigate('equipes')">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
+    </button>
+    <button class="sidebar-item" data-page="timeline" title="Timeline" onclick="navigate('timeline')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+    </button>
+    <button class="sidebar-item" data-page="projetos" title="Projetos" onclick="navigate('projetos')">
+      <svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
+    </button>
+    <button class="sidebar-item" data-page="usuarios" title="Usuários" onclick="navigate('usuarios')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg>
+    </button>
+    <button class="sidebar-item" data-page="fontes" title="Fontes de Dados" onclick="navigate('fontes')">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+    </button>
+    <div class="sidebar-spacer"></div>
+    <button class="sidebar-item" title="Sair" onclick="logout()">
+      <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
+  </nav>
+
+  <div class="main">
+    <!-- EQUIPES -->
+    <div class="page active" id="page-equipes">
+      <div class="page-header-row">
+        <h1 class="page-title" id="equipe-title">Equipes</h1>
+        <span class="page-badge" id="equipe-badge" style="display:none"></span>
+      </div>
+      <div id="equipe-select-wrap" style="margin-bottom:20px">
+        <select class="filter-select" id="equipe-select" onchange="loadEquipeResumo()">
+          <option value="">Selecione uma equipe...</option>
+        </select>
+      </div>
+      <div id="equipe-content">
+        <div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Selecione uma equipe para ver o resumo</div></div>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="page" id="page-timeline">
+      <div class="page-header-row"><h1 class="page-title">Timeline de Capacidade</h1></div>
+      <div class="timeline-filters">
+        <select class="filter-select" id="timeline-equipe" onchange="loadTimeline()"><option value="">Equipe...</option></select>
+        <select class="filter-select" id="timeline-ano" onchange="loadTimeline()"></select>
+      </div>
+      <div id="timeline-content">
+        <div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-text">Selecione equipe e ano</div></div>
+      </div>
+    </div>
+
+    <!-- PROJETOS -->
+    <div class="page" id="page-projetos">
+      <div class="page-header-row"><h1 class="page-title">Projetos (Épicos)</h1></div>
+      <div class="timeline-filters">
+        <select class="filter-select" id="projetos-equipe" onchange="loadProjetos()"><option value="">Todas as equipes</option></select>
+      </div>
+      <div id="projetos-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- USUARIOS -->
+    <div class="page" id="page-usuarios">
+      <div class="page-header-row">
+        <h1 class="page-title">Usuários</h1>
+        <button class="btn-add" onclick="openUsuarioModal()">+ Novo Usuário</button>
+      </div>
+      <div id="usuarios-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- FONTES -->
+    <div class="page" id="page-fontes">
+      <div class="page-header-row">
+        <h1 class="page-title">Fontes de Dados</h1>
+        <button class="btn-add" onclick="openFonteModal()">+ Nova Fonte</button>
+      </div>
+      <div id="fontes-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="fonte-modal" onclick="if(event.target===this)closeFonteModal()">
+  <div class="modal">
+    <div class="modal-title">Nova Fonte de Dados</div>
+    <form id="fonte-form" onsubmit="return handleFonteSubmit(event)">
+      <div class="form-group"><label class="form-label">Nome</label><input class="form-input" type="text" id="fonte-nome" placeholder="Ex: JIRA Produção" required></div>
+      <div class="form-group"><label class="form-label">URL Base</label><input class="form-input" type="url" id="fonte-url" placeholder="https://empresa.atlassian.net" required></div>
+      <div class="form-group"><label class="form-label">Email do Usuário</label><input class="form-input" type="email" id="fonte-email" placeholder="seu@email.com" required></div>
+      <div class="form-group"><label class="form-label">API Token</label><input class="form-input" type="password" id="fonte-token" placeholder="Token de acesso JIRA" required></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeFonteModal()">Cancelar</button>
+        <button class="btn-primary" type="submit" id="fonte-submit-btn" style="width:auto">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="logs-modal" onclick="if(event.target===this)closeLogsModal()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title" id="logs-modal-title">Histórico de Sincronização</div>
+    <div id="logs-modal-content"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="modal-actions"><button class="btn-cancel" type="button" onclick="closeLogsModal()">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="usuario-modal" onclick="if(event.target===this)closeUsuarioModal()">
+  <div class="modal">
+    <div class="modal-title" id="usuario-modal-title">Novo Usuário</div>
+    <form id="usuario-form" onsubmit="return handleUsuarioSubmit(event)">
+      <input type="hidden" id="usuario-edit-id">
+      <div class="form-group"><label class="form-label">Nome Completo</label><input class="form-input" type="text" id="usuario-nome" required></div>
+      <div class="form-group"><label class="form-label">Apelido</label><input class="form-input" type="text" id="usuario-apelido" maxlength="50" required></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="usuario-email" required></div>
+      <div class="form-group"><label class="form-label">Cargo</label>
+        <select class="form-select" id="usuario-cargo" required>
+          <option value="coordenador">Coordenador</option>
+          <option value="gerente">Gerente</option>
+          <option value="gerente_projetos">Gerente de Projetos</option>
+        </select>
+      </div>
+      <div class="form-group" id="usuario-senha-group"><label class="form-label">Senha</label><input class="form-input" type="password" id="usuario-senha" minlength="8" placeholder="Mínimo 8 caracteres"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeUsuarioModal()">Cancelar</button>
+        <button class="btn-primary" type="submit" id="usuario-submit-btn" style="width:auto">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="senha-modal" onclick="if(event.target===this)closeSenhaModal()">
+  <div class="modal">
+    <div class="modal-title">Alterar Senha</div>
+    <form id="senha-form" onsubmit="return handleSenhaSubmit(event)">
+      <input type="hidden" id="senha-user-id">
+      <div class="form-group"><label class="form-label">Senha Atual</label><input class="form-input" type="password" id="senha-atual" required></div>
+      <div class="form-group"><label class="form-label">Nova Senha</label><input class="form-input" type="password" id="senha-nova" minlength="8" required></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeSenhaModal()">Cancelar</button>
+        <button class="btn-primary" type="submit" style="width:auto">Alterar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="projmeta-modal" onclick="if(event.target===this)closeProjMetaModal()">
+  <div class="modal">
+    <div class="modal-title" id="projmeta-title">Editar Épico</div>
+    <form id="projmeta-form" onsubmit="return handleProjMetaSubmit(event)">
+      <input type="hidden" id="projmeta-id">
+      <div class="form-group"><label class="form-label">Apelido (max 15 chars, uppercase)</label><input class="form-input" type="text" id="projmeta-apelido" maxlength="15" style="text-transform:uppercase"></div>
+      <div class="form-group"><label class="form-label">Data Início Execução</label><input class="form-input" type="date" id="projmeta-data-inicio"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeProjMetaModal()">Cancelar</button>
+        <button class="btn-primary" type="submit" style="width:auto">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="analise-modal" onclick="if(event.target===this)closeAnaliseModal()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title" id="analise-title">Análise de Capacidade</div>
+    <div id="analise-content"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="modal-actions"><button class="btn-cancel" type="button" onclick="closeAnaliseModal()">Fechar</button></div>
+  </div>
+</div>
+
+<div class="gantt-tooltip" id="gantt-tooltip" style="display:none"></div>
+
+<script>
+const API = '/api/v1';
+let token = localStorage.getItem('tcloud_token');
+let currentUser = null;
+
+function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...opts.headers };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  return fetch(API + path, { ...opts, headers }).then(async r => {
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      if (r.status === 401) { logout(); return; }
+      throw new Error(data?.error || r.statusText);
+    }
+    return data;
+  });
+}
+
+function formatDate(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// === AUTH ===
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  btn.disabled = true; errEl.style.display = 'none';
+  try {
+    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: document.getElementById('login-email').value, senha: document.getElementById('login-senha').value }) });
+    token = data.token; currentUser = data.usuario;
+    localStorage.setItem('tcloud_token', token);
+    showApp();
+  } catch (err) { errEl.textContent = err.message || 'Erro ao fazer login'; errEl.style.display = 'block'; }
+  finally { btn.disabled = false; }
+  return false;
+}
+function logout() { token = null; currentUser = null; localStorage.removeItem('tcloud_token'); document.getElementById('login-page').style.display = 'flex'; document.getElementById('app-shell').classList.add('hidden'); }
+function showApp() { document.getElementById('login-page').style.display = 'none'; document.getElementById('app-shell').classList.remove('hidden'); loadEquipes(); loadTimelineFilters(); }
+
+// === NAV ===
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.sidebar-item[data-page]').forEach(i => i.classList.toggle('active', i.dataset.page === page));
+  if (page === 'usuarios') loadUsuarios();
+  if (page === 'fontes') loadFontes();
+  if (page === 'projetos') loadProjetos();
+}
+
+// === EQUIPES ===
+async function loadEquipes() {
+  try {
+    const teams = await api('/equipes');
+    const fills = [
+      {sel: document.getElementById('equipe-select'), def: 'Selecione uma equipe...'},
+      {sel: document.getElementById('timeline-equipe'), def: 'Equipe...'},
+      {sel: document.getElementById('projetos-equipe'), def: 'Todas as equipes'}
+    ];
+    fills.forEach(({sel, def}) => {
+      sel.innerHTML = '<option value="">' + def + '</option>';
+      (teams || []).forEach(t => { sel.innerHTML += '<option value="' + esc(t) + '">' + esc(t) + '</option>'; });
+    });
+  } catch (e) { console.error(e); }
+}
+
+async function loadEquipeResumo() {
+  const team = document.getElementById('equipe-select').value;
+  if (!team) { document.getElementById('equipe-content').innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Selecione uma equipe para ver o resumo</div></div>'; document.getElementById('equipe-title').textContent = 'Equipes'; document.getElementById('equipe-badge').style.display = 'none'; return; }
+  document.getElementById('equipe-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const resumo = await api('/equipes/' + encodeURIComponent(team) + '/resumo?periodo=3m');
+    document.getElementById('equipe-title').textContent = team;
+    document.getElementById('equipe-badge').textContent = 'TIME'; document.getElementById('equipe-badge').style.display = '';
+    renderEquipeResumo(resumo, team);
+  } catch (e) { document.getElementById('equipe-content').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function renderEquipeResumo(r, team) {
+  const pctBar = v => Math.min(100, Math.max(0, v));
+  const barClass = v => v < 55 ? 'low' : v < 70 ? 'mid' : 'high';
+  const initials = n => { const p = n.split(' '); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : p[0][0].toUpperCase(); };
+  const colors = ['#5B7FBF','#0D7C66','#9B6DC4','#C78D2E','#D4483B','#3A8F7A','#E8913A','#6366F1'];
+  const ini = r.detalhes_iniciativas || {};
+  const iniTotal = (ini.percentual_manutencao||0) + (ini.percentual_melhorias||0) + (ini.percentual_evolucao||0) + (ini.percentual_suporte||0);
+  let membersHtml = '';
+  (r.membros || []).forEach((m, i) => {
+    const c = colors[i % colors.length]; const pct = m.atuacao_rastreada || 0;
+    membersHtml += '<div class="member-row"><div class="member-avatar" style="background:' + c + '">' + initials(m.nome) + '</div><div class="member-info"><div class="member-name">' + esc(m.nome) + '</div><div class="member-email">' + esc(m.email) + '</div></div><div class="member-metric-wrap"><div class="member-bar-wrap"><div class="member-bar"><div class="member-bar-fill ' + barClass(pct) + '" style="width:' + pctBar(pct) + '%"></div></div></div><div class="member-pct">' + pct.toFixed(1) + '%</div></div></div>';
+  });
+  const segWidth = v => iniTotal > 0 ? (v / iniTotal * 100).toFixed(1) : 0;
+  document.getElementById('equipe-content').innerHTML =
+    '<div class="period-filter fade-in" id="equipe-period"><span class="period-label">Período</span><button class="period-chip" data-period="1m">1m</button><button class="period-chip" data-period="2m">2m</button><button class="period-chip active" data-period="3m">3m</button><button class="period-chip" data-period="6m">6m</button><button class="period-chip" data-period="1a">1a</button></div>' +
+    '<div class="metrics-grid fade-in"><div class="metric-card accent"><div class="metric-label">Atuação Rastreada</div><div class="metric-value">' + (r.atuacao_rastreada||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.atuacao_rastreada||0) + '%;background:var(--accent)"></div></div></div><div class="metric-card neutral"><div class="metric-label">Metas</div><div class="metric-value">' + (r.percentual_metas||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.percentual_metas||0) + '%;background:var(--text-tertiary)"></div></div></div><div class="metric-card neutral"><div class="metric-label">Compromissos</div><div class="metric-value">' + (r.percentual_compromissos||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.percentual_compromissos||0) + '%;background:var(--text-tertiary)"></div></div></div><div class="metric-card neutral"><div class="metric-label">Iniciativas</div><div class="metric-value">' + (r.percentual_iniciativas||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.percentual_iniciativas||0) + '%;background:var(--text-tertiary)"></div></div></div></div>' +
+    '<div class="breakdown-section fade-in"><div class="breakdown-header"><span class="breakdown-title">Iniciativas — Detalhamento</span><span class="breakdown-total">' + (r.percentual_iniciativas||0).toFixed(1) + '%</span></div><div class="stacked-bar"><div class="stacked-segment" style="width:' + segWidth(ini.percentual_manutencao||0) + '%;background:var(--red)"></div><div class="stacked-segment" style="width:' + segWidth(ini.percentual_melhorias||0) + '%;background:var(--amber)"></div><div class="stacked-segment" style="width:' + segWidth(ini.percentual_evolucao||0) + '%;background:var(--accent)"></div><div class="stacked-segment" style="width:' + segWidth(ini.percentual_suporte||0) + '%;background:var(--blue)"></div></div><div class="breakdown-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div><span class="legend-label">Manutenção</span><span class="legend-value">' + (ini.percentual_manutencao||0).toFixed(1) + '%</span></div><div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div><span class="legend-label">Melhorias</span><span class="legend-value">' + (ini.percentual_melhorias||0).toFixed(1) + '%</span></div><div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div><span class="legend-label">Evolução</span><span class="legend-value">' + (ini.percentual_evolucao||0).toFixed(1) + '%</span></div><div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div><span class="legend-label">Suporte</span><span class="legend-value">' + (ini.percentual_suporte||0).toFixed(1) + '%</span></div></div></div>' +
+    '<div class="members-section fade-in"><div class="members-header"><span class="members-title">Membros da Equipe</span><span class="members-count">' + (r.membros||[]).length + ' membros</span></div><div class="members-list">' + membersHtml + '</div></div>';
+  document.querySelectorAll('#equipe-period .period-chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+      document.querySelector('#equipe-period .period-chip.active').classList.remove('active');
+      chip.classList.add('active');
+      try { const data = await api('/equipes/' + encodeURIComponent(team) + '/resumo?periodo=' + chip.dataset.period); renderEquipeResumo(data, team); } catch(e) { console.error(e); }
+    });
+  });
+}
+
+// === TIMELINE ===
+let timelineData = null;
+function loadTimelineFilters() {
+  const sel = document.getElementById('timeline-ano'); const year = new Date().getFullYear(); sel.innerHTML = '';
+  for (let y = year - 2; y <= year + 2; y++) sel.innerHTML += '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + y + '</option>';
+}
+async function loadTimeline() {
+  const equipe = document.getElementById('timeline-equipe').value;
+  const ano = document.getElementById('timeline-ano').value;
+  if (!equipe || !ano) return;
+  document.getElementById('timeline-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    timelineData = await api('/timeline-capacidade?equipe=' + encodeURIComponent(equipe) + '&ano=' + ano);
+    timelineData._equipe = equipe; timelineData._ano = parseInt(ano);
+    renderTimeline(timelineData);
+  } catch (e) { document.getElementById('timeline-content').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function renderTimeline(data) {
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  let capacityHtml = '';
+  (data.capacidade_mensal || []).forEach(m => {
+    const cls = m.horas_disponiveis === 0 && m.horas_estimadas === 0 ? 'capacity-zero' : m.horas_estimadas > m.horas_disponiveis ? 'capacity-over' : 'capacity-under';
+    const sign = m.percentual_delta > 0 ? '+' : '';
+    capacityHtml += '<div class="capacity-month ' + cls + '">' +
+      '<div class="capacity-month-name">' + meses[m.mes - 1] + '</div>' +
+      '<div class="capacity-month-delta">' + sign + m.percentual_delta.toFixed(0) + '%</div>' +
+      '<div class="capacity-month-hours">' + m.horas_estimadas.toFixed(0) + 'h / ' + m.horas_disponiveis.toFixed(0) + 'h</div>' +
+      '<button class="capacity-month-btn" onclick="analisarMes(' + m.mes + ')">Analisar</button>' +
+    '</div>';
+  });
+
+  // Gantt chart
+  const ano = data._ano || new Date().getFullYear();
+  const anoStart = new Date(ano, 0, 1).getTime();
+  const anoEnd = new Date(ano, 11, 31).getTime();
+  const totalMs = anoEnd - anoStart;
+  const projetos = (data.projetos || []).filter(p => p.data_inicio_execucao || p.data_limite);
+
+  let ganttHeader = '<div class="gantt-header"><div style="width:140px;flex-shrink:0"></div>';
+  meses.forEach(m => { ganttHeader += '<div class="gantt-header-cell">' + m + '</div>'; });
+  ganttHeader += '</div>';
+
+  let ganttRows = '';
+  projetos.forEach(p => {
+    const label = esc(p.apelido || p.numero_ticket || '—');
+    const star = p.projeto_ci ? '<span class="gantt-star" title="Projeto CI — ' + esc(p.projeto_ci_ticket || '') + '">★</span>' : '';
+    const startDate = p.data_inicio_execucao ? new Date(p.data_inicio_execucao).getTime() : null;
+    const endDate = p.data_limite ? new Date(p.data_limite).getTime() : null;
+    let barHtml = '';
+    if (startDate && endDate && endDate > startDate) {
+      const left = Math.max(0, (startDate - anoStart) / totalMs * 100);
+      const width = Math.min(100 - left, (endDate - startDate) / totalMs * 100);
+      const tipoDemanda = p.tipo_demanda || '—';
+      const dias = (p.total_dias_estimados || 0).toFixed(0);
+      const dlStr = p.data_limite || '—';
+      barHtml = '<div class="gantt-bar" style="left:' + left + '%;width:' + Math.max(1, width) + '%" ' +
+        'onmouseenter="showGanttTip(event,\'' + esc(label) + '\',\'' + dias + 'd\',\'' + esc(dlStr) + '\',\'' + esc(tipoDemanda) + '\')" onmouseleave="hideGanttTip()">' +
+        '<span class="gantt-bar-text">' + esc(p.resumo || '') + '</span></div>';
+    }
+    ganttRows += '<div class="gantt-row"><div class="gantt-label">' + star + label + '</div><div class="gantt-bar-area">' + barHtml + '</div></div>';
+  });
+
+  let ganttHtml = '';
+  if (projetos.length > 0) {
+    ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Gantt — Épicos</div><div class="gantt-wrap"><div class="gantt">' + ganttHeader + '<div class="gantt-rows">' + ganttRows + '</div></div></div></div>';
+  } else {
+    ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Gantt — Épicos</div><div class="empty-state" style="padding:30px"><div class="empty-state-text">Nenhum épico com datas definidas</div></div></div>';
+  }
+
+  document.getElementById('timeline-content').innerHTML =
+    '<div class="timeline-card fade-in"><div class="timeline-card-title">Capacidade Mensal</div><div class="capacity-grid">' + capacityHtml + '</div></div>' +
+    ganttHtml +
+    '<div id="analise-inline"></div>';
+}
+
+function showGanttTip(e, label, dias, dataLimite, tipo) {
+  const tip = document.getElementById('gantt-tooltip');
+  tip.innerHTML = '<b>' + label + '</b><br>Dias estimados: ' + dias + '<br>Data limite: ' + dataLimite + '<br>Tipo: ' + tipo;
+  tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX + 12, window.innerWidth - 300) + 'px';
+  tip.style.top = (e.clientY + 12) + 'px';
+}
+function hideGanttTip() { document.getElementById('gantt-tooltip').style.display = 'none'; }
+
+async function analisarMes(mes) {
+  if (!timelineData) return;
+  document.getElementById('analise-title').textContent = 'Análise — ' + ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][mes-1] + '/' + timelineData._ano;
+  document.getElementById('analise-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('analise-modal').classList.add('open');
+  try {
+    const result = await api('/timeline-capacidade/analisar', {
+      method: 'POST',
+      body: JSON.stringify({ equipe: timelineData._equipe, ano: timelineData._ano, mes: mes })
+    });
+    document.getElementById('analise-content').innerHTML = '<div class="analysis-popup">' + esc(result.analise) + '</div>';
+  } catch (err) {
+    document.getElementById('analise-content').innerHTML = '<div class="empty-state" style="padding:20px"><div class="empty-state-text">' + esc(err.message) + '</div></div>';
+  }
+}
+function closeAnaliseModal() { document.getElementById('analise-modal').classList.remove('open'); }
+
+// === PROJETOS ===
+async function loadProjetos() {
+  const el = document.getElementById('projetos-content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const equipe = document.getElementById('projetos-equipe').value;
+  const q = equipe ? '?equipe=' + encodeURIComponent(equipe) : '';
+  try {
+    const epicos = await api('/projetos' + q);
+    if (!epicos || epicos.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-text">Nenhum épico encontrado</div><div class="empty-state-sub">Sincronize dados do JIRA primeiro</div></div>'; return; }
+    let rows = '';
+    epicos.forEach(p => {
+      const dl = p.data_limite || '—';
+      const die = p.data_inicio_execucao ? new Date(p.data_inicio_execucao).toLocaleDateString('pt-BR') : '—';
+      rows += '<tr onclick="openProjMetaModal(\'' + p.id + '\',\'' + esc(p.numero_ticket) + '\',\'' + esc(p.apelido || '') + '\',\'' + (p.data_inicio_execucao ? p.data_inicio_execucao.substring(0,10) : '') + '\')" style="cursor:pointer">' +
+        '<td style="font-weight:550;color:var(--accent)">' + esc(p.numero_ticket) + '</td>' +
+        '<td style="font-weight:550;color:var(--text-primary)">' + esc(p.apelido || '—') + '</td>' +
+        '<td>' + esc(p.resumo || '') + '</td>' +
+        '<td>' + esc(p.tipo_demanda || '—') + '</td>' +
+        '<td>' + esc(p.status) + '</td>' +
+        '<td>' + die + '</td>' +
+        '<td>' + dl + '</td>' +
+      '</tr>';
+    });
+    el.innerHTML = '<div class="users-table-wrap fade-in"><table class="users-table"><thead><tr><th>Ticket</th><th>Apelido</th><th>Resumo</th><th>Tipo</th><th>Status</th><th>Início Exec.</th><th>Data Limite</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function openProjMetaModal(id, ticket, apelido, dataInicio) {
+  document.getElementById('projmeta-id').value = id;
+  document.getElementById('projmeta-title').textContent = 'Editar — ' + ticket;
+  document.getElementById('projmeta-apelido').value = apelido;
+  document.getElementById('projmeta-data-inicio').value = dataInicio;
+  document.getElementById('projmeta-modal').classList.add('open');
+}
+function closeProjMetaModal() { document.getElementById('projmeta-modal').classList.remove('open'); }
+
+async function handleProjMetaSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('projmeta-id').value;
+  const body = {};
+  const apelido = document.getElementById('projmeta-apelido').value.trim();
+  if (apelido) body.apelido = apelido;
+  const dataInicio = document.getElementById('projmeta-data-inicio').value;
+  if (dataInicio) body.data_inicio_execucao = new Date(dataInicio).toISOString();
+  try {
+    await api('/projetos/' + id + '/metadata', { method: 'PUT', body: JSON.stringify(body) });
+    closeProjMetaModal();
+    loadProjetos();
+  } catch (err) { alert('Erro: ' + err.message); }
+  return false;
+}
+
+// === USUARIOS ===
+async function loadUsuarios() {
+  const el = document.getElementById('usuarios-content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const data = await api('/usuarios');
+    const users = data?.usuarios || [];
+    if (users.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-text">Nenhum usuário cadastrado</div></div>'; return; }
+    let rows = '';
+    users.forEach(u => {
+      rows += '<tr>' +
+        '<td style="font-weight:550;color:var(--text-primary)">' + esc(u.nome_completo) + '</td>' +
+        '<td>' + esc(u.apelido) + '</td>' +
+        '<td>' + esc(u.email) + '</td>' +
+        '<td>' + esc(u.cargo) + '</td>' +
+        '<td><span class="status-pill ' + (u.ativo ? 'active' : 'inactive') + '">' + (u.ativo ? 'Ativo' : 'Inativo') + '</span></td>' +
+        '<td style="white-space:nowrap">' +
+          '<button class="btn-sm" onclick="editUsuario(\'' + u.id + '\')">Editar</button> ' +
+          '<button class="btn-sm" onclick="openSenhaModal(\'' + u.id + '\')">Senha</button>' +
+        '</td></tr>';
+    });
+    el.innerHTML = '<div class="users-table-wrap fade-in"><table class="users-table"><thead><tr><th>Nome</th><th>Apelido</th><th>Email</th><th>Cargo</th><th>Status</th><th>Ações</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function openUsuarioModal() {
+  document.getElementById('usuario-form').reset();
+  document.getElementById('usuario-edit-id').value = '';
+  document.getElementById('usuario-modal-title').textContent = 'Novo Usuário';
+  document.getElementById('usuario-senha-group').style.display = '';
+  document.getElementById('usuario-senha').required = true;
+  document.getElementById('usuario-modal').classList.add('open');
+}
+function closeUsuarioModal() { document.getElementById('usuario-modal').classList.remove('open'); }
+
+async function editUsuario(id) {
+  try {
+    const u = await api('/usuarios/' + id);
+    document.getElementById('usuario-edit-id').value = u.id;
+    document.getElementById('usuario-modal-title').textContent = 'Editar Usuário';
+    document.getElementById('usuario-nome').value = u.nome_completo;
+    document.getElementById('usuario-apelido').value = u.apelido;
+    document.getElementById('usuario-email').value = u.email;
+    document.getElementById('usuario-cargo').value = u.cargo;
+    document.getElementById('usuario-senha-group').style.display = 'none';
+    document.getElementById('usuario-senha').required = false;
+    document.getElementById('usuario-modal').classList.add('open');
+  } catch (err) { alert('Erro: ' + err.message); }
+}
+
+async function handleUsuarioSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('usuario-edit-id').value;
+  const btn = document.getElementById('usuario-submit-btn');
+  btn.disabled = true;
+  try {
+    if (id) {
+      await api('/usuarios/' + id, { method: 'PUT', body: JSON.stringify({
+        nome_completo: document.getElementById('usuario-nome').value,
+        apelido: document.getElementById('usuario-apelido').value,
+        email: document.getElementById('usuario-email').value,
+        cargo: document.getElementById('usuario-cargo').value
+      })});
+    } else {
+      await api('/usuarios', { method: 'POST', body: JSON.stringify({
+        nome_completo: document.getElementById('usuario-nome').value,
+        apelido: document.getElementById('usuario-apelido').value,
+        email: document.getElementById('usuario-email').value,
+        cargo: document.getElementById('usuario-cargo').value,
+        senha: document.getElementById('usuario-senha').value
+      })});
+    }
+    closeUsuarioModal(); loadUsuarios();
+  } catch (err) { alert('Erro: ' + err.message); }
+  finally { btn.disabled = false; }
+  return false;
+}
+
+function openSenhaModal(id) {
+  document.getElementById('senha-form').reset();
+  document.getElementById('senha-user-id').value = id;
+  document.getElementById('senha-modal').classList.add('open');
+}
+function closeSenhaModal() { document.getElementById('senha-modal').classList.remove('open'); }
+
+async function handleSenhaSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('senha-user-id').value;
+  try {
+    await api('/usuarios/' + id + '/senha', { method: 'PUT', body: JSON.stringify({
+      senha_atual: document.getElementById('senha-atual').value,
+      nova_senha: document.getElementById('senha-nova').value
+    })});
+    closeSenhaModal(); alert('Senha alterada');
+  } catch (err) { alert('Erro: ' + err.message); }
+  return false;
+}
+
+// === FONTES ===
+async function loadFontes() {
+  const el = document.getElementById('fontes-content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const fontes = await api('/fontes');
+    if (!fontes || fontes.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔗</div><div class="empty-state-text">Nenhuma fonte de dados configurada</div><div class="empty-state-sub">Clique em "+ Nova Fonte" para configurar uma conexão JIRA</div></div>'; return; }
+    await renderFonteCards(fontes, el);
+  } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+async function renderFonteCards(fontes, el) {
+  let html = '<div class="fonte-cards fade-in">';
+  for (const f of fontes) {
+    let syncStatus = null;
+    try { syncStatus = await api('/sync/status?fonte_dados_id=' + f.id); } catch(e) {}
+    const hasSync = syncStatus && syncStatus.status && syncStatus.status !== 'never_synced';
+    const statusClass = hasSync ? syncStatus.status : 'never';
+    const statusLabel = hasSync ? (syncStatus.status === 'success' ? 'Sincronizado' : syncStatus.status === 'running' ? 'Sincronizando...' : syncStatus.status === 'partial' ? 'Parcial' : 'Erro') : 'Nunca sincronizado';
+    const lastSync = f.ultimo_sync ? formatDate(f.ultimo_sync) : '—';
+    const statsHtml = hasSync ? '<div class="fonte-card-stats"><span><b>' + (syncStatus.total_projetos||0) + '</b> projetos</span><span><b>' + (syncStatus.total_tarefas||0) + '</b> tarefas</span><span><b>' + (syncStatus.total_membros||0) + '</b> membros</span><span><b>' + (syncStatus.total_sprints||0) + '</b> sprints</span></div>' : '';
+    html += '<div class="fonte-card"><div class="fonte-card-header"><span class="fonte-card-name">' + esc(f.nome) + '</span><span class="fonte-card-type">' + esc(f.tipo) + '</span></div><div class="fonte-card-url">' + esc(f.base_url) + '</div><div class="fonte-card-sync"><span class="fonte-card-sync-dot ' + statusClass + '"></span>' + statusLabel + (f.ultimo_sync ? ' — ' + lastSync : '') + '</div>' + statsHtml + '<div class="fonte-card-actions"><button class="btn-sm primary" onclick="triggerSync(\'' + f.id + '\', this)"' + (syncStatus?.status === 'running' ? ' disabled' : '') + '>Sincronizar</button><button class="btn-sm" onclick="openLogsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Logs</button><button class="btn-sm danger" onclick="deleteFonte(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Excluir</button></div></div>';
+  }
+  html += '</div>'; el.innerHTML = html;
+}
+
+function openFonteModal() { document.getElementById('fonte-form').reset(); document.getElementById('fonte-modal').classList.add('open'); }
+function closeFonteModal() { document.getElementById('fonte-modal').classList.remove('open'); }
+
+async function handleFonteSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('fonte-submit-btn'); btn.disabled = true;
+  try {
+    await api('/fontes', { method: 'POST', body: JSON.stringify({
+      nome: document.getElementById('fonte-nome').value, tipo: 'jira',
+      base_url: document.getElementById('fonte-url').value, auth_type: 'basic',
+      user_email: document.getElementById('fonte-email').value,
+      api_token: document.getElementById('fonte-token').value, custom_field_map: {}
+    })});
+    closeFonteModal(); loadFontes();
+  } catch (err) { alert('Erro: ' + err.message); }
+  finally { btn.disabled = false; }
+  return false;
+}
+
+async function triggerSync(fonteId, btnEl) {
+  btnEl.disabled = true; btnEl.textContent = 'Sincronizando...';
+  try { await api('/sync/trigger?fonte_dados_id=' + fonteId, { method: 'POST' }); loadFontes(); }
+  catch (err) { alert('Erro: ' + err.message); btnEl.disabled = false; btnEl.textContent = 'Sincronizar'; }
+}
+
+async function deleteFonte(fonteId, nome) {
+  if (!confirm('Excluir fonte "' + nome + '"?')) return;
+  try { await api('/fontes/' + fonteId, { method: 'DELETE' }); loadFontes(); } catch (err) { alert('Erro: ' + err.message); }
+}
+
+function openLogsModal(fonteId, nome) {
+  document.getElementById('logs-modal-title').textContent = 'Logs — ' + nome;
+  document.getElementById('logs-modal-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('logs-modal').classList.add('open');
+  loadSyncLogs(fonteId);
+}
+function closeLogsModal() { document.getElementById('logs-modal').classList.remove('open'); }
+
+async function loadSyncLogs(fonteId) {
+  const el = document.getElementById('logs-modal-content');
+  try {
+    const logs = await api('/sync/logs?fonte_dados_id=' + fonteId + '&limit=20');
+    if (!logs || logs.length === 0) { el.innerHTML = '<div class="empty-state" style="padding:30px"><div class="empty-state-text">Nenhum log</div></div>'; return; }
+    let html = '<div class="sync-logs">';
+    logs.forEach(l => {
+      const statusCls = l.status || 'running';
+      const statusTxt = l.status === 'success' ? 'OK' : l.status === 'partial' ? 'Parcial' : l.status === 'running' ? 'Em andamento' : 'Erro';
+      html += '<div class="sync-log-row"><span class="sync-log-status ' + statusCls + '">' + statusTxt + '</span><span class="sync-log-time">' + formatDate(l.iniciado_em) + '</span><span class="sync-log-totals">' + l.total_projetos + ' proj, ' + l.total_tarefas + ' tarefas, ' + l.total_membros + ' membros' + (l.mensagem ? ' — ' + esc(l.mensagem) : '') + '</span></div>';
+    });
+    el.innerHTML = html + '</div>';
+  } catch (err) { el.innerHTML = '<div class="empty-state" style="padding:30px"><div class="empty-state-text">' + esc(err.message) + '</div></div>'; }
+}
+
+// === MODAL UTILS ===
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+});
+
+// === INIT ===
+if (token) { api('/usuarios').then(() => showApp()).catch(() => logout()); }
+else { document.getElementById('login-page').style.display = 'flex'; }
+</script>
+</body>
+</html>

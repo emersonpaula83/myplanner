@@ -13,17 +13,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/totvs/tcloud-planner/backend/internal/domain"
+	"github.com/totvs/tcloud-planner/backend/internal/middleware"
 	"github.com/totvs/tcloud-planner/backend/internal/service"
 	"go.uber.org/zap"
 )
 
 type TimelineStore interface {
-	BuscarEpicosEquipe(ctx context.Context, team string, ano int) ([]domain.EpicoEquipe, error)
+	BuscarEpicosEquipe(ctx context.Context, team string, ano int, projetoIDs []uuid.UUID) ([]domain.EpicoEquipe, error)
 	ContarMembrosAtivosEquipe(ctx context.Context, team string) (int, error)
 	BuscarAusenciasMensais(ctx context.Context, team string, ano int) ([]domain.AusenciaMensal, error)
 	AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time) error
 	BuscarEpicoPorID(ctx context.Context, id uuid.UUID) (*domain.Tarefa, error)
-	ListarEpicos(ctx context.Context, team *string) ([]domain.ProjetoListItem, error)
+	ListarEpicos(ctx context.Context, team *string, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error)
 }
 
 type TimelineHandler struct {
@@ -48,8 +49,8 @@ type timelineData struct {
 // fetchTimelineData fetches épicos, active member count and monthly
 // absences for the given equipe/ano, and builds the derived
 // projetosCapacidade slice used for capacity calculations.
-func (h *TimelineHandler) fetchTimelineData(ctx context.Context, equipe string, ano int) (*timelineData, error) {
-	epicos, err := h.store.BuscarEpicosEquipe(ctx, equipe, ano)
+func (h *TimelineHandler) fetchTimelineData(ctx context.Context, equipe string, ano int, projetoIDs []uuid.UUID) (*timelineData, error) {
+	epicos, err := h.store.BuscarEpicosEquipe(ctx, equipe, ano, projetoIDs)
 	if err != nil {
 		return nil, fmt.Errorf("buscando épicos: %w", err)
 	}
@@ -101,7 +102,8 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := h.fetchTimelineData(r.Context(), equipe, ano)
+	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
+	data, err := h.fetchTimelineData(r.Context(), equipe, ano, projetoIDs)
 	if err != nil {
 		h.logger.Error("failed to fetch timeline data", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
@@ -219,7 +221,8 @@ func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
 		team = &t
 	}
 
-	epicos, err := h.store.ListarEpicos(r.Context(), team)
+	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
+	epicos, err := h.store.ListarEpicos(r.Context(), team, projetoIDs)
 	if err != nil {
 		h.logger.Error("failed to list epicos", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao listar épicos")
@@ -254,7 +257,8 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	data, err := h.fetchTimelineData(r.Context(), req.Equipe, req.Ano)
+	projetoIDsA := middleware.ProjetoIDsFromContext(r.Context())
+	data, err := h.fetchTimelineData(r.Context(), req.Equipe, req.Ano, projetoIDsA)
 	if err != nil {
 		h.logger.Error("failed to fetch timeline data for analysis", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")

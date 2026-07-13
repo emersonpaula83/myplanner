@@ -53,6 +53,9 @@ func (m *mockUsuarioStore) AtualizarProjetos(ctx context.Context, usuarioID uuid
 func (m *mockUsuarioStore) BuscarProjetoIDsPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error) {
 	return m.buscarProjetoIDsFn(ctx, usuarioID)
 }
+func (m *mockUsuarioStore) ValidarProjetosExistem(ctx context.Context, projetoIDs []uuid.UUID) error {
+	return nil
+}
 
 func TestLogin_Success(t *testing.T) {
 	userID := uuid.New()

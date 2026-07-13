@@ -87,6 +87,9 @@ func main() {
 
 	timelineHandler := handler.NewTimelineHandler(timelineRepo, analyzer, logger)
 
+	membroRepo := repository.NewMembroRepository(pool)
+	membroHandler := handler.NewMembroHandler(membroRepo, logger)
+
 	syncRepo := repository.NewSyncRepository(pool)
 	clientFactory := func(baseURL, email, apiToken string, rateLimit int, logger *zap.Logger) jira.Client {
 		return jira.NewHTTPClient(baseURL, email, apiToken, rateLimit, logger)
@@ -149,6 +152,10 @@ func main() {
 			r.Post("/timeline-capacidade/analisar", timelineHandler.AnalisarCapacidade)
 			r.Get("/projetos", timelineHandler.ListProjetos)
 			r.Put("/projetos/{id}/metadata", timelineHandler.UpdateProjetoMetadata)
+
+			r.Get("/membros", membroHandler.List)
+			r.Put("/membros/{id}/team", membroHandler.UpdateTeam)
+			r.Get("/membros/teams", membroHandler.ListTeams)
 
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)

@@ -178,6 +178,21 @@ func (r *UsuarioRepository) AtualizarProjetos(ctx context.Context, usuarioID uui
 	return r.ListarProjetos(ctx, usuarioID)
 }
 
+func (r *UsuarioRepository) ValidarProjetosExistem(ctx context.Context, projetoIDs []uuid.UUID) error {
+	if len(projetoIDs) == 0 {
+		return nil
+	}
+	var count int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM projetos WHERE id = ANY($1)`, projetoIDs).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("validando projetos: %w", err)
+	}
+	if count != len(projetoIDs) {
+		return fmt.Errorf("um ou mais projeto_ids não existem na tabela projetos")
+	}
+	return nil
+}
+
 func (r *UsuarioRepository) BuscarProjetoIDsPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT projeto_id FROM usuario_projetos WHERE usuario_id = $1

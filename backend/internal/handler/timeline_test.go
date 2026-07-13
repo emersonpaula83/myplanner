@@ -25,7 +25,7 @@ type mockTimelineStore struct {
 	capturedApelido *string
 }
 
-func (m *mockTimelineStore) BuscarEpicosEquipe(_ context.Context, _ string, _ int) ([]domain.EpicoEquipe, error) {
+func (m *mockTimelineStore) BuscarEpicosEquipe(_ context.Context, _ string, _ int, _ []uuid.UUID) ([]domain.EpicoEquipe, error) {
 	return m.epicos, nil
 }
 
@@ -46,7 +46,7 @@ func (m *mockTimelineStore) BuscarEpicoPorID(_ context.Context, _ uuid.UUID) (*d
 	return m.epicoPorID, nil
 }
 
-func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ *string) ([]domain.ProjetoListItem, error) {
+func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ *string, _ []uuid.UUID) ([]domain.ProjetoListItem, error) {
 	return m.epicosList, nil
 }
 

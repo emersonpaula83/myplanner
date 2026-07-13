@@ -5,8 +5,7 @@ services:
       POSTGRES_USER: tcloud
       POSTGRES_PASSWORD: tcloud_dev
       POSTGRES_DB: tcloud_planner
-    ports:
-      - "5433:5432"
+    network_mode: host
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

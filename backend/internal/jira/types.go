@@ -52,6 +52,21 @@ type JiraIssue struct {
 		Components   []JiraComponent `json:"components"`
 		CustomFields map[string]any  `json:"-"`
 	} `json:"fields"`
+	Changelog *JiraChangelog `json:"changelog"`
+}
+
+type JiraChangelog struct {
+	Histories []JiraHistory `json:"histories"`
+}
+
+type JiraHistory struct {
+	Created string            `json:"created"`
+	Items   []JiraHistoryItem `json:"items"`
+}
+
+type JiraHistoryItem struct {
+	Field    string `json:"field"`
+	ToString string `json:"toString"`
 }
 
 type JiraType struct {

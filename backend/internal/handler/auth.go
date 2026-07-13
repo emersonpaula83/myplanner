@@ -22,6 +22,7 @@ type UsuarioStore interface {
 	ListarProjetos(ctx context.Context, usuarioID uuid.UUID) ([]domain.ProjetoResumo, error)
 	AtualizarProjetos(ctx context.Context, usuarioID uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoResumo, error)
 	BuscarProjetoIDsPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error)
+	ValidarProjetosExistem(ctx context.Context, projetoIDs []uuid.UUID) error
 }
 
 type AuthHandler struct {

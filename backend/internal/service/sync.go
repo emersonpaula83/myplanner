@@ -168,8 +168,15 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 
 	memberCache := make(map[string]uuid.UUID)
 	sprintCache := make(map[int]uuid.UUID)
+	type parentRef struct {
+		tarefaID    uuid.UUID
+		parentJiraID string
+	}
+	var pendingParents []parentRef
 
 	for _, jp := range projects {
+		teamName := jp.Name
+
 		users, err := client.GetUsers(ctx, jp.Key)
 		if err != nil {
 			syncErrors = append(syncErrors, fmt.Errorf("fetching users for %s: %w", jp.Key, err))
@@ -186,7 +193,7 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 				if u.AvatarUrls.Small != "" {
 					avatarPtr = &u.AvatarUrls.Small
 				}
-				id, err := s.repo.UpsertMembro(ctx, fonte.ID, u.AccountID, u.DisplayName, emailPtr, avatarPtr, nil)
+				id, err := s.repo.UpsertMembro(ctx, fonte.ID, u.AccountID, u.DisplayName, emailPtr, avatarPtr, &teamName)
 				if err != nil {
 					syncErrors = append(syncErrors, err)
 					continue
@@ -263,6 +270,13 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 				continue
 			}
 
+			if issue.Fields.Parent != nil && issue.Fields.Parent.ID != "" {
+				pendingParents = append(pendingParents, parentRef{
+					tarefaID:     tarefaID,
+					parentJiraID: issue.Fields.Parent.ID,
+				})
+			}
+
 			for _, comp := range issue.Fields.Components {
 				prodID, err := s.repo.UpsertProduto(ctx, fonte.ID, comp.ID, comp.Name, nil, &projetoID)
 				if err != nil {
@@ -274,6 +288,20 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 				}
 			}
 			totals.Tarefas++
+		}
+	}
+
+	for _, pp := range pendingParents {
+		parentID, err := s.repo.LookupTarefaIDByJiraID(ctx, fonte.ID, pp.parentJiraID)
+		if err != nil {
+			syncErrors = append(syncErrors, err)
+			continue
+		}
+		if parentID == uuid.Nil {
+			continue
+		}
+		if err := s.repo.UpdateTarefaParent(ctx, pp.tarefaID, parentID); err != nil {
+			syncErrors = append(syncErrors, err)
 		}
 	}
 
@@ -341,31 +369,63 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 		}
 	}
 
+	var dataInicioExecucao *time.Time
+	if issue.Changelog != nil {
+		dataInicioExecucao = extractFirstInProgressDate(issue.Changelog)
+	}
+
 	params := &repository.UpsertTarefaParams{
-		FonteDadosID:     fonte.ID,
-		ProjetoID:        projetoID,
-		JiraID:           issue.ID,
-		NumeroTicket:     issue.Key,
-		Resumo:           f.Summary,
-		Tipo:             f.IssueType.Name,
-		Status:           f.Status.Name,
-		Prioridade:       nilIfEmpty(f.Priority),
-		EstimativaPontos: f.StoryPoints,
-		EstimativaTempo:  estimativaTempo,
-		TempoGasto:       tempoGasto,
-		ResponsavelID:    responsavelID,
-		RelatorID:        relatorID,
-		SprintID:         sprintID,
-		DataCriacao:      dataCriacao,
-		DataLimite:       dataLimite,
-		DataResolvido:    dataResolvido,
-		DataAtualizado:   dataAtualizado,
-		TipoDemanda:      tipoDemanda,
-		StatusCategoria:  &statusCat,
-		CamposExtras:     json.RawMessage(`{}`),
+		FonteDadosID:       fonte.ID,
+		ProjetoID:          projetoID,
+		JiraID:             issue.ID,
+		NumeroTicket:       issue.Key,
+		Resumo:             f.Summary,
+		Tipo:               f.IssueType.Name,
+		Status:             f.Status.Name,
+		Prioridade:         nilIfEmpty(f.Priority),
+		EstimativaPontos:   f.StoryPoints,
+		EstimativaTempo:    estimativaTempo,
+		TempoGasto:         tempoGasto,
+		ResponsavelID:      responsavelID,
+		RelatorID:          relatorID,
+		SprintID:           sprintID,
+		DataCriacao:        dataCriacao,
+		DataLimite:         dataLimite,
+		DataResolvido:      dataResolvido,
+		DataAtualizado:     dataAtualizado,
+		TipoDemanda:        tipoDemanda,
+		StatusCategoria:    &statusCat,
+		CamposExtras:       json.RawMessage(`{}`),
+		DataInicioExecucao: dataInicioExecucao,
 	}
 
 	return s.repo.UpsertTarefa(ctx, params)
+}
+
+var inProgressStatuses = map[string]bool{
+	"In Progress":      true,
+	"Em Andamento":     true,
+	"Desenvolvimento":  true,
+	"Em Desenvolvimento": true,
+}
+
+func extractFirstInProgressDate(cl *jira.JiraChangelog) *time.Time {
+	var earliest *time.Time
+	for _, h := range cl.Histories {
+		for _, item := range h.Items {
+			if item.Field != "status" {
+				continue
+			}
+			if !inProgressStatuses[item.ToString] {
+				continue
+			}
+			t := parseOptionalJiraTime(h.Created)
+			if t != nil && (earliest == nil || t.Before(*earliest)) {
+				earliest = t
+			}
+		}
+	}
+	return earliest
 }
 
 func nilIfEmpty(p *jira.JiraPrio) *string {

@@ -147,6 +147,30 @@ func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams
 	return id, nil
 }
 
+func (r *SyncRepository) LookupTarefaIDByJiraID(ctx context.Context, fonteDadosID uuid.UUID, jiraID string) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := r.pool.QueryRow(ctx, `
+		SELECT id FROM tarefas WHERE fonte_dados_id = $1 AND jira_id = $2
+	`, fonteDadosID, jiraID).Scan(&id)
+	if err == pgx.ErrNoRows {
+		return uuid.Nil, nil
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("looking up tarefa by jira_id %s: %w", jiraID, err)
+	}
+	return id, nil
+}
+
+func (r *SyncRepository) UpdateTarefaParent(ctx context.Context, tarefaID, parentID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE tarefas SET parent_id = $2, updated_at = NOW() WHERE id = $1
+	`, tarefaID, parentID)
+	if err != nil {
+		return fmt.Errorf("updating parent_id for tarefa %s: %w", tarefaID, err)
+	}
+	return nil
+}
+
 func (r *SyncRepository) UpsertProduto(ctx context.Context, fonteDadosID uuid.UUID, jiraID, nome string, descricao *string, projetoID *uuid.UUID) (uuid.UUID, error) {
 	var id uuid.UUID
 	err := r.pool.QueryRow(ctx, `

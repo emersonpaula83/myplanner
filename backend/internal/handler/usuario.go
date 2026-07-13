@@ -236,6 +236,11 @@ func (h *UsuarioHandler) UpdateProjetos(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if err := h.store.ValidarProjetosExistem(r.Context(), req.ProjetoIDs); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	projetos, err := h.store.AtualizarProjetos(r.Context(), id, req.ProjetoIDs)
 	if err != nil {
 		h.logger.Error("failed to update projetos", zap.Error(err))

@@ -19,7 +19,13 @@ func NewTimelineRepository(pool *pgxpool.Pool) *TimelineRepository {
 	return &TimelineRepository{pool: pool}
 }
 
-func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, team string, ano int) ([]domain.EpicoEquipe, error) {
+func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, team string, ano int, projetoIDs []uuid.UUID) ([]domain.EpicoEquipe, error) {
+	projetoFilter := ""
+	args := []any{team, ano}
+	if len(projetoIDs) > 0 {
+		projetoFilter = " AND e.projeto_id = ANY($3)"
+		args = append(args, projetoIDs)
+	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT
 			e.id, e.numero_ticket, e.resumo, e.status, e.apelido,
@@ -39,10 +45,11 @@ func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, team string
 			  e.status IN ('Em Andamento', 'Desenvolvimento')
 			  OR (e.status = 'Backlog' AND EXTRACT(YEAR FROM e.data_limite) = $2)
 		  )
+	`+projetoFilter+`
 		ORDER BY
 			CASE WHEN e.status IN ('Em Andamento', 'Desenvolvimento') THEN 0 ELSE 1 END,
 			e.data_limite ASC NULLS LAST
-	`, team, ano)
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("fetching epicos equipe: %w", err)
 	}
@@ -148,27 +155,46 @@ func (r *TimelineRepository) BuscarEpicoPorID(ctx context.Context, id uuid.UUID)
 	return &t, nil
 }
 
-func (r *TimelineRepository) ListarEpicos(ctx context.Context, team *string) ([]domain.ProjetoListItem, error) {
+func (r *TimelineRepository) ListarEpicos(ctx context.Context, team *string, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error) {
 	var rows pgx.Rows
 	var err error
 
+	projetoFilter := ""
 	if team != nil {
+		args := []any{*team}
+		if len(projetoIDs) > 0 {
+			projetoFilter = " AND e.projeto_id = ANY($2)"
+			args = append(args, projetoIDs)
+		}
 		rows, err = r.pool.Query(ctx, `
 			SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
 			       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
 			FROM tarefas e
 			WHERE e.tipo = 'Épico'
 			  AND EXISTS (SELECT 1 FROM tarefas ch WHERE ch.parent_id = e.id AND ch.team = $1)
+		`+projetoFilter+`
 			ORDER BY e.resumo
-		`, *team)
+		`, args...)
 	} else {
-		rows, err = r.pool.Query(ctx, `
-			SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
-			       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
-			FROM tarefas e
-			WHERE e.tipo = 'Épico'
-			ORDER BY e.resumo
-		`)
+		if len(projetoIDs) > 0 {
+			projetoFilter = " AND e.projeto_id = ANY($1)"
+			rows, err = r.pool.Query(ctx, `
+				SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
+				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
+				FROM tarefas e
+				WHERE e.tipo = 'Épico'
+			`+projetoFilter+`
+				ORDER BY e.resumo
+			`, projetoIDs)
+		} else {
+			rows, err = r.pool.Query(ctx, `
+				SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
+				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
+				FROM tarefas e
+				WHERE e.tipo = 'Épico'
+				ORDER BY e.resumo
+			`)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("listing epicos: %w", err)

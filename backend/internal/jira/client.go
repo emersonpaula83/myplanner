@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -46,18 +45,37 @@ func NewHTTPClient(baseURL, email, apiToken string, ratePerSec int, logger *zap.
 }
 
 func (c *HTTPClient) do(ctx context.Context, path string) ([]byte, error) {
+	return c.doRequest(ctx, http.MethodGet, path, nil)
+}
+
+func (c *HTTPClient) doPost(ctx context.Context, path string, payload any) ([]byte, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling payload: %w", err)
+	}
+	return c.doRequest(ctx, http.MethodPost, path, data)
+}
+
+func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body []byte) ([]byte, error) {
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("rate limiter: %w", err)
 	}
 
 	reqURL := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	var reqBody io.Reader
+	if body != nil {
+		reqBody = strings.NewReader(string(body))
+	}
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
 	req.SetBasicAuth(c.email, c.apiToken)
 	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -65,17 +83,17 @@ func (c *HTTPClient) do(ctx context.Context, path string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
 
 	if resp.StatusCode >= 400 {
-		c.logger.Warn("jira api error", zap.Int("status", resp.StatusCode), zap.String("path", path), zap.String("body", string(body[:min(len(body), 200)])))
+		c.logger.Warn("jira api error", zap.Int("status", resp.StatusCode), zap.String("path", path), zap.String("body", string(respBody[:min(len(respBody), 200)])))
 		return nil, fmt.Errorf("jira api error: status %d", resp.StatusCode)
 	}
 
-	return body, nil
+	return respBody, nil
 }
 
 func (c *HTTPClient) GetProjects(ctx context.Context) ([]JiraProject, error) {
@@ -108,14 +126,21 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 	}
 	jql += " ORDER BY updated DESC"
 
-	fields := "summary,issuetype,status,priority,assignee,reporter,project,created,updated,duedate,resolutiondate,timetracking,sprint,parent,labels,components"
+	fields := []string{"summary", "issuetype", "status", "priority", "assignee", "reporter",
+		"project", "created", "updated", "duedate", "resolutiondate", "timetracking",
+		"sprint", "parent", "labels", "components"}
 
 	all := make([]JiraIssue, 0)
 	startAt := 0
 	for {
-		path := fmt.Sprintf("/rest/api/3/search?jql=%s&startAt=%d&maxResults=100&fields=%s",
-			url.QueryEscape(jql), startAt, fields)
-		body, err := c.do(ctx, path)
+		payload := map[string]any{
+			"jql":        jql,
+			"startAt":    startAt,
+			"maxResults": 100,
+			"fields":     fields,
+			"expand":     []string{"changelog"},
+		}
+		body, err := c.doPost(ctx, "/rest/api/3/search/jql", payload)
 		if err != nil {
 			return nil, err
 		}
