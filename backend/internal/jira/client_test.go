@@ -141,6 +141,29 @@ func TestGetProjects_Pagination(t *testing.T) {
 	}
 }
 
+func TestExtractCustomFields(t *testing.T) {
+	raw := json.RawMessage(`{
+		"summary": "Test",
+		"customfield_10100": {"value": "Meta"},
+		"customfield_10200": "some string",
+		"status": {"name": "Done"}
+	}`)
+
+	result := extractCustomFields(raw)
+	if result == nil {
+		t.Fatal("expected non-nil custom fields")
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 custom fields, got %d", len(result))
+	}
+	if _, ok := result["customfield_10100"]; !ok {
+		t.Error("expected customfield_10100")
+	}
+	if _, ok := result["customfield_10200"]; !ok {
+		t.Error("expected customfield_10200")
+	}
+}
+
 func TestAPIError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

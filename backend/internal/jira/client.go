@@ -119,18 +119,59 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 		if err != nil {
 			return nil, err
 		}
-		var result jiraSearchResult
-		if err := json.Unmarshal(body, &result); err != nil {
+
+		var rawResult struct {
+			StartAt    int               `json:"startAt"`
+			MaxResults int               `json:"maxResults"`
+			Total      int               `json:"total"`
+			Issues     []json.RawMessage `json:"issues"`
+		}
+		if err := json.Unmarshal(body, &rawResult); err != nil {
 			return nil, fmt.Errorf("decoding issues: %w", err)
 		}
-		all = append(all, result.Issues...)
-		if startAt+len(result.Issues) >= result.Total || len(result.Issues) == 0 {
+
+		for _, rawIssue := range rawResult.Issues {
+			var issue JiraIssue
+			if err := json.Unmarshal(rawIssue, &issue); err != nil {
+				c.logger.Warn("skipping unparseable issue", zap.Error(err))
+				continue
+			}
+			var issueMap map[string]json.RawMessage
+			if err := json.Unmarshal(rawIssue, &issueMap); err == nil {
+				if fieldsRaw, ok := issueMap["fields"]; ok {
+					issue.Fields.CustomFields = extractCustomFields(fieldsRaw)
+				}
+			}
+			all = append(all, issue)
+		}
+
+		if rawResult.StartAt+len(rawResult.Issues) >= rawResult.Total || len(rawResult.Issues) == 0 {
 			break
 		}
-		startAt += len(result.Issues)
+		startAt += len(rawResult.Issues)
 	}
 	c.logger.Debug("fetched issues", zap.String("project", projectKey), zap.Int("count", len(all)))
 	return all, nil
+}
+
+// extractCustomFields scans the raw JIRA "fields" JSON object and pulls out
+// any keys prefixed with "customfield_", since those are not represented as
+// named struct fields on JiraIssue.
+func extractCustomFields(raw json.RawMessage) map[string]any {
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil
+	}
+	result := make(map[string]any)
+	for k, v := range fields {
+		if len(k) > 12 && k[:12] == "customfield_" {
+			result[k] = v
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func (c *HTTPClient) GetUsers(ctx context.Context, projectKey string) ([]JiraUser, error) {
