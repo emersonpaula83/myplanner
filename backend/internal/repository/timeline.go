@@ -19,9 +19,9 @@ func NewTimelineRepository(pool *pgxpool.Pool) *TimelineRepository {
 	return &TimelineRepository{pool: pool}
 }
 
-func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, team string, ano int, projetoIDs []uuid.UUID) ([]domain.EpicoEquipe, error) {
+func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, equipeID uuid.UUID, ano int, projetoIDs []uuid.UUID) ([]domain.EpicoEquipe, error) {
 	projetoFilter := ""
-	args := []any{team, ano}
+	args := []any{equipeID, ano}
 	if len(projetoIDs) > 0 {
 		projetoFilter = " AND e.projeto_id = ANY($3)"
 		args = append(args, projetoIDs)
@@ -31,7 +31,9 @@ func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, team string
 			e.id, e.numero_ticket, e.resumo, e.status, e.apelido,
 			e.data_inicio_execucao, e.data_limite, e.tipo_demanda,
 			COALESCE(
-				(SELECT SUM(c.estimativa_tempo) FROM tarefas c WHERE c.parent_id = e.id AND c.team = $1),
+				(SELECT SUM(c.estimativa_tempo) FROM tarefas c
+				 WHERE c.parent_id = e.id
+				   AND c.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)),
 				0
 			) AS total_segundos_equipe,
 			EXISTS(
@@ -40,7 +42,11 @@ func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, team string
 			(SELECT p.numero_ticket FROM tarefas p WHERE p.id = e.parent_id AND p.numero_ticket LIKE 'GDPTC-%') AS projeto_ci_ticket
 		FROM tarefas e
 		WHERE e.tipo = 'Épico'
-		  AND EXISTS (SELECT 1 FROM tarefas ch WHERE ch.parent_id = e.id AND ch.team = $1)
+		  AND EXISTS (
+		      SELECT 1 FROM tarefas ch
+		      WHERE ch.parent_id = e.id
+		        AND ch.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)
+		  )
 		  AND (
 			  e.status IN ('Em Andamento', 'Desenvolvimento')
 			  OR (e.status = 'Backlog' AND EXTRACT(YEAR FROM e.data_limite) = $2)
@@ -71,18 +77,21 @@ func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, team string
 	return result, rows.Err()
 }
 
-func (r *TimelineRepository) ContarMembrosAtivosEquipe(ctx context.Context, team string) (int, error) {
+func (r *TimelineRepository) ContarMembrosAtivosEquipe(ctx context.Context, equipeID uuid.UUID) (int, error) {
 	var count int
 	err := r.pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM membros WHERE team = $1 AND ativo = true
-	`, team).Scan(&count)
+		SELECT COUNT(*)
+		FROM equipe_membros em
+		JOIN membros m ON m.id = em.membro_id
+		WHERE em.equipe_id = $1 AND m.ativo = true
+	`, equipeID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("counting membros ativos: %w", err)
 	}
 	return count, nil
 }
 
-func (r *TimelineRepository) BuscarAusenciasMensais(ctx context.Context, team string, ano int) ([]domain.AusenciaMensal, error) {
+func (r *TimelineRepository) BuscarAusenciasMensais(ctx context.Context, equipeID uuid.UUID, ano int) ([]domain.AusenciaMensal, error) {
 	inicioAno := time.Date(ano, 1, 1, 0, 0, 0, 0, time.UTC)
 	fimAno := time.Date(ano, 12, 31, 0, 0, 0, 0, time.UTC)
 
@@ -93,12 +102,13 @@ func (r *TimelineRepository) BuscarAusenciasMensais(ctx context.Context, team st
 			       EXTRACT(MONTH FROM dia)::int AS mes, dia::date
 			FROM disponibilidade d
 			JOIN membros m ON m.id = d.membro_id
+			JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1
 			CROSS JOIN LATERAL generate_series(
 				GREATEST(d.data_inicio, $2::date),
 				LEAST(d.data_fim, $3::date),
 				'1 day'::interval
 			) dia
-			WHERE m.team = $1 AND m.ativo = true
+			WHERE m.ativo = true
 			  AND d.tipo IN ('dayoff','ferias','licenca_medica','licenca_paternidade','licenca_maternidade')
 			  AND d.data_fim >= $2::date
 			  AND d.data_inicio <= $3::date
@@ -106,7 +116,7 @@ func (r *TimelineRepository) BuscarAusenciasMensais(ctx context.Context, team st
 		) sub
 		GROUP BY sub.membro_id, sub.nome, sub.tipo, sub.mes
 		ORDER BY sub.mes, sub.nome
-	`, team, inicioAno, fimAno)
+	`, equipeID, inicioAno, fimAno)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ausencias mensais: %w", err)
 	}
@@ -155,13 +165,13 @@ func (r *TimelineRepository) BuscarEpicoPorID(ctx context.Context, id uuid.UUID)
 	return &t, nil
 }
 
-func (r *TimelineRepository) ListarEpicos(ctx context.Context, team *string, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error) {
+func (r *TimelineRepository) ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error) {
 	var rows pgx.Rows
 	var err error
 
 	projetoFilter := ""
-	if team != nil {
-		args := []any{*team}
+	if equipeID != nil {
+		args := []any{*equipeID}
 		if len(projetoIDs) > 0 {
 			projetoFilter = " AND e.projeto_id = ANY($2)"
 			args = append(args, projetoIDs)
@@ -171,7 +181,11 @@ func (r *TimelineRepository) ListarEpicos(ctx context.Context, team *string, pro
 			       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
 			FROM tarefas e
 			WHERE e.tipo = 'Épico'
-			  AND EXISTS (SELECT 1 FROM tarefas ch WHERE ch.parent_id = e.id AND ch.team = $1)
+			  AND EXISTS (
+			      SELECT 1 FROM tarefas ch
+			      WHERE ch.parent_id = e.id
+			        AND ch.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)
+			  )
 		`+projetoFilter+`
 			ORDER BY e.resumo
 		`, args...)

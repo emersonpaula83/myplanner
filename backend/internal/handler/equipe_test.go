@@ -89,8 +89,7 @@ func TestCalcularResumoEquipe(t *testing.T) {
 			SegundosCompromissos: 36000,  // 10h
 			SegundosIniciativas:  36000,  // 10h
 			SegundosManutencao:   7200,   // 2h
-			SegundosMelhorias:    14400,  // 4h
-			SegundosEvolucao:     10800,  // 3h
+			SegundosMelhorias:    25200,  // 7h (melhorias+inovação)
 			SegundosSuporte:      3600,   // 1h
 		},
 		{
@@ -100,8 +99,7 @@ func TestCalcularResumoEquipe(t *testing.T) {
 			SegundosCompromissos: 18000, // 5h
 			SegundosIniciativas:  18000, // 5h
 			SegundosManutencao:   3600,  // 1h
-			SegundosMelhorias:    7200,  // 2h
-			SegundosEvolucao:     3600,  // 1h
+			SegundosMelhorias:    10800, // 3h (melhorias+inovação)
 			SegundosSuporte:      3600,  // 1h
 		},
 	}
@@ -109,7 +107,8 @@ func TestCalcularResumoEquipe(t *testing.T) {
 	// 10 weekdays = 80h total per person
 	diasUteis := 10
 
-	resumo := CalcularResumoEquipe("TeamA", "2m", membros, ausencias, tarefas, diasUteis)
+	teamID := uuid.New()
+	resumo := CalcularResumoEquipe(teamID, "TeamA", "2m", membros, ausencias, tarefas, diasUteis)
 
 	if resumo.NomeEquipe != "TeamA" {
 		t.Errorf("NomeEquipe = %q, want TeamA", resumo.NomeEquipe)
@@ -144,14 +143,9 @@ func TestCalcularResumoEquipe(t *testing.T) {
 		t.Errorf("PercentualManutencao = %.2f, want 20.00", resumo.DetalhesIniciativas.PercentualManutencao)
 	}
 
-	// Melhorias: (14400+7200)/54000*100 = 40%
-	if math.Abs(resumo.DetalhesIniciativas.PercentualMelhorias-40.0) > 0.01 {
-		t.Errorf("PercentualMelhorias = %.2f, want 40.00", resumo.DetalhesIniciativas.PercentualMelhorias)
-	}
-
-	// Evolucao: (10800+3600)/54000*100 ≈ 26.67%
-	if math.Abs(resumo.DetalhesIniciativas.PercentualEvolucao-26.67) > 0.01 {
-		t.Errorf("PercentualEvolucao = %.2f, want 26.67", resumo.DetalhesIniciativas.PercentualEvolucao)
+	// Melhorias e Inovação: (25200+10800)/54000*100 ≈ 66.67%
+	if math.Abs(resumo.DetalhesIniciativas.PercentualMelhorias-66.67) > 0.01 {
+		t.Errorf("PercentualMelhorias = %.2f, want 66.67", resumo.DetalhesIniciativas.PercentualMelhorias)
 	}
 
 	// Suporte: (3600+3600)/54000*100 ≈ 13.33%
@@ -170,7 +164,7 @@ func TestCalcularResumoEquipe_NoTasks(t *testing.T) {
 	ausencias := map[uuid.UUID]int{}
 	tarefas := []domain.HorasTarefasMembro{}
 
-	resumo := CalcularResumoEquipe("Empty", "1m", membros, ausencias, tarefas, 22)
+	resumo := CalcularResumoEquipe(uuid.New(), "Empty", "1m", membros, ausencias, tarefas, 22)
 
 	if resumo.AtuacaoRastreada != 0 {
 		t.Errorf("AtuacaoRastreada = %.2f, want 0", resumo.AtuacaoRastreada)
@@ -188,7 +182,7 @@ func TestCalcularResumoEquipe_AllAbsent(t *testing.T) {
 		{MembroID: id1, TotalSegundos: 3600},
 	}
 
-	resumo := CalcularResumoEquipe("Team", "1m", membros, ausencias, tarefas, 22)
+	resumo := CalcularResumoEquipe(uuid.New(), "Team", "1m", membros, ausencias, tarefas, 22)
 
 	// horasReais = 0, so atuacao = 0 (no division by zero)
 	if resumo.AtuacaoRastreada != 0 {

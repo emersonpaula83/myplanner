@@ -22,12 +22,14 @@ type Client interface {
 }
 
 type HTTPClient struct {
-	baseURL    string
-	email      string
-	apiToken   string
-	httpClient *http.Client
-	limiter    *rate.Limiter
-	logger     *zap.Logger
+	baseURL     string
+	authType    string
+	email       string
+	apiToken    string
+	accessToken string
+	httpClient  *http.Client
+	limiter     *rate.Limiter
+	logger      *zap.Logger
 }
 
 func NewHTTPClient(baseURL, email, apiToken string, ratePerSec int, logger *zap.Logger) *HTTPClient {
@@ -36,11 +38,26 @@ func NewHTTPClient(baseURL, email, apiToken string, ratePerSec int, logger *zap.
 	}
 	return &HTTPClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
+		authType:   "basic",
 		email:      email,
 		apiToken:   apiToken,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		limiter:    rate.NewLimiter(rate.Limit(ratePerSec), ratePerSec),
 		logger:     logger,
+	}
+}
+
+func NewOAuthClient(baseURL, accessToken string, ratePerSec int, logger *zap.Logger) *HTTPClient {
+	if ratePerSec <= 0 {
+		ratePerSec = 5
+	}
+	return &HTTPClient{
+		baseURL:     strings.TrimRight(baseURL, "/"),
+		authType:    "oauth2",
+		accessToken: accessToken,
+		httpClient:  &http.Client{Timeout: 30 * time.Second},
+		limiter:     rate.NewLimiter(rate.Limit(ratePerSec), ratePerSec),
+		logger:      logger,
 	}
 }
 
@@ -71,7 +88,11 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body []
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	req.SetBasicAuth(c.email, c.apiToken)
+	if c.authType == "oauth2" {
+		req.Header.Set("Authorization", "Bearer "+c.accessToken)
+	} else {
+		req.SetBasicAuth(c.email, c.apiToken)
+	}
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -89,8 +110,9 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body []
 	}
 
 	if resp.StatusCode >= 400 {
-		c.logger.Warn("jira api error", zap.Int("status", resp.StatusCode), zap.String("path", path), zap.String("body", string(respBody[:min(len(respBody), 200)])))
-		return nil, fmt.Errorf("jira api error: status %d", resp.StatusCode)
+		errBody := string(respBody[:min(len(respBody), 500)])
+		c.logger.Warn("jira api error", zap.Int("status", resp.StatusCode), zap.String("path", path), zap.String("body", errBody))
+		return nil, fmt.Errorf("jira api error: status %d: %s", resp.StatusCode, errBody)
 	}
 
 	return respBody, nil
@@ -131,14 +153,16 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 		"sprint", "parent", "labels", "components"}
 
 	all := make([]JiraIssue, 0)
-	startAt := 0
+	var nextPageToken string
 	for {
 		payload := map[string]any{
 			"jql":        jql,
-			"startAt":    startAt,
 			"maxResults": 100,
 			"fields":     fields,
-			"expand":     []string{"changelog"},
+			"expand":     "changelog",
+		}
+		if nextPageToken != "" {
+			payload["nextPageToken"] = nextPageToken
 		}
 		body, err := c.doPost(ctx, "/rest/api/3/search/jql", payload)
 		if err != nil {
@@ -146,10 +170,9 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 		}
 
 		var rawResult struct {
-			StartAt    int               `json:"startAt"`
-			MaxResults int               `json:"maxResults"`
-			Total      int               `json:"total"`
-			Issues     []json.RawMessage `json:"issues"`
+			NextPageToken string            `json:"nextPageToken"`
+			IsLast        bool              `json:"isLast"`
+			Issues        []json.RawMessage `json:"issues"`
 		}
 		if err := json.Unmarshal(body, &rawResult); err != nil {
 			return nil, fmt.Errorf("decoding issues: %w", err)
@@ -170,10 +193,10 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 			all = append(all, issue)
 		}
 
-		if rawResult.StartAt+len(rawResult.Issues) >= rawResult.Total || len(rawResult.Issues) == 0 {
+		if rawResult.IsLast || len(rawResult.Issues) == 0 || rawResult.NextPageToken == "" {
 			break
 		}
-		startAt += len(rawResult.Issues)
+		nextPageToken = rawResult.NextPageToken
 	}
 	c.logger.Debug("fetched issues", zap.String("project", projectKey), zap.Int("count", len(all)))
 	return all, nil

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -11,12 +12,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// EquipeStore defines data access for team queries.
-// Team endpoints intentionally bypass ProjetoFilter scoping — teams span
-// projects, so visibility is by team membership, not project access.
 type EquipeStore interface {
-	ListEquipes(ctx context.Context) ([]string, error)
-	GetMembrosEquipe(ctx context.Context, team string) ([]domain.Membro, error)
+	ListEquipes(ctx context.Context) ([]domain.Equipe, error)
+	GetEquipeByID(ctx context.Context, id uuid.UUID) (*domain.Equipe, error)
+	CreateEquipe(ctx context.Context, nome string) (*domain.Equipe, error)
+	UpdateEquipe(ctx context.Context, id uuid.UUID, nome string) error
+	DeleteEquipe(ctx context.Context, id uuid.UUID) error
+	GetMembrosEquipe(ctx context.Context, equipeID uuid.UUID) ([]domain.Membro, error)
+	AddMembroEquipe(ctx context.Context, equipeID uuid.UUID, membroID uuid.UUID) error
+	RemoveMembroEquipe(ctx context.Context, equipeID uuid.UUID, membroID uuid.UUID) error
 	GetDiasAusencia(ctx context.Context, membroIDs []uuid.UUID, inicio, fim time.Time) (map[uuid.UUID]int, error)
 	GetHorasTarefasEquipe(ctx context.Context, membroIDs []uuid.UUID, inicio, fim time.Time) ([]domain.HorasTarefasMembro, error)
 }
@@ -60,7 +64,8 @@ func ContarDiasUteis(inicio, fim time.Time) int {
 }
 
 func CalcularResumoEquipe(
-	team string,
+	equipeID uuid.UUID,
+	equipeNome string,
 	periodo string,
 	membros []domain.Membro,
 	ausencias map[uuid.UUID]int,
@@ -77,7 +82,8 @@ func CalcularResumoEquipe(
 	var somaAtuacao float64
 	var totalSegundosEquipe int64
 	var totalMetas, totalCompromissos, totalIniciativas int64
-	var totalManutencao, totalMelhorias, totalEvolucao, totalSuporte int64
+	var totalManutencao, totalMelhorias, totalSuporte int64
+	var totalEstimadoAbertos int64
 
 	membrosResumo := make([]domain.MembroResumo, len(membros))
 	for i, m := range membros {
@@ -110,8 +116,8 @@ func CalcularResumoEquipe(
 		totalIniciativas += t.SegundosIniciativas
 		totalManutencao += t.SegundosManutencao
 		totalMelhorias += t.SegundosMelhorias
-		totalEvolucao += t.SegundosEvolucao
 		totalSuporte += t.SegundosSuporte
+		totalEstimadoAbertos += t.SegundosEstimadoAbertos
 	}
 
 	mediaAtuacao := 0.0
@@ -130,14 +136,15 @@ func CalcularResumoEquipe(
 	if totalIniciativas > 0 {
 		detalhes.PercentualManutencao = float64(totalManutencao) / float64(totalIniciativas) * 100
 		detalhes.PercentualMelhorias = float64(totalMelhorias) / float64(totalIniciativas) * 100
-		detalhes.PercentualEvolucao = float64(totalEvolucao) / float64(totalIniciativas) * 100
 		detalhes.PercentualSuporte = float64(totalSuporte) / float64(totalIniciativas) * 100
 	}
 
 	return domain.ResumoEquipe{
-		NomeEquipe:             team,
+		EquipeID:               equipeID,
+		NomeEquipe:             equipeNome,
 		Periodo:                periodo,
 		AtuacaoRastreada:       mediaAtuacao,
+		TotalHorasEstimadas:    float64(totalEstimadoAbertos) / 3600.0,
 		PercentualMetas:        pctMetas,
 		PercentualCompromissos: pctCompromissos,
 		PercentualIniciativas:  pctIniciativas,
@@ -147,17 +154,81 @@ func CalcularResumoEquipe(
 }
 
 func (h *EquipeHandler) List(w http.ResponseWriter, r *http.Request) {
-	teams, err := h.store.ListEquipes(r.Context())
+	equipes, err := h.store.ListEquipes(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list equipes", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to list equipes")
 		return
 	}
-	respondJSON(w, http.StatusOK, teams)
+	respondJSON(w, http.StatusOK, equipes)
+}
+
+func (h *EquipeHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Nome string `json:"nome"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	if req.Nome == "" {
+		respondError(w, http.StatusBadRequest, "nome é obrigatório")
+		return
+	}
+	equipe, err := h.store.CreateEquipe(r.Context(), req.Nome)
+	if err != nil {
+		h.logger.Error("failed to create equipe", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao criar equipe")
+		return
+	}
+	respondJSON(w, http.StatusCreated, equipe)
+}
+
+func (h *EquipeHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	var req struct {
+		Nome string `json:"nome"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	if req.Nome == "" {
+		respondError(w, http.StatusBadRequest, "nome é obrigatório")
+		return
+	}
+	if err := h.store.UpdateEquipe(r.Context(), id, req.Nome); err != nil {
+		h.logger.Error("failed to update equipe", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao atualizar equipe")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"message": "equipe atualizada"})
+}
+
+func (h *EquipeHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	if err := h.store.DeleteEquipe(r.Context(), id); err != nil {
+		h.logger.Error("failed to delete equipe", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao excluir equipe")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"message": "equipe excluída"})
 }
 
 func (h *EquipeHandler) GetResumo(w http.ResponseWriter, r *http.Request) {
-	team := chi.URLParam(r, "team")
+	equipeID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
 	periodo := r.URL.Query().Get("periodo")
 	if periodo == "" {
 		periodo = "3m"
@@ -169,14 +240,30 @@ func (h *EquipeHandler) GetResumo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	membros, err := h.store.GetMembrosEquipe(r.Context(), team)
+	equipe, err := h.store.GetEquipeByID(r.Context(), equipeID)
+	if err != nil {
+		h.logger.Error("failed to get equipe", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "failed to get equipe")
+		return
+	}
+	if equipe == nil {
+		respondError(w, http.StatusNotFound, "equipe não encontrada")
+		return
+	}
+
+	membros, err := h.store.GetMembrosEquipe(r.Context(), equipeID)
 	if err != nil {
 		h.logger.Error("failed to get membros equipe", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to get team members")
 		return
 	}
 	if len(membros) == 0 {
-		respondError(w, http.StatusNotFound, "equipe não encontrada")
+		respondJSON(w, http.StatusOK, domain.ResumoEquipe{
+			EquipeID:   equipeID,
+			NomeEquipe: equipe.Nome,
+			Periodo:    periodo,
+			Membros:    []domain.MembroResumo{},
+		})
 		return
 	}
 
@@ -200,17 +287,66 @@ func (h *EquipeHandler) GetResumo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	diasUteis := ContarDiasUteis(inicio, fim)
-	resumo := CalcularResumoEquipe(team, periodo, membros, ausencias, tarefas, diasUteis)
+	resumo := CalcularResumoEquipe(equipeID, equipe.Nome, periodo, membros, ausencias, tarefas, diasUteis)
 	respondJSON(w, http.StatusOK, resumo)
 }
 
 func (h *EquipeHandler) GetMembros(w http.ResponseWriter, r *http.Request) {
-	team := chi.URLParam(r, "team")
-	membros, err := h.store.GetMembrosEquipe(r.Context(), team)
+	equipeID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	membros, err := h.store.GetMembrosEquipe(r.Context(), equipeID)
 	if err != nil {
 		h.logger.Error("failed to get membros equipe", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to get team members")
 		return
 	}
 	respondJSON(w, http.StatusOK, membros)
+}
+
+func (h *EquipeHandler) AddMembro(w http.ResponseWriter, r *http.Request) {
+	equipeID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	var req struct {
+		MembroID string `json:"membro_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	membroID, err := uuid.Parse(req.MembroID)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "membro_id inválido")
+		return
+	}
+	if err := h.store.AddMembroEquipe(r.Context(), equipeID, membroID); err != nil {
+		h.logger.Error("failed to add membro to equipe", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao adicionar membro")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"message": "membro adicionado"})
+}
+
+func (h *EquipeHandler) RemoveMembro(w http.ResponseWriter, r *http.Request) {
+	equipeID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	membroID, err := uuid.Parse(chi.URLParam(r, "membroId"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "membro_id inválido")
+		return
+	}
+	if err := h.store.RemoveMembroEquipe(r.Context(), equipeID, membroID); err != nil {
+		h.logger.Error("failed to remove membro from equipe", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao remover membro")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"message": "membro removido"})
 }

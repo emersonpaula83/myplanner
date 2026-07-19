@@ -15,6 +15,8 @@ import (
 type SyncStoreInterface interface {
 	SyncFonteDados(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error)
 	SyncAll(ctx context.Context) ([]domain.SyncLog, error)
+	SyncProject(ctx context.Context, fonteDadosID uuid.UUID, projectKey string) (*domain.SyncLog, error)
+	ListJiraProjects(ctx context.Context, fonteDadosID uuid.UUID) ([]domain.JiraProjectInfo, error)
 	GetStatus(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error)
 	ListLogs(ctx context.Context, fonteDadosID uuid.UUID, limit int) ([]domain.SyncLog, error)
 }
@@ -30,6 +32,7 @@ func NewSyncHandler(store SyncStoreInterface, logger *zap.Logger) *SyncHandler {
 
 func (h *SyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 	fdIDStr := r.URL.Query().Get("fonte_dados_id")
+	projectKey := r.URL.Query().Get("project_key")
 
 	if fdIDStr == "" {
 		logs, err := h.store.SyncAll(r.Context())
@@ -51,6 +54,17 @@ func (h *SyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if projectKey != "" {
+		log, err := h.store.SyncProject(r.Context(), fdID, projectKey)
+		if err != nil {
+			h.logger.Error("failed to sync project", zap.String("project", projectKey), zap.Error(err))
+			respondError(w, http.StatusInternalServerError, "falha ao sincronizar projeto: "+err.Error())
+			return
+		}
+		respondJSON(w, http.StatusOK, log)
+		return
+	}
+
 	log, err := h.store.SyncFonteDados(r.Context(), fdID)
 	if err != nil {
 		h.logger.Error("failed to sync fonte dados", zap.Error(err))
@@ -59,6 +73,29 @@ func (h *SyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, log)
+}
+
+func (h *SyncHandler) ListJiraProjects(w http.ResponseWriter, r *http.Request) {
+	fdIDStr := r.URL.Query().Get("fonte_dados_id")
+	if fdIDStr == "" {
+		respondError(w, http.StatusBadRequest, "fonte_dados_id é obrigatório")
+		return
+	}
+
+	fdID, err := uuid.Parse(fdIDStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "fonte_dados_id inválido")
+		return
+	}
+
+	projects, err := h.store.ListJiraProjects(r.Context(), fdID)
+	if err != nil {
+		h.logger.Error("failed to list jira projects", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar projetos: "+err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, projects)
 }
 
 func (h *SyncHandler) GetSyncStatus(w http.ResponseWriter, r *http.Request) {

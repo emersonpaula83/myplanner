@@ -210,6 +210,18 @@ func (r *SyncRepository) CreateSyncLog(ctx context.Context, log *domain.SyncLog)
 	return nil
 }
 
+func (r *SyncRepository) UpdateSyncLogTotals(ctx context.Context, id uuid.UUID, totals SyncTotals) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE sync_logs
+		SET total_projetos = $2, total_tarefas = $3, total_membros = $4, total_sprints = $5
+		WHERE id = $1
+	`, id, totals.Projetos, totals.Tarefas, totals.Membros, totals.Sprints)
+	if err != nil {
+		return fmt.Errorf("updating sync log totals %s: %w", id, err)
+	}
+	return nil
+}
+
 func (r *SyncRepository) UpdateSyncLog(ctx context.Context, id uuid.UUID, status string, finalizadoEm time.Time, totals SyncTotals, erros json.RawMessage, mensagem *string) error {
 	if erros == nil {
 		erros = json.RawMessage(`[]`)

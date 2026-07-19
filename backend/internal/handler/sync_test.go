@@ -28,6 +28,12 @@ func (m *mockSyncStore) SyncFonteDados(ctx context.Context, id uuid.UUID) (*doma
 func (m *mockSyncStore) SyncAll(ctx context.Context) ([]domain.SyncLog, error) {
 	return m.syncAllResult, m.syncAllErr
 }
+func (m *mockSyncStore) SyncProject(ctx context.Context, id uuid.UUID, projectKey string) (*domain.SyncLog, error) {
+	return m.syncOneResult, m.syncOneErr
+}
+func (m *mockSyncStore) ListJiraProjects(ctx context.Context, id uuid.UUID) ([]domain.JiraProjectInfo, error) {
+	return nil, nil
+}
 func (m *mockSyncStore) GetStatus(ctx context.Context, id uuid.UUID) (*domain.SyncLog, error) {
 	return m.statusResult, nil
 }

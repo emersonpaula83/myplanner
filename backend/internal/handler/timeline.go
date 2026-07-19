@@ -19,12 +19,12 @@ import (
 )
 
 type TimelineStore interface {
-	BuscarEpicosEquipe(ctx context.Context, team string, ano int, projetoIDs []uuid.UUID) ([]domain.EpicoEquipe, error)
-	ContarMembrosAtivosEquipe(ctx context.Context, team string) (int, error)
-	BuscarAusenciasMensais(ctx context.Context, team string, ano int) ([]domain.AusenciaMensal, error)
+	BuscarEpicosEquipe(ctx context.Context, equipeID uuid.UUID, ano int, projetoIDs []uuid.UUID) ([]domain.EpicoEquipe, error)
+	ContarMembrosAtivosEquipe(ctx context.Context, equipeID uuid.UUID) (int, error)
+	BuscarAusenciasMensais(ctx context.Context, equipeID uuid.UUID, ano int) ([]domain.AusenciaMensal, error)
 	AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time) error
 	BuscarEpicoPorID(ctx context.Context, id uuid.UUID) (*domain.Tarefa, error)
-	ListarEpicos(ctx context.Context, team *string, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error)
+	ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error)
 }
 
 type TimelineHandler struct {
@@ -37,8 +37,6 @@ func NewTimelineHandler(store TimelineStore, analyzer service.AnalisadorCapacida
 	return &TimelineHandler{store: store, analyzer: analyzer, logger: logger}
 }
 
-// timelineData holds the raw data needed to compute team capacity for a
-// given equipe/ano, shared by ListTimeline and AnalisarCapacidade.
 type timelineData struct {
 	epicos             []domain.EpicoEquipe
 	membrosCount       int
@@ -46,21 +44,18 @@ type timelineData struct {
 	projetosCapacidade []domain.ProjetoCapacidade
 }
 
-// fetchTimelineData fetches épicos, active member count and monthly
-// absences for the given equipe/ano, and builds the derived
-// projetosCapacidade slice used for capacity calculations.
-func (h *TimelineHandler) fetchTimelineData(ctx context.Context, equipe string, ano int, projetoIDs []uuid.UUID) (*timelineData, error) {
-	epicos, err := h.store.BuscarEpicosEquipe(ctx, equipe, ano, projetoIDs)
+func (h *TimelineHandler) fetchTimelineData(ctx context.Context, equipeID uuid.UUID, ano int, projetoIDs []uuid.UUID) (*timelineData, error) {
+	epicos, err := h.store.BuscarEpicosEquipe(ctx, equipeID, ano, projetoIDs)
 	if err != nil {
 		return nil, fmt.Errorf("buscando épicos: %w", err)
 	}
 
-	membrosCount, err := h.store.ContarMembrosAtivosEquipe(ctx, equipe)
+	membrosCount, err := h.store.ContarMembrosAtivosEquipe(ctx, equipeID)
 	if err != nil {
 		return nil, fmt.Errorf("contando membros ativos: %w", err)
 	}
 
-	ausencias, err := h.store.BuscarAusenciasMensais(ctx, equipe, ano)
+	ausencias, err := h.store.BuscarAusenciasMensais(ctx, equipeID, ano)
 	if err != nil {
 		return nil, fmt.Errorf("buscando ausências mensais: %w", err)
 	}
@@ -85,9 +80,14 @@ func (h *TimelineHandler) fetchTimelineData(ctx context.Context, equipe string, 
 }
 
 func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
-	equipe := r.URL.Query().Get("equipe")
-	if equipe == "" {
+	equipeStr := r.URL.Query().Get("equipe")
+	if equipeStr == "" {
 		respondError(w, http.StatusBadRequest, "equipe é obrigatório")
+		return
+	}
+	equipeID, err := uuid.Parse(equipeStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "equipe id inválido")
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
-	data, err := h.fetchTimelineData(r.Context(), equipe, ano, projetoIDs)
+	data, err := h.fetchTimelineData(r.Context(), equipeID, ano, projetoIDs)
 	if err != nil {
 		h.logger.Error("failed to fetch timeline data", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
@@ -136,7 +136,7 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 	capacidade := CalcularCapacidadeMensal(ano, data.membrosCount, data.ausencias, data.projetosCapacidade)
 
 	respondJSON(w, http.StatusOK, domain.TimelineResponse{
-		Equipe:           equipe,
+		Equipe:           equipeStr,
 		Ano:              ano,
 		Projetos:         projetos,
 		CapacidadeMensal: capacidade,
@@ -216,13 +216,18 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 }
 
 func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
-	var team *string
+	var equipeID *uuid.UUID
 	if t := r.URL.Query().Get("equipe"); t != "" {
-		team = &t
+		id, err := uuid.Parse(t)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "equipe id inválido")
+			return
+		}
+		equipeID = &id
 	}
 
 	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
-	epicos, err := h.store.ListarEpicos(r.Context(), team, projetoIDs)
+	epicos, err := h.store.ListarEpicos(r.Context(), equipeID, projetoIDs)
 	if err != nil {
 		h.logger.Error("failed to list epicos", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao listar épicos")
@@ -248,6 +253,11 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 		respondError(w, http.StatusBadRequest, "equipe é obrigatório")
 		return
 	}
+	equipeID, err := uuid.Parse(req.Equipe)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "equipe id inválido")
+		return
+	}
 	if req.Ano <= 0 {
 		respondError(w, http.StatusBadRequest, "ano inválido")
 		return
@@ -258,7 +268,7 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 	}
 
 	projetoIDsA := middleware.ProjetoIDsFromContext(r.Context())
-	data, err := h.fetchTimelineData(r.Context(), req.Equipe, req.Ano, projetoIDsA)
+	data, err := h.fetchTimelineData(r.Context(), equipeID, req.Ano, projetoIDsA)
 	if err != nil {
 		h.logger.Error("failed to fetch timeline data for analysis", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")

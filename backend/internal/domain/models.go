@@ -143,6 +143,20 @@ type LimiteAlerta struct {
 	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
 
+type MembroStats struct {
+	TotalTarefas        int     `json:"total_tarefas"`
+	TarefasConcluidas   int     `json:"tarefas_concluidas"`
+	TarefasEmAndamento  int     `json:"tarefas_em_andamento"`
+	DiasAusenteAno      int     `json:"dias_ausente_ano"`
+	TotalHorasEstimadas float64 `json:"total_horas_estimadas"`
+}
+
+type JiraProjectInfo struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
 type SyncLog struct {
 	ID             uuid.UUID       `json:"id" db:"id"`
 	FonteDadosID   uuid.UUID       `json:"fonte_dados_id" db:"fonte_dados_id"`

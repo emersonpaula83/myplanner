@@ -160,6 +160,30 @@ cmd_test() {
     log "Testes OK!"
 }
 
+cmd_clean() {
+    warn "Limpando TODOS os dados do banco (mantém estrutura e fonte_dados)..."
+    read -rp "Tem certeza? (s/N) " confirm
+    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+        log "Cancelado."
+        return 0
+    fi
+    docker compose -f "$ROOT/docker-compose.yml" exec -T db psql -U tcloud -d tcloud_planner -c \
+        "TRUNCATE tarefas, tarefa_produtos, sprints, projetos, membros, sync_logs, disponibilidade, equipes, equipe_membros, limites_alerta, produtos, usuario_projetos CASCADE;"
+    log "Dados sincronizados limpos! (usuarios e fonte_dados preservados)"
+}
+
+cmd_cleanall() {
+    warn "Limpando TUDO (incluindo fonte_dados e migrações)..."
+    read -rp "Tem certeza? Vai precisar rodar migrate de novo. (s/N) " confirm
+    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+        log "Cancelado."
+        return 0
+    fi
+    docker compose -f "$ROOT/docker-compose.yml" exec -T db psql -U tcloud -d tcloud_planner -c \
+        "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    log "Schema zerado! Rode: ./dev.sh migrate"
+}
+
 cmd_up() {
     log "Subindo tudo..."
     cmd_db
@@ -192,6 +216,8 @@ cmd_help() {
     echo "  test      Roda testes"
     echo "  status    Mostra status dos serviços"
     echo "  logs      Mostra logs do servidor (tail -f)"
+    echo "  clean     Limpa dados (mantém estrutura e fonte_dados)"
+    echo "  cleanall  Zera schema completo (precisa migrate depois)"
     echo "  help      Mostra esta ajuda"
     echo ""
 }
@@ -208,5 +234,7 @@ case "${1:-help}" in
     test)    cmd_test ;;
     status)  cmd_status ;;
     logs)    cmd_logs ;;
+    clean)   cmd_clean ;;
+    cleanall) cmd_cleanall ;;
     help|*)  cmd_help ;;
 esac

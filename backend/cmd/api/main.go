@@ -94,7 +94,26 @@ func main() {
 	clientFactory := func(baseURL, email, apiToken string, rateLimit int, logger *zap.Logger) jira.Client {
 		return jira.NewHTTPClient(baseURL, email, apiToken, rateLimit, logger)
 	}
-	syncService := service.NewSyncService(syncRepo, fonteDadosRepo, clientFactory, cfg.Sync.RateLimitPerSec, logger)
+	oauthClientFactory := func(baseURL, accessToken string, rateLimit int, logger *zap.Logger) jira.Client {
+		return jira.NewOAuthClient(baseURL, accessToken, rateLimit, logger)
+	}
+
+	var oauthSvc *jira.OAuthService
+	var oauthHandler *handler.OAuthHandler
+	if cfg.AtlassianOAuth.ClientID != "" && cfg.AtlassianOAuth.ClientSecret != "" {
+		oauthCfg := jira.OAuthConfig{
+			ClientID:     cfg.AtlassianOAuth.ClientID,
+			ClientSecret: cfg.AtlassianOAuth.ClientSecret,
+			CallbackURL:  cfg.AtlassianOAuth.AppBaseURL + "/auth/atlassian/callback",
+		}
+		oauthSvc = jira.NewOAuthService(oauthCfg)
+		oauthHandler = handler.NewOAuthHandler(oauthSvc, fonteDadosRepo, logger)
+		logger.Info("atlassian oauth configured", zap.String("callback", oauthCfg.CallbackURL))
+	} else {
+		logger.Warn("ATLASSIAN_CLIENT_ID/SECRET not set, OAuth disabled")
+	}
+
+	syncService := service.NewSyncService(syncRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	syncHandler := handler.NewSyncHandler(syncService, logger)
 
 	syncWorker := worker.NewSyncWorker(func(ctx context.Context) error {
@@ -123,6 +142,11 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	if oauthHandler != nil {
+		r.Get("/auth/atlassian/authorize", oauthHandler.Authorize)
+		r.Get("/auth/atlassian/callback", oauthHandler.Callback)
+	}
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
 
@@ -145,8 +169,13 @@ func main() {
 			r.Put("/usuarios/{id}/projetos", usuarioHandler.UpdateProjetos)
 
 			r.Get("/equipes", equipeHandler.List)
-			r.Get("/equipes/{team}/resumo", equipeHandler.GetResumo)
-			r.Get("/equipes/{team}/membros", equipeHandler.GetMembros)
+			r.Post("/equipes", equipeHandler.Create)
+			r.Put("/equipes/{id}", equipeHandler.Update)
+			r.Delete("/equipes/{id}", equipeHandler.Delete)
+			r.Get("/equipes/{id}/resumo", equipeHandler.GetResumo)
+			r.Get("/equipes/{id}/membros", equipeHandler.GetMembros)
+			r.Post("/equipes/{id}/membros", equipeHandler.AddMembro)
+			r.Delete("/equipes/{id}/membros/{membroId}", equipeHandler.RemoveMembro)
 
 			r.Get("/timeline-capacidade", timelineHandler.ListTimeline)
 			r.Post("/timeline-capacidade/analisar", timelineHandler.AnalisarCapacidade)
@@ -154,12 +183,16 @@ func main() {
 			r.Put("/projetos/{id}/metadata", timelineHandler.UpdateProjetoMetadata)
 
 			r.Get("/membros", membroHandler.List)
-			r.Put("/membros/{id}/team", membroHandler.UpdateTeam)
-			r.Get("/membros/teams", membroHandler.ListTeams)
+			r.Get("/membros/search", membroHandler.Search)
+			r.Get("/membros/{id}", membroHandler.GetByID)
+			r.Post("/membros/{id}/disponibilidade", membroHandler.CreateDisponibilidade)
+			r.Put("/membros/{id}/disponibilidade/{dispId}", membroHandler.UpdateDisponibilidade)
+			r.Delete("/membros/{id}/disponibilidade/{dispId}", membroHandler.DeleteDisponibilidade)
 
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)
 			r.Get("/sync/logs", syncHandler.ListSyncLogs)
+			r.Get("/sync/projects", syncHandler.ListJiraProjects)
 		})
 	})
 

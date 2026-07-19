@@ -7,13 +7,14 @@ import (
 )
 
 type Config struct {
-	DB     DBConfig
-	Server ServerConfig
-	Jira   JiraConfig
-	Sync   SyncConfig
-	Log    LogConfig
-	Auth   AuthConfig
-	Gemini GeminiConfig
+	DB             DBConfig
+	Server         ServerConfig
+	Jira           JiraConfig
+	AtlassianOAuth AtlassianOAuthConfig
+	Sync           SyncConfig
+	Log            LogConfig
+	Auth           AuthConfig
+	Gemini         GeminiConfig
 }
 
 type DBConfig struct {
@@ -40,6 +41,12 @@ type JiraConfig struct {
 	AuthType  string
 	UserEmail string
 	APIToken  string
+}
+
+type AtlassianOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	AppBaseURL   string
 }
 
 type SyncConfig struct {
@@ -80,6 +87,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("JWT_EXPIRATION_HOURS", 24)
 	viper.SetDefault("GEMINI_MODEL", "gemini-2.0-flash")
 	viper.SetDefault("ADMIN_EMAIL", "admin@tcloud.local")
+	viper.SetDefault("APP_BASE_URL", "http://localhost:8080")
 
 	_ = viper.ReadInConfig()
 
@@ -113,6 +121,11 @@ func Load() (*Config, error) {
 			JWTSecret:          viper.GetString("JWT_SECRET"),
 			JWTExpirationHours: viper.GetInt("JWT_EXPIRATION_HOURS"),
 			AdminEmail:         viper.GetString("ADMIN_EMAIL"),
+		},
+		AtlassianOAuth: AtlassianOAuthConfig{
+			ClientID:     viper.GetString("ATLASSIAN_CLIENT_ID"),
+			ClientSecret: viper.GetString("ATLASSIAN_CLIENT_SECRET"),
+			AppBaseURL:   viper.GetString("APP_BASE_URL"),
 		},
 		Gemini: GeminiConfig{
 			APIKey: viper.GetString("GEMINI_API_KEY"),

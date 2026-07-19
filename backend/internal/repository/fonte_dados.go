@@ -21,13 +21,16 @@ func NewFonteDadosRepository(pool *pgxpool.Pool) *FonteDadosRepository {
 }
 
 type CreateFonteDadosRequest struct {
-	Nome           string          `json:"nome"`
-	Tipo           string          `json:"tipo"`
-	BaseURL        string          `json:"base_url"`
-	AuthType       string          `json:"auth_type"`
-	APIToken       *string         `json:"api_token"`
-	UserEmail      *string         `json:"user_email"`
-	CustomFieldMap json.RawMessage `json:"custom_field_map"`
+	Nome               string          `json:"nome"`
+	Tipo               string          `json:"tipo"`
+	BaseURL            string          `json:"base_url"`
+	AuthType           string          `json:"auth_type"`
+	APIToken           *string         `json:"api_token"`
+	UserEmail          *string         `json:"user_email"`
+	OAuth2AccessToken  *string         `json:"-"`
+	OAuth2RefreshToken *string         `json:"-"`
+	OAuth2TokenExpiry  *time.Time      `json:"-"`
+	CustomFieldMap     json.RawMessage `json:"custom_field_map"`
 }
 
 type UpdateFonteDadosRequest struct {
@@ -95,13 +98,15 @@ func (r *FonteDadosRepository) Create(ctx context.Context, req *CreateFonteDados
 	}
 
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO fonte_dados (id, nome, tipo, base_url, auth_type, api_token, user_email, custom_field_map)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO fonte_dados (id, nome, tipo, base_url, auth_type, api_token, user_email,
+		       oauth2_access_token, oauth2_refresh_token, oauth2_token_expiry, custom_field_map)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, nome, tipo, base_url, auth_type, api_token, user_email,
 		          oauth2_client_id, oauth2_client_secret, oauth2_access_token,
 		          oauth2_refresh_token, oauth2_token_expiry, custom_field_map,
 		          ativo, ultimo_sync, created_at, updated_at
-	`, uuid.New(), req.Nome, req.Tipo, req.BaseURL, req.AuthType, req.APIToken, req.UserEmail, cfm)
+	`, uuid.New(), req.Nome, req.Tipo, req.BaseURL, req.AuthType, req.APIToken, req.UserEmail,
+		req.OAuth2AccessToken, req.OAuth2RefreshToken, req.OAuth2TokenExpiry, cfm)
 
 	fd, err := scanFonteDadosRow(row)
 	if err != nil {
@@ -167,6 +172,23 @@ func (r *FonteDadosRepository) UpdateUltimoSync(ctx context.Context, id uuid.UUI
 		return fmt.Errorf("fonte_dados %s not found", id)
 	}
 
+	return nil
+}
+
+func (r *FonteDadosRepository) SaveOAuthTokens(ctx context.Context, id uuid.UUID, baseURL, accessToken, refreshToken string, expiry time.Time) error {
+	result, err := r.pool.Exec(ctx, `
+		UPDATE fonte_dados
+		SET base_url = $2, auth_type = 'oauth2',
+		    oauth2_access_token = $3, oauth2_refresh_token = $4,
+		    oauth2_token_expiry = $5, updated_at = NOW()
+		WHERE id = $1
+	`, id, baseURL, accessToken, refreshToken, expiry)
+	if err != nil {
+		return fmt.Errorf("saving oauth tokens for fonte_dados %s: %w", id, err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("fonte_dados %s not found", id)
+	}
 	return nil
 }
 

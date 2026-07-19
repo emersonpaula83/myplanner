@@ -25,15 +25,15 @@ type mockTimelineStore struct {
 	capturedApelido *string
 }
 
-func (m *mockTimelineStore) BuscarEpicosEquipe(_ context.Context, _ string, _ int, _ []uuid.UUID) ([]domain.EpicoEquipe, error) {
+func (m *mockTimelineStore) BuscarEpicosEquipe(_ context.Context, _ uuid.UUID, _ int, _ []uuid.UUID) ([]domain.EpicoEquipe, error) {
 	return m.epicos, nil
 }
 
-func (m *mockTimelineStore) ContarMembrosAtivosEquipe(_ context.Context, _ string) (int, error) {
+func (m *mockTimelineStore) ContarMembrosAtivosEquipe(_ context.Context, _ uuid.UUID) (int, error) {
 	return m.membrosCount, nil
 }
 
-func (m *mockTimelineStore) BuscarAusenciasMensais(_ context.Context, _ string, _ int) ([]domain.AusenciaMensal, error) {
+func (m *mockTimelineStore) BuscarAusenciasMensais(_ context.Context, _ uuid.UUID, _ int) ([]domain.AusenciaMensal, error) {
 	return m.ausencias, nil
 }
 
@@ -46,7 +46,7 @@ func (m *mockTimelineStore) BuscarEpicoPorID(_ context.Context, _ uuid.UUID) (*d
 	return m.epicoPorID, nil
 }
 
-func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ *string, _ []uuid.UUID) ([]domain.ProjetoListItem, error) {
+func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ *uuid.UUID, _ []uuid.UUID) ([]domain.ProjetoListItem, error) {
 	return m.epicosList, nil
 }
 
@@ -73,7 +73,7 @@ func TestListTimeline_MissingEquipe(t *testing.T) {
 
 func TestListTimeline_MissingAno(t *testing.T) {
 	h := NewTimelineHandler(&mockTimelineStore{}, nil, zap.NewNop())
-	req := httptest.NewRequest("GET", "/api/v1/timeline-capacidade?equipe=Backend", nil)
+	req := httptest.NewRequest("GET", "/api/v1/timeline-capacidade?equipe="+uuid.New().String(), nil)
 	w := httptest.NewRecorder()
 
 	h.ListTimeline(w, req)
@@ -102,8 +102,9 @@ func TestListTimeline_Success(t *testing.T) {
 		ausencias:    []domain.AusenciaMensal{},
 	}
 
+	testEquipeID := uuid.New()
 	h := NewTimelineHandler(store, nil, zap.NewNop())
-	req := httptest.NewRequest("GET", "/api/v1/timeline-capacidade?equipe=Backend&ano=2026", nil)
+	req := httptest.NewRequest("GET", "/api/v1/timeline-capacidade?equipe="+testEquipeID.String()+"&ano=2026", nil)
 	w := httptest.NewRecorder()
 
 	h.ListTimeline(w, req)
@@ -116,8 +117,8 @@ func TestListTimeline_Success(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decoding response: %v", err)
 	}
-	if resp.Equipe != "Backend" {
-		t.Errorf("Equipe = %q, want Backend", resp.Equipe)
+	if resp.Equipe != testEquipeID.String() {
+		t.Errorf("Equipe = %q, want %s", resp.Equipe, testEquipeID.String())
 	}
 	if len(resp.Projetos) != 1 {
 		t.Fatalf("Projetos count = %d, want 1", len(resp.Projetos))
@@ -201,7 +202,7 @@ func TestUpdateProjetoMetadata_UppercaseConversion(t *testing.T) {
 func TestAnalisarCapacidade_NoAnalyzer(t *testing.T) {
 	h := NewTimelineHandler(&mockTimelineStore{}, nil, zap.NewNop())
 
-	body := `{"equipe":"Backend","ano":2026,"mes":7}`
+	body := `{"equipe":"00000000-0000-0000-0000-000000000001","ano":2026,"mes":7}`
 	req := httptest.NewRequest("POST", "/api/v1/timeline-capacidade/analisar", bytes.NewBufferString(body))
 	w := httptest.NewRecorder()
 
@@ -215,7 +216,7 @@ func TestAnalisarCapacidade_NoAnalyzer(t *testing.T) {
 func TestAnalisarCapacidade_InvalidMes(t *testing.T) {
 	h := NewTimelineHandler(&mockTimelineStore{}, &mockAnalyzer{}, zap.NewNop())
 
-	body := `{"equipe":"Backend","ano":2026,"mes":13}`
+	body := `{"equipe":"00000000-0000-0000-0000-000000000001","ano":2026,"mes":13}`
 	req := httptest.NewRequest("POST", "/", bytes.NewBufferString(body))
 	w := httptest.NewRecorder()
 

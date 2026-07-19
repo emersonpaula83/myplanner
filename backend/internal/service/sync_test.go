@@ -89,7 +89,10 @@ func TestSyncServiceStructure(t *testing.T) {
 		return mockClient
 	}
 
-	svc := NewSyncService(nil, nil, factory, 5, logger)
+	oauthFactory := func(baseURL, accessToken string, rateLimit int, logger *zap.Logger) jira.Client {
+		return mockClient
+	}
+	svc := NewSyncService(nil, nil, factory, oauthFactory, nil, 5, logger)
 	if svc == nil {
 		t.Fatal("expected non-nil service")
 	}
