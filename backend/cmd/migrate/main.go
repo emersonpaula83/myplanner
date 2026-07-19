@@ -9,7 +9,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/totvs/tcloud-planner/backend/internal/config"
+	"github.com/emersonpaula83/myplanner/backend/internal/config"
 )
 
 func main() {

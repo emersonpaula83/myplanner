@@ -27,7 +27,7 @@ INSERT INTO usuarios (nome_completo, apelido, email, senha_hash, cargo)
 VALUES (
     'Administrador',
     'admin',
-    'admin@tcloud.local',
+    'admin@myplanner.local',
     '$2a$12$YD27E7brWZvrrq0lVpbsouDUIi3UiwgjT6NsiIOQGPzwDBlvC5DYK',
     'coordenador'
 );

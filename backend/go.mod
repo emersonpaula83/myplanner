@@ -1,4 +1,4 @@
-module github.com/totvs/tcloud-planner/backend
+module github.com/emersonpaula83/myplanner/backend
 
 go 1.25.0
 

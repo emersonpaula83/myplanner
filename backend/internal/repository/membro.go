@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/totvs/tcloud-planner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 )
 
 type MembroRepository struct {

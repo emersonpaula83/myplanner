@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tCloud Planner</title>
+<title>MyPlanner</title>
 <style>
 :root {
   --accent: #0D7C66;
@@ -358,8 +358,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 <div class="login-page" id="login-page">
   <div class="login-card">
     <div class="login-logo">
-      <div class="login-logo-icon">tC</div>
-      <span class="login-logo-text">tCloud Planner</span>
+      <div class="login-logo-icon">MP</div>
+      <span class="login-logo-text">MyPlanner</span>
     </div>
     <div class="login-error" id="login-error"></div>
     <form id="login-form" onsubmit="return handleLogin(event)">
@@ -378,7 +378,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 
 <div class="app-shell hidden" id="app-shell">
   <nav class="sidebar" aria-label="Navegação">
-    <div class="sidebar-logo">tC</div>
+    <div class="sidebar-logo">MP</div>
     <button class="sidebar-item active" data-page="equipes" title="Equipes" onclick="navigate('equipes')">
       <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
     </button>
@@ -600,7 +600,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 
 <script>
 const API = '/api/v1';
-let token = localStorage.getItem('tcloud_token');
+let token = localStorage.getItem('myplanner_token');
 let currentUser = null;
 
 function api(path, opts = {}) {
@@ -629,13 +629,13 @@ async function handleLogin(e) {
     const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: document.getElementById('login-email').value, senha: document.getElementById('login-senha').value }) });
     if (!data || !data.token) throw new Error('Credenciais inválidas');
     token = data.token; currentUser = data.usuario;
-    localStorage.setItem('tcloud_token', token);
+    localStorage.setItem('myplanner_token', token);
     showApp();
   } catch (err) { errEl.textContent = err.message || 'Erro ao fazer login'; errEl.style.display = 'block'; }
   finally { btn.disabled = false; }
   return false;
 }
-function logout() { token = null; currentUser = null; localStorage.removeItem('tcloud_token'); document.getElementById('login-page').style.display = 'flex'; document.getElementById('app-shell').classList.add('hidden'); }
+function logout() { token = null; currentUser = null; localStorage.removeItem('myplanner_token'); document.getElementById('login-page').style.display = 'flex'; document.getElementById('app-shell').classList.add('hidden'); }
 function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app-shell').classList.remove('hidden');

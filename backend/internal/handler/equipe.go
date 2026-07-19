@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/totvs/tcloud-planner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 	"go.uber.org/zap"
 )
 

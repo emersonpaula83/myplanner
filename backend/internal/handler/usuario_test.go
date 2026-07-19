@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/totvs/tcloud-planner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 	"go.uber.org/zap"
 )
 
@@ -19,7 +19,7 @@ func TestUsuarioHandler_List(t *testing.T) {
 	store := &mockUsuarioStore{
 		listarTodosFn: func(_ context.Context) ([]domain.Usuario, error) {
 			return []domain.Usuario{
-				{ID: uuid.New(), NomeCompleto: "Admin", Apelido: "admin", Email: "admin@tcloud.local", Cargo: "coordenador", Ativo: true},
+				{ID: uuid.New(), NomeCompleto: "Admin", Apelido: "admin", Email: "admin@myplanner.local", Cargo: "coordenador", Ativo: true},
 			}, nil
 		},
 	}
@@ -108,7 +108,7 @@ func TestUsuarioHandler_GetByID(t *testing.T) {
 				ID:           id,
 				NomeCompleto: "Admin",
 				Apelido:      "admin",
-				Email:        "admin@tcloud.local",
+				Email:        "admin@myplanner.local",
 				Cargo:        "coordenador",
 				Ativo:        true,
 			}, nil

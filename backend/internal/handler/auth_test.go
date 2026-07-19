@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/totvs/tcloud-planner/backend/internal/auth"
-	"github.com/totvs/tcloud-planner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/auth"
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 	"go.uber.org/zap"
 )
 
@@ -80,7 +80,7 @@ func TestLogin_Success(t *testing.T) {
 	logger := zap.NewNop()
 	h := NewAuthHandler(store, ts, logger)
 
-	body := `{"email":"admin@tcloud.local","senha":"Totvs@123"}`
+	body := `{"email":"admin@myplanner.local","senha":"Totvs@123"}`
 	req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -115,7 +115,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	ts := auth.NewTokenService("test-secret-key-minimum-32-chars!!", 24)
 	h := NewAuthHandler(store, ts, zap.NewNop())
 
-	body := `{"email":"admin@tcloud.local","senha":"wrong-password"}`
+	body := `{"email":"admin@myplanner.local","senha":"wrong-password"}`
 	req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
 

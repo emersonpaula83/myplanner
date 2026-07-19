@@ -2,14 +2,14 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: tcloud
-      POSTGRES_PASSWORD: tcloud_dev
-      POSTGRES_DB: tcloud_planner
+      POSTGRES_USER: myplanner
+      POSTGRES_PASSWORD: myplanner_dev
+      POSTGRES_DB: myplanner
     network_mode: host
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tcloud -d tcloud_planner"]
+      test: ["CMD-SHELL", "pg_isready -U myplanner -d myplanner"]
       interval: 5s
       timeout: 3s
       retries: 5

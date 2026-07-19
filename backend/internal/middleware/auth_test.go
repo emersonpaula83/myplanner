@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/totvs/tcloud-planner/backend/internal/auth"
+	"github.com/emersonpaula83/myplanner/backend/internal/auth"
 )
 
 func TestAuthJWT_ValidToken(t *testing.T) {

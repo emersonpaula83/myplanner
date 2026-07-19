@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/totvs/tcloud-planner/backend/internal/domain"
-	"github.com/totvs/tcloud-planner/backend/internal/jira"
-	"github.com/totvs/tcloud-planner/backend/internal/repository"
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/jira"
+	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
 

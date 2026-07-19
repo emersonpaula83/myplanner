@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/totvs/tcloud-planner/backend/internal/auth"
+	"github.com/emersonpaula83/myplanner/backend/internal/auth"
 )
 
 type contextKey string

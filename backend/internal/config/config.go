@@ -75,9 +75,9 @@ func Load() (*Config, error) {
 
 	viper.SetDefault("DB_HOST", "localhost")
 	viper.SetDefault("DB_PORT", 5432)
-	viper.SetDefault("DB_USER", "tcloud")
-	viper.SetDefault("DB_PASSWORD", "tcloud_dev")
-	viper.SetDefault("DB_NAME", "tcloud_planner")
+	viper.SetDefault("DB_USER", "myplanner")
+	viper.SetDefault("DB_PASSWORD", "myplanner_dev")
+	viper.SetDefault("DB_NAME", "myplanner")
 	viper.SetDefault("DB_SSLMODE", "disable")
 	viper.SetDefault("SERVER_PORT", "8080")
 	viper.SetDefault("SERVER_HOST", "0.0.0.0")
@@ -86,7 +86,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("LOG_LEVEL", "debug")
 	viper.SetDefault("JWT_EXPIRATION_HOURS", 24)
 	viper.SetDefault("GEMINI_MODEL", "gemini-2.0-flash")
-	viper.SetDefault("ADMIN_EMAIL", "admin@tcloud.local")
+	viper.SetDefault("ADMIN_EMAIL", "admin@myplanner.local")
 	viper.SetDefault("APP_BASE_URL", "http://localhost:8080")
 
 	_ = viper.ReadInConfig()

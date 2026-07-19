@@ -3,7 +3,7 @@ package handler
 import (
 	"time"
 
-	"github.com/totvs/tcloud-planner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 )
 
 func DistribuirHorasPorMes(projetos []domain.ProjetoCapacidade, ano int) map[int]float64 {

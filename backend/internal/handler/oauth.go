@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/totvs/tcloud-planner/backend/internal/jira"
-	"github.com/totvs/tcloud-planner/backend/internal/repository"
+	"github.com/emersonpaula83/myplanner/backend/internal/jira"
+	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
 
