@@ -295,101 +295,176 @@ func (s *SyncService) flushProgress(ctx context.Context, syncLogID *uuid.UUID, t
 	}
 }
 
-func (s *SyncService) syncProjectData(ctx context.Context, client jira.Client, fonte *domain.FonteDados, jp jira.JiraProject, memberCache map[string]uuid.UUID, sprintCache map[int]uuid.UUID, syncLogID *uuid.UUID) (repository.SyncTotals, []parentRef, []error) {
+
+func (s *SyncService) resolveParents(ctx context.Context, fonte *domain.FonteDados, pendingParents []parentRef) []error {
+	var errs []error
+	for _, pp := range pendingParents {
+		parentID, err := s.repo.LookupTarefaIDByJiraID(ctx, fonte.ID, pp.parentJiraID)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if parentID == uuid.Nil {
+			continue
+		}
+		if err := s.repo.UpdateTarefaParent(ctx, pp.tarefaID, parentID); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte *domain.FonteDados) (repository.SyncTotals, []error) {
 	var totals repository.SyncTotals
 	var syncErrors []error
-	var pendingParents []parentRef
-	teamName := jp.Name
 
-	users, err := client.GetUsers(ctx, jp.Key)
-	if err != nil {
-		syncErrors = append(syncErrors, fmt.Errorf("fetching users for %s: %w", jp.Key, err))
+	if sprintFieldID, err := client.GetSprintFieldID(ctx); err == nil {
+		client.SetSprintFieldID(sprintFieldID)
+		s.logger.Info("sprint field discovered", zap.String("fieldID", sprintFieldID))
 	} else {
-		for _, u := range users {
-			if _, cached := memberCache[u.AccountID]; cached {
-				continue
-			}
-			var emailPtr *string
-			if u.EmailAddress != "" {
-				emailPtr = &u.EmailAddress
-			}
-			var avatarPtr *string
-			if u.AvatarUrls.Small != "" {
-				avatarPtr = &u.AvatarUrls.Small
-			}
-			id, err := s.repo.UpsertMembro(ctx, fonte.ID, u.AccountID, u.DisplayName, emailPtr, avatarPtr, &teamName)
+		s.logger.Debug("could not discover sprint field", zap.Error(err))
+	}
+
+	projectKeys, err := s.repo.GetProjectKeysForSync(ctx, fonte.ID)
+	if err != nil {
+		return totals, []error{fmt.Errorf("getting project keys: %w", err)}
+	}
+
+	if len(projectKeys) == 0 {
+		s.logger.Info("no equipe-linked projects found, falling back to full project list")
+		projects, err := client.GetProjects(ctx)
+		if err != nil {
+			return totals, []error{fmt.Errorf("fetching projects: %w", err)}
+		}
+		for _, p := range projects {
+			projectKeys = append(projectKeys, p.Key)
+		}
+	}
+
+	s.logger.Info("syncing projects", zap.Int("count", len(projectKeys)), zap.Strings("keys", projectKeys))
+
+	issues, err := client.GetIssuesByProjects(ctx, projectKeys, nil)
+	if err != nil {
+		return totals, []error{fmt.Errorf("fetching issues: %w", err)}
+	}
+
+	memberCache := make(map[string]uuid.UUID)
+	sprintCache := make(map[int]uuid.UUID)
+	projectCache := make(map[string]uuid.UUID)
+	var allPendingParents []parentRef
+
+	for i, issue := range issues {
+		projetoID, err := s.ensureProject(ctx, fonte, issue, projectCache)
+		if err != nil {
+			syncErrors = append(syncErrors, err)
+			continue
+		}
+
+		s.ensureMember(ctx, fonte, issue.Fields.Assignee, issue.Fields.Project.Name, memberCache, &totals)
+		s.ensureMember(ctx, fonte, issue.Fields.Reporter, issue.Fields.Project.Name, memberCache, &totals)
+
+		tarefaID, err := s.processIssue(ctx, fonte, projetoID, issue, memberCache, sprintCache)
+		if err != nil {
+			syncErrors = append(syncErrors, err)
+			continue
+		}
+
+		if issue.Fields.Parent != nil && issue.Fields.Parent.ID != "" {
+			allPendingParents = append(allPendingParents, parentRef{
+				tarefaID:     tarefaID,
+				parentJiraID: issue.Fields.Parent.ID,
+			})
+		}
+
+		for _, comp := range issue.Fields.Components {
+			prodID, err := s.repo.UpsertProduto(ctx, fonte.ID, comp.ID, comp.Name, nil, &projetoID)
 			if err != nil {
 				syncErrors = append(syncErrors, err)
 				continue
 			}
-			memberCache[u.AccountID] = id
-			totals.Membros++
+			if err := s.repo.LinkTarefaProduto(ctx, tarefaID, prodID); err != nil {
+				syncErrors = append(syncErrors, err)
+			}
 		}
-		s.flushProgress(ctx, syncLogID, totals)
+		totals.Tarefas++
+
+		if (i+1)%50 == 0 {
+			s.logger.Info("sync progress", zap.Int("processed", i+1), zap.Int("total", len(issues)))
+		}
 	}
 
+	totals.Projetos = len(projectCache)
+	totals.Sprints = len(sprintCache)
+	syncErrors = append(syncErrors, s.resolveParents(ctx, fonte, allPendingParents)...)
+	return totals, syncErrors
+}
+
+func (s *SyncService) ensureProject(ctx context.Context, fonte *domain.FonteDados, issue jira.JiraIssue, cache map[string]uuid.UUID) (uuid.UUID, error) {
+	jp := issue.Fields.Project
+	if id, ok := cache[jp.ID]; ok {
+		return id, nil
+	}
 	var leadID *uuid.UUID
-	if jp.Lead != nil {
-		if lid, ok := memberCache[jp.Lead.AccountID]; ok {
-			leadID = &lid
-		}
-	}
 	var categoria *string
-	if jp.ProjectCategory != nil && jp.ProjectCategory.Name != "" {
-		categoria = &jp.ProjectCategory.Name
+	projetoID, err := s.repo.UpsertProjeto(ctx, fonte.ID, jp.ID, jp.Key, jp.Name, nil, leadID, categoria)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("upserting project %s: %w", jp.Key, err)
 	}
-	var descricao *string
-	if jp.Description != "" {
-		descricao = &jp.Description
+	cache[jp.ID] = projetoID
+	return projetoID, nil
+}
+
+func (s *SyncService) ensureMember(ctx context.Context, fonte *domain.FonteDados, user *jira.JiraUser, teamName string, cache map[string]uuid.UUID, totals *repository.SyncTotals) {
+	if user == nil || user.AccountID == "" {
+		return
+	}
+	if _, ok := cache[user.AccountID]; ok {
+		return
+	}
+	var emailPtr *string
+	if user.EmailAddress != "" {
+		emailPtr = &user.EmailAddress
+	}
+	var avatarPtr *string
+	if user.AvatarUrls.Small != "" {
+		avatarPtr = &user.AvatarUrls.Small
+	}
+	id, err := s.repo.UpsertMembro(ctx, fonte.ID, user.AccountID, user.DisplayName, emailPtr, avatarPtr, &teamName)
+	if err != nil {
+		s.logger.Warn("failed to upsert member from issue", zap.String("accountID", user.AccountID), zap.Error(err))
+		return
+	}
+	cache[user.AccountID] = id
+	totals.Membros++
+}
+
+func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client, fonte *domain.FonteDados, projectKey string, syncLogID *uuid.UUID) (repository.SyncTotals, []error) {
+	if sprintFieldID, err := client.GetSprintFieldID(ctx); err == nil {
+		client.SetSprintFieldID(sprintFieldID)
 	}
 
-	projetoID, err := s.repo.UpsertProjeto(ctx, fonte.ID, jp.ID, jp.Key, jp.Name, descricao, leadID, categoria)
+	issues, err := client.GetIssuesByProjects(ctx, []string{projectKey}, nil)
 	if err != nil {
-		return totals, nil, append(syncErrors, err)
-	}
-	totals.Projetos++
-	s.flushProgress(ctx, syncLogID, totals)
-
-	boards, err := client.GetBoards(ctx, jp.Key)
-	if err != nil {
-		syncErrors = append(syncErrors, fmt.Errorf("fetching boards for %s: %w", jp.Key, err))
-	} else {
-		for _, b := range boards {
-			sprints, err := client.GetBoardSprints(ctx, b.ID)
-			if err != nil {
-				syncErrors = append(syncErrors, fmt.Errorf("fetching sprints for board %d: %w", b.ID, err))
-				continue
-			}
-			for _, sp := range sprints {
-				if _, cached := sprintCache[sp.ID]; cached {
-					continue
-				}
-				var estado *string
-				if sp.State != "" {
-					estado = &sp.State
-				}
-				boardID := b.ID
-				spID, err := s.repo.UpsertSprint(ctx, fonte.ID, sp.ID, sp.Name, estado,
-					parseOptionalTime(sp.StartDate), parseOptionalTime(sp.EndDate),
-					parseOptionalTime(sp.CompleteDate), &boardID, &projetoID)
-				if err != nil {
-					syncErrors = append(syncErrors, err)
-					continue
-				}
-				sprintCache[sp.ID] = spID
-				totals.Sprints++
-			}
-		}
-		s.flushProgress(ctx, syncLogID, totals)
+		return repository.SyncTotals{}, []error{fmt.Errorf("fetching issues for %s: %w", projectKey, err)}
 	}
 
-	issues, err := client.GetProjectIssues(ctx, jp.Key, fonte.UltimoSync)
-	if err != nil {
-		syncErrors = append(syncErrors, fmt.Errorf("fetching issues for %s: %w", jp.Key, err))
-		return totals, pendingParents, syncErrors
-	}
+	var totals repository.SyncTotals
+	var syncErrors []error
+	memberCache := make(map[string]uuid.UUID)
+	sprintCache := make(map[int]uuid.UUID)
+	projectCache := make(map[string]uuid.UUID)
+	var pendingParents []parentRef
 
 	for i, issue := range issues {
+		projetoID, err := s.ensureProject(ctx, fonte, issue, projectCache)
+		if err != nil {
+			syncErrors = append(syncErrors, err)
+			continue
+		}
+
+		s.ensureMember(ctx, fonte, issue.Fields.Assignee, issue.Fields.Project.Name, memberCache, &totals)
+		s.ensureMember(ctx, fonte, issue.Fields.Reporter, issue.Fields.Project.Name, memberCache, &totals)
+
 		tarefaID, err := s.processIssue(ctx, fonte, projetoID, issue, memberCache, sprintCache)
 		if err != nil {
 			syncErrors = append(syncErrors, err)
@@ -419,78 +494,11 @@ func (s *SyncService) syncProjectData(ctx context.Context, client jira.Client, f
 			s.flushProgress(ctx, syncLogID, totals)
 		}
 	}
+
+	totals.Projetos = len(projectCache)
+	totals.Sprints = len(sprintCache)
 	s.flushProgress(ctx, syncLogID, totals)
-
-	return totals, pendingParents, syncErrors
-}
-
-func (s *SyncService) resolveParents(ctx context.Context, fonte *domain.FonteDados, pendingParents []parentRef) []error {
-	var errs []error
-	for _, pp := range pendingParents {
-		parentID, err := s.repo.LookupTarefaIDByJiraID(ctx, fonte.ID, pp.parentJiraID)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		if parentID == uuid.Nil {
-			continue
-		}
-		if err := s.repo.UpdateTarefaParent(ctx, pp.tarefaID, parentID); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errs
-}
-
-func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte *domain.FonteDados) (repository.SyncTotals, []error) {
-	var totals repository.SyncTotals
-	var syncErrors []error
-
-	projects, err := client.GetProjects(ctx)
-	if err != nil {
-		return totals, []error{fmt.Errorf("fetching projects: %w", err)}
-	}
-
-	memberCache := make(map[string]uuid.UUID)
-	sprintCache := make(map[int]uuid.UUID)
-	var allPendingParents []parentRef
-
-	for _, jp := range projects {
-		pTotals, parents, pErrors := s.syncProjectData(ctx, client, fonte, jp, memberCache, sprintCache, nil)
-		totals.Projetos += pTotals.Projetos
-		totals.Tarefas += pTotals.Tarefas
-		totals.Membros += pTotals.Membros
-		totals.Sprints += pTotals.Sprints
-		syncErrors = append(syncErrors, pErrors...)
-		allPendingParents = append(allPendingParents, parents...)
-	}
-
-	syncErrors = append(syncErrors, s.resolveParents(ctx, fonte, allPendingParents)...)
-	return totals, syncErrors
-}
-
-func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client, fonte *domain.FonteDados, projectKey string, syncLogID *uuid.UUID) (repository.SyncTotals, []error) {
-	projects, err := client.GetProjects(ctx)
-	if err != nil {
-		return repository.SyncTotals{}, []error{fmt.Errorf("fetching projects: %w", err)}
-	}
-
-	var target *jira.JiraProject
-	for i := range projects {
-		if projects[i].Key == projectKey {
-			target = &projects[i]
-			break
-		}
-	}
-	if target == nil {
-		return repository.SyncTotals{}, []error{fmt.Errorf("project %s not found in JIRA", projectKey)}
-	}
-
-	memberCache := make(map[string]uuid.UUID)
-	sprintCache := make(map[int]uuid.UUID)
-
-	totals, parents, syncErrors := s.syncProjectData(ctx, client, fonte, *target, memberCache, sprintCache, syncLogID)
-	syncErrors = append(syncErrors, s.resolveParents(ctx, fonte, parents)...)
+	syncErrors = append(syncErrors, s.resolveParents(ctx, fonte, pendingParents)...)
 	return totals, syncErrors
 }
 
@@ -513,6 +521,23 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 	if f.Sprint != nil {
 		if id, ok := sprintCache[f.Sprint.ID]; ok {
 			sprintID = &id
+		} else {
+			var estado *string
+			if f.Sprint.State != "" {
+				estado = &f.Sprint.State
+			}
+			var boardID *int
+			if f.Sprint.OriginBoardID > 0 {
+				bid := f.Sprint.OriginBoardID
+				boardID = &bid
+			}
+			spID, err := s.repo.UpsertSprint(ctx, fonte.ID, f.Sprint.ID, f.Sprint.Name, estado,
+				parseOptionalTime(f.Sprint.StartDate), parseOptionalTime(f.Sprint.EndDate),
+				parseOptionalTime(f.Sprint.CompleteDate), boardID, &projetoID)
+			if err == nil {
+				sprintCache[f.Sprint.ID] = spID
+				sprintID = &spID
+			}
 		}
 	}
 

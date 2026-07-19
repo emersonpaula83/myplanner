@@ -22,7 +22,6 @@ import (
 	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
-	"github.com/emersonpaula83/myplanner/backend/internal/worker"
 	"go.uber.org/zap"
 )
 
@@ -90,6 +89,10 @@ func main() {
 	membroRepo := repository.NewMembroRepository(pool)
 	membroHandler := handler.NewMembroHandler(membroRepo, logger)
 
+	sprintRepo := repository.NewSprintRepository(pool)
+	sprintService := service.NewSprintService(sprintRepo, logger)
+	sprintHandler := handler.NewSprintHandler(sprintService, logger)
+
 	syncRepo := repository.NewSyncRepository(pool)
 	clientFactory := func(baseURL, email, apiToken string, rateLimit int, logger *zap.Logger) jira.Client {
 		return jira.NewHTTPClient(baseURL, email, apiToken, rateLimit, logger)
@@ -116,11 +119,6 @@ func main() {
 	syncService := service.NewSyncService(syncRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	syncHandler := handler.NewSyncHandler(syncService, logger)
 
-	syncWorker := worker.NewSyncWorker(func(ctx context.Context) error {
-		_, err := syncService.SyncAll(ctx)
-		return err
-	}, cfg.Sync.IntervalMinutes, logger)
-	go syncWorker.Start(ctx)
 
 	r := chi.NewRouter()
 
@@ -189,6 +187,11 @@ func main() {
 			r.Put("/membros/{id}/disponibilidade/{dispId}", membroHandler.UpdateDisponibilidade)
 			r.Delete("/membros/{id}/disponibilidade/{dispId}", membroHandler.DeleteDisponibilidade)
 
+			r.Get("/sprints", sprintHandler.ListSprints)
+			r.Get("/sprints/projetos", sprintHandler.ListProjetos)
+			r.Get("/projetos/{id}/sprints", sprintHandler.ListByProjeto)
+			r.Get("/sprints/{id}/capacity", sprintHandler.GetCapacity)
+
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)
 			r.Get("/sync/logs", syncHandler.ListSyncLogs)
@@ -237,8 +240,6 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-quit
 	logger.Info("shutting down server", zap.String("signal", sig.String()))
-
-	syncWorker.Stop()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()

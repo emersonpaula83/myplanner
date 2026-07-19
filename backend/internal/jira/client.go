@@ -16,20 +16,24 @@ import (
 type Client interface {
 	GetProjects(ctx context.Context) ([]JiraProject, error)
 	GetProjectIssues(ctx context.Context, projectKey string, updatedSince *time.Time) ([]JiraIssue, error)
+	GetIssuesByProjects(ctx context.Context, projectKeys []string, updatedSince *time.Time) ([]JiraIssue, error)
 	GetUsers(ctx context.Context, projectKey string) ([]JiraUser, error)
 	GetBoards(ctx context.Context, projectKey string) ([]JiraBoard, error)
 	GetBoardSprints(ctx context.Context, boardID int) ([]JiraSprint, error)
+	GetSprintFieldID(ctx context.Context) (string, error)
+	SetSprintFieldID(id string)
 }
 
 type HTTPClient struct {
-	baseURL     string
-	authType    string
-	email       string
-	apiToken    string
-	accessToken string
-	httpClient  *http.Client
-	limiter     *rate.Limiter
-	logger      *zap.Logger
+	baseURL       string
+	authType      string
+	email         string
+	apiToken      string
+	accessToken   string
+	httpClient    *http.Client
+	limiter       *rate.Limiter
+	logger        *zap.Logger
+	sprintFieldID string
 }
 
 func NewHTTPClient(baseURL, email, apiToken string, ratePerSec int, logger *zap.Logger) *HTTPClient {
@@ -151,6 +155,9 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 	fields := []string{"summary", "issuetype", "status", "priority", "assignee", "reporter",
 		"project", "created", "updated", "duedate", "resolutiondate", "timetracking",
 		"sprint", "parent", "labels", "components"}
+	if c.sprintFieldID != "" && c.sprintFieldID != "sprint" {
+		fields = append(fields, c.sprintFieldID)
+	}
 
 	all := make([]JiraIssue, 0)
 	var nextPageToken string
@@ -188,6 +195,9 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 			if err := json.Unmarshal(rawIssue, &issueMap); err == nil {
 				if fieldsRaw, ok := issueMap["fields"]; ok {
 					issue.Fields.CustomFields = extractCustomFields(fieldsRaw)
+					if issue.Fields.Sprint == nil {
+						issue.Fields.Sprint = c.extractSprintField(fieldsRaw)
+					}
 				}
 			}
 			all = append(all, issue)
@@ -200,6 +210,137 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 	}
 	c.logger.Debug("fetched issues", zap.String("project", projectKey), zap.Int("count", len(all)))
 	return all, nil
+}
+
+func (c *HTTPClient) GetIssuesByProjects(ctx context.Context, projectKeys []string, updatedSince *time.Time) ([]JiraIssue, error) {
+	if len(projectKeys) == 0 {
+		return nil, nil
+	}
+	jql := fmt.Sprintf("project IN (%s)", strings.Join(projectKeys, ", "))
+	if updatedSince != nil {
+		jql += fmt.Sprintf(" AND updated >= \"%s\"", updatedSince.Format("2006-01-02 15:04"))
+	}
+	jql += " ORDER BY updated DESC"
+
+	fields := []string{"summary", "issuetype", "status", "priority", "assignee", "reporter",
+		"project", "created", "updated", "duedate", "resolutiondate", "timetracking",
+		"sprint", "parent", "labels", "components"}
+	if c.sprintFieldID != "" && c.sprintFieldID != "sprint" {
+		fields = append(fields, c.sprintFieldID)
+	}
+
+	all := make([]JiraIssue, 0)
+	var nextPageToken string
+	for {
+		payload := map[string]any{
+			"jql":        jql,
+			"maxResults": 100,
+			"fields":     fields,
+			"expand":     "changelog",
+		}
+		if nextPageToken != "" {
+			payload["nextPageToken"] = nextPageToken
+		}
+		body, err := c.doPost(ctx, "/rest/api/3/search/jql", payload)
+		if err != nil {
+			return nil, err
+		}
+
+		var rawResult struct {
+			NextPageToken string            `json:"nextPageToken"`
+			IsLast        bool              `json:"isLast"`
+			Issues        []json.RawMessage `json:"issues"`
+		}
+		if err := json.Unmarshal(body, &rawResult); err != nil {
+			return nil, fmt.Errorf("decoding issues: %w", err)
+		}
+
+		for _, rawIssue := range rawResult.Issues {
+			var issue JiraIssue
+			if err := json.Unmarshal(rawIssue, &issue); err != nil {
+				c.logger.Warn("skipping unparseable issue", zap.Error(err))
+				continue
+			}
+			var issueMap map[string]json.RawMessage
+			if err := json.Unmarshal(rawIssue, &issueMap); err == nil {
+				if fieldsRaw, ok := issueMap["fields"]; ok {
+					issue.Fields.CustomFields = extractCustomFields(fieldsRaw)
+					if issue.Fields.Sprint == nil {
+						issue.Fields.Sprint = c.extractSprintField(fieldsRaw)
+					}
+				}
+			}
+			all = append(all, issue)
+		}
+
+		if rawResult.IsLast || len(rawResult.Issues) == 0 || rawResult.NextPageToken == "" {
+			break
+		}
+		nextPageToken = rawResult.NextPageToken
+	}
+	c.logger.Debug("fetched issues by projects", zap.Int("projects", len(projectKeys)), zap.Int("issues", len(all)))
+	return all, nil
+}
+
+func (c *HTTPClient) extractSprintField(raw json.RawMessage) *JiraSprint {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil
+	}
+	// Try known sprint field ID first
+	if c.sprintFieldID != "" {
+		if v, ok := fields[c.sprintFieldID]; ok && len(v) > 0 && string(v) != "null" {
+			if sp := tryParseSprintValue(v); sp != nil {
+				return sp
+			}
+		}
+	}
+	// Fallback: scan all customfields
+	for k, v := range fields {
+		if len(k) <= 12 || k[:12] != "customfield_" {
+			continue
+		}
+		if len(v) == 0 || string(v) == "null" {
+			continue
+		}
+		if sp := tryParseSprintValue(v); sp != nil {
+			c.logger.Debug("found sprint in custom field", zap.String("field", k), zap.Int("sprintID", sp.ID))
+			if c.sprintFieldID == "" {
+				c.sprintFieldID = k
+			}
+			return sp
+		}
+	}
+	return nil
+}
+
+func tryParseSprintValue(v json.RawMessage) *JiraSprint {
+	if sp := tryParseSprint(v); sp != nil {
+		return sp
+	}
+	var arr []json.RawMessage
+	if json.Unmarshal(v, &arr) == nil && len(arr) > 0 {
+		return tryParseSprint(arr[0])
+	}
+	return nil
+}
+
+func tryParseSprint(data json.RawMessage) *JiraSprint {
+	var obj map[string]any
+	if json.Unmarshal(data, &obj) != nil {
+		return nil
+	}
+	if _, hasName := obj["name"]; !hasName {
+		return nil
+	}
+	if _, hasState := obj["state"]; !hasState {
+		return nil
+	}
+	var sprint JiraSprint
+	if json.Unmarshal(data, &sprint) == nil && sprint.ID > 0 {
+		return &sprint
+	}
+	return nil
 }
 
 // extractCustomFields scans the raw JIRA "fields" JSON object and pulls out
@@ -234,6 +375,42 @@ func (c *HTTPClient) GetUsers(ctx context.Context, projectKey string) ([]JiraUse
 	}
 	c.logger.Debug("fetched users", zap.String("project", projectKey), zap.Int("count", len(users)))
 	return users, nil
+}
+
+func (c *HTTPClient) GetSprintFieldID(ctx context.Context) (string, error) {
+	body, err := c.do(ctx, "/rest/api/3/field")
+	if err != nil {
+		return "", err
+	}
+	var fields []struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Custom bool   `json:"custom"`
+		Schema *struct {
+			Type   string `json:"type"`
+			Custom string `json:"custom"`
+		} `json:"schema"`
+	}
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return "", fmt.Errorf("decoding fields: %w", err)
+	}
+	for _, f := range fields {
+		if f.Schema != nil && f.Schema.Custom == "com.pyxis.greenhopper.jira:gh-sprint" {
+			c.logger.Info("discovered sprint field", zap.String("id", f.ID), zap.String("name", f.Name))
+			return f.ID, nil
+		}
+	}
+	for _, f := range fields {
+		if strings.EqualFold(f.Name, "Sprint") && f.Custom {
+			c.logger.Info("discovered sprint field by name", zap.String("id", f.ID))
+			return f.ID, nil
+		}
+	}
+	return "", fmt.Errorf("sprint field not found")
+}
+
+func (c *HTTPClient) SetSprintFieldID(id string) {
+	c.sprintFieldID = id
 }
 
 func (c *HTTPClient) GetBoards(ctx context.Context, projectKey string) ([]JiraBoard, error) {

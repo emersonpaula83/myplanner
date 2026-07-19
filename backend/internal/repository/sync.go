@@ -295,6 +295,30 @@ func (r *SyncRepository) ListSyncLogs(ctx context.Context, fonteDadosID uuid.UUI
 	return logs, rows.Err()
 }
 
+func (r *SyncRepository) GetProjectKeysForSync(ctx context.Context, fonteDadosID uuid.UUID) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT p.chave
+		FROM projetos p
+		INNER JOIN tarefas t ON t.projeto_id = p.id
+		INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id
+		WHERE p.fonte_dados_id = $1 AND p.ativo = true
+	`, fonteDadosID)
+	if err != nil {
+		return nil, fmt.Errorf("getting project keys for sync: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, fmt.Errorf("scanning project key: %w", err)
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
 func (r *SyncRepository) GetFonteDadosAtivas(ctx context.Context) ([]domain.FonteDados, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, nome, tipo, base_url, auth_type, api_token, user_email,

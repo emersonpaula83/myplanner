@@ -287,6 +287,58 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 /* Analysis popup */
 .analysis-popup { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 16px; box-shadow: var(--shadow-card); white-space: pre-wrap; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
 
+/* Sprint */
+.page-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+.page-tab { padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--text-tertiary); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -2px; font-family: inherit; transition: all .15s; }
+.page-tab:hover { color: var(--text-primary); }
+.page-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sprint-filters { display: flex; gap: 6px; margin-bottom: 16px; }
+.sprint-list { display: flex; flex-direction: column; gap: 8px; }
+.sprint-item { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; cursor: pointer; transition: all .15s; box-shadow: var(--shadow-card); }
+.sprint-item:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
+.sprint-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.sprint-dot.active { background: var(--accent); }
+.sprint-dot.closed { background: var(--text-tertiary); }
+.sprint-dot.future { background: var(--blue); }
+.sprint-info { flex: 1; min-width: 0; }
+.sprint-name { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.sprint-dates { font-size: 12px; color: var(--text-tertiary); }
+.sprint-meta { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; text-align: right; }
+.sprint-state-badge { display: inline-flex; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+.sprint-state-badge.active { background: var(--accent-soft); color: var(--accent); }
+.sprint-state-badge.closed { background: var(--chip-bg); color: var(--text-tertiary); }
+.sprint-state-badge.future { background: var(--blue-soft); color: var(--blue); }
+.sprint-ausencias-preview { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.sprint-aus-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--amber-soft); color: var(--amber); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 500; }
+.sprint-aus-detail { font-weight: 400; opacity: .8; }
+
+.capacity-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-card); margin-top: 16px; }
+.capacity-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.capacity-panel-title { font-size: 15px; font-weight: 650; color: var(--text-primary); }
+.capacity-panel-sub { font-size: 12px; color: var(--text-tertiary); }
+.capacity-members { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.capacity-card { background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px; }
+.capacity-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.capacity-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--accent); overflow: hidden; flex-shrink: 0; }
+.capacity-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.capacity-card-name { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+.capacity-card-pct { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.capacity-card-pct.green { color: var(--accent); }
+.capacity-card-pct.amber { color: var(--amber); }
+.capacity-card-pct.red { color: var(--red); }
+.capacity-bar { height: 6px; border-radius: 3px; background: var(--member-bar-bg); overflow: hidden; margin-bottom: 8px; }
+.capacity-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+.capacity-bar-fill.green { background: var(--accent); }
+.capacity-bar-fill.amber { background: var(--amber); }
+.capacity-bar-fill.red { background: var(--red); }
+.capacity-card-detail { font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; }
+.capacity-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.capacity-badge { display: inline-flex; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.capacity-badge.absence { background: var(--amber-soft); color: var(--amber); }
+.capacity-badge.overcapacity { background: var(--red-soft); color: var(--red); text-transform: uppercase; letter-spacing: .3px; }
+.capacity-back-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; transition: all .15s; margin-bottom: 16px; }
+.capacity-back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 .projects-list { margin-top: 12px; max-height: 400px; overflow-y: auto; }
 .project-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); transition: background .15s; }
 .project-row:last-child { border-bottom: none; }
@@ -435,11 +487,29 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 
     <!-- PROJETOS -->
     <div class="page" id="page-projetos">
-      <div class="page-header-row"><h1 class="page-title">Projetos (Épicos)</h1></div>
-      <div class="timeline-filters">
-        <select class="filter-select" id="projetos-equipe" onchange="loadProjetos()"><option value="">Todas as equipes</option></select>
+      <div class="page-header-row"><h1 class="page-title">Projetos</h1></div>
+      <div class="page-tabs">
+        <button class="page-tab active" onclick="switchProjetosTab('epicos')">Épicos</button>
+        <button class="page-tab" onclick="switchProjetosTab('sprints')">Sprints</button>
       </div>
-      <div id="projetos-content"><div class="loading"><div class="spinner"></div></div></div>
+      <div id="projetos-tab-epicos">
+        <div class="timeline-filters">
+          <select class="filter-select" id="projetos-equipe" onchange="loadProjetos()"><option value="">Todas as equipes</option></select>
+        </div>
+        <div id="projetos-content"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+      <div id="projetos-tab-sprints" style="display:none">
+        <div class="timeline-filters">
+          <select class="filter-select" id="sprints-equipe" onchange="loadSprints()"><option value="">Selecione uma equipe</option></select>
+        </div>
+        <div class="sprint-filters" id="sprint-estado-filters">
+          <button class="period-chip" onclick="filterSprints('')">Todas</button>
+          <button class="period-chip active" onclick="filterSprints('active')">Ativas</button>
+          <button class="period-chip" onclick="filterSprints('future')">Futuras</button>
+          <button class="period-chip" onclick="filterSprints('closed')">Concluídas</button>
+        </div>
+        <div id="sprints-content"></div>
+      </div>
     </div>
 
     <!-- USUARIOS -->
@@ -676,7 +746,8 @@ async function loadEquipes() {
     const fills = [
       {sel: document.getElementById('equipe-select'), def: 'Todos os membros'},
       {sel: document.getElementById('timeline-equipe'), def: 'Equipe...'},
-      {sel: document.getElementById('projetos-equipe'), def: 'Todas as equipes'}
+      {sel: document.getElementById('projetos-equipe'), def: 'Todas as equipes'},
+      {sel: document.getElementById('sprints-equipe'), def: 'Todas as equipes'}
     ];
     fills.forEach(({sel, def}) => {
       sel.innerHTML = '<option value="">' + def + '</option>';
@@ -1029,6 +1100,138 @@ async function handleProjMetaSubmit(e) {
     loadProjetos();
   } catch (err) { alert('Erro: ' + err.message); }
   return false;
+}
+
+// === SPRINTS ===
+let sprintEstadoFilter = 'active';
+
+function switchProjetosTab(tab) {
+  const tabs = document.querySelectorAll('#page-projetos .page-tab');
+  tabs.forEach(t => t.classList.remove('active'));
+  document.getElementById('projetos-tab-epicos').style.display = tab === 'epicos' ? '' : 'none';
+  document.getElementById('projetos-tab-sprints').style.display = tab === 'sprints' ? '' : 'none';
+  tabs[tab === 'epicos' ? 0 : 1].classList.add('active');
+  if (tab === 'sprints') loadSprints();
+}
+
+function filterSprints(estado) {
+  sprintEstadoFilter = estado;
+  const chips = document.querySelectorAll('#sprint-estado-filters .period-chip');
+  chips.forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  loadSprints();
+}
+
+async function loadSprints() {
+  const el = document.getElementById('sprints-content');
+  const equipe = document.getElementById('sprints-equipe').value;
+  if (!equipe) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Selecione uma equipe para ver as sprints</div></div>';
+    return;
+  }
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const params = new URLSearchParams();
+    params.set('equipe', equipe);
+    if (sprintEstadoFilter) params.set('estado', sprintEstadoFilter);
+    const sprints = await api('/sprints?' + params.toString());
+    if (!sprints || sprints.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏃</div><div class="empty-state-text">Nenhuma sprint encontrada</div></div>'; return; }
+    let html = '<div class="sprint-list">';
+    sprints.forEach(s => {
+      const estado = s.estado || 'future';
+      const dates = formatSprintDates(s.data_inicio, s.data_fim);
+      const projeto = s.projeto_chave ? '<span style="color:var(--text-tertiary);font-size:11px">' + esc(s.projeto_chave) + '</span> ' : '';
+      html += '<div class="sprint-item" id="sprint-item-' + s.id + '" onclick="openSprintCapacity(\'' + s.id + '\')">' +
+        '<div class="sprint-dot ' + estado + '"></div>' +
+        '<div class="sprint-info"><div class="sprint-name">' + projeto + esc(s.nome) + '</div><div class="sprint-dates">' + dates + '</div>' +
+        '<div class="sprint-ausencias-preview" id="sprint-aus-' + s.id + '"></div></div>' +
+        '<div class="sprint-meta"><span class="sprint-state-badge ' + estado + '">' + formatEstado(estado) + '</span><br><span>' + s.total_tarefas + ' tarefas</span></div>' +
+      '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+    sprints.forEach(s => loadSprintAusencias(s.id));
+  } catch(e) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+async function loadSprintAusencias(sprintID) {
+  const el = document.getElementById('sprint-aus-' + sprintID);
+  if (!el) return;
+  try {
+    const data = await api('/sprints/' + sprintID + '/capacity');
+    if (!data.membros) return;
+    const aus = data.membros.filter(m => m.ausencias && m.ausencias.length > 0);
+    if (aus.length === 0) return;
+    let html = '';
+    aus.forEach(m => {
+      const initials = m.nome.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+      const avatar = m.avatar_url ? '<img src="' + esc(m.avatar_url) + '" alt="" style="width:16px;height:16px;border-radius:50%">' : '<span style="font-size:9px;font-weight:600">' + initials + '</span>';
+      const tipos = m.ausencias.map(a => formatTipoAusencia(a.tipo) + ' ' + a.dias + 'd').join(', ');
+      html += '<span class="sprint-aus-tag" title="' + esc(m.nome) + ': ' + esc(tipos) + '">' + avatar + ' ' + esc(m.nome.split(' ')[0]) + ' <span class="sprint-aus-detail">' + esc(tipos) + '</span></span>';
+    });
+    el.innerHTML = html;
+  } catch(e) {}
+}
+
+function formatEstado(e) {
+  if (e === 'active') return 'Ativa';
+  if (e === 'closed') return 'Concluída';
+  if (e === 'future') return 'Futura';
+  return e || '—';
+}
+
+function formatSprintDates(inicio, fim) {
+  if (!inicio && !fim) return '—';
+  const opts = { day: '2-digit', month: '2-digit', year: 'numeric' };
+  const di = inicio ? new Date(inicio).toLocaleDateString('pt-BR', opts) : '?';
+  const df = fim ? new Date(fim).toLocaleDateString('pt-BR', opts) : '?';
+  return di + ' — ' + df;
+}
+
+async function openSprintCapacity(sprintID) {
+  const el = document.getElementById('sprints-content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const data = await api('/sprints/' + sprintID + '/capacity');
+    let html = '<button class="capacity-back-btn" onclick="loadSprints()">← Voltar</button>';
+    html += '<div class="capacity-panel">';
+    html += '<div class="capacity-panel-header"><div><div class="capacity-panel-title">' + esc(data.sprint.nome) + '</div>';
+    html += '<div class="capacity-panel-sub">' + formatSprintDates(data.sprint.data_inicio, data.sprint.data_fim) + ' • ' + data.dias_uteis + ' dias úteis</div></div>';
+    const estado = data.sprint.estado || 'future';
+    html += '<span class="sprint-state-badge ' + estado + '">' + formatEstado(estado) + '</span></div>';
+
+    if (!data.membros || data.membros.length === 0) {
+      html += '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Nenhum membro com tarefas nesta sprint</div></div>';
+    } else {
+      html += '<div class="capacity-members">';
+      data.membros.forEach(m => {
+        const pctClass = m.percentual_alocacao > 100 ? 'red' : m.percentual_alocacao > 80 ? 'amber' : 'green';
+        const barWidth = Math.min(m.percentual_alocacao, 150);
+        const initials = m.nome.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+        const avatar = m.avatar_url ? '<img src="' + esc(m.avatar_url) + '" alt="">' : initials;
+        html += '<div class="capacity-card">';
+        html += '<div class="capacity-card-header"><div class="capacity-avatar">' + avatar + '</div>';
+        html += '<div class="capacity-card-name">' + esc(m.nome) + '</div>';
+        html += '<div class="capacity-card-pct ' + pctClass + '">' + m.percentual_alocacao.toFixed(1) + '%</div></div>';
+        html += '<div class="capacity-bar"><div class="capacity-bar-fill ' + pctClass + '" style="width:' + barWidth + '%"></div></div>';
+        html += '<div class="capacity-card-detail">' + m.horas_estimadas.toFixed(1) + 'h estimadas / ' + m.horas_disponiveis.toFixed(1) + 'h disponíveis</div>';
+        html += '<div class="capacity-badges">';
+        if (m.overcapacity) html += '<span class="capacity-badge overcapacity">Overcapacity</span>';
+        m.ausencias.forEach(a => {
+          html += '<span class="capacity-badge absence">' + formatTipoAusencia(a.tipo) + ' ' + a.dias + 'd</span>';
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<button class="capacity-back-btn" onclick="loadSprints()">← Voltar</button><div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function formatTipoAusencia(tipo) {
+  const map = { ferias: 'Férias', folga: 'Folga', licenca: 'Licença', dayoff: 'Day Off', atestado: 'Atestado' };
+  return map[tipo] || tipo;
 }
 
 // === USUARIOS ===

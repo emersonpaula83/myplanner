@@ -27,6 +27,9 @@ func (m *mockJiraClient) GetProjects(ctx context.Context) ([]jira.JiraProject, e
 func (m *mockJiraClient) GetProjectIssues(ctx context.Context, projectKey string, updatedSince *time.Time) ([]jira.JiraIssue, error) {
 	return m.issues, nil
 }
+func (m *mockJiraClient) GetIssuesByProjects(ctx context.Context, projectKeys []string, updatedSince *time.Time) ([]jira.JiraIssue, error) {
+	return m.issues, nil
+}
 func (m *mockJiraClient) GetUsers(ctx context.Context, projectKey string) ([]jira.JiraUser, error) {
 	return m.users, nil
 }
@@ -36,6 +39,10 @@ func (m *mockJiraClient) GetBoards(ctx context.Context, projectKey string) ([]ji
 func (m *mockJiraClient) GetBoardSprints(ctx context.Context, boardID int) ([]jira.JiraSprint, error) {
 	return m.sprints, nil
 }
+func (m *mockJiraClient) GetSprintFieldID(ctx context.Context) (string, error) {
+	return "customfield_10020", nil
+}
+func (m *mockJiraClient) SetSprintFieldID(id string) {}
 
 func TestParseJiraTime(t *testing.T) {
 	tests := []struct {

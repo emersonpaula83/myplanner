@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BACKEND="$ROOT/backend"
-PID_FILE="/tmp/tcloud-planner.pid"
-BIN="/tmp/tcloud-planner-dev"
+PID_FILE="/tmp/myplanner.pid"
+BIN="/tmp/myplanner-dev"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -12,9 +12,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-log()  { echo -e "${GREEN}[tcloud]${NC} $1"; }
-warn() { echo -e "${YELLOW}[tcloud]${NC} $1"; }
-err()  { echo -e "${RED}[tcloud]${NC} $1"; }
+log()  { echo -e "${GREEN}[myplanner]${NC} $1"; }
+warn() { echo -e "${YELLOW}[myplanner]${NC} $1"; }
+err()  { echo -e "${RED}[myplanner]${NC} $1"; }
 
 stop_server() {
     if [ -f "$PID_FILE" ]; then
@@ -39,18 +39,28 @@ stop_server() {
     fi
 }
 
+ensure_no_local_postgres() {
+    if ss -tlnp 2>/dev/null | grep -q "127.0.0.1:5432"; then
+        warn "Postgres local detectado na porta 5432, parando..."
+        systemctl stop postgresql 2>/dev/null || true
+        sleep 1
+    fi
+}
+
 cmd_db() {
     log "Subindo PostgreSQL..."
+    ensure_no_local_postgres
     docker compose -f "$ROOT/docker-compose.yml" up -d db
     log "Aguardando PostgreSQL ficar pronto..."
-    for i in $(seq 1 30); do
-        if docker compose -f "$ROOT/docker-compose.yml" exec -T db pg_isready -U tcloud -d tcloud_planner >/dev/null 2>&1; then
+    for i in $(seq 1 60); do
+        if docker compose -f "$ROOT/docker-compose.yml" exec -T db pg_isready -U myplanner -d myplanner >/dev/null 2>&1; then
             log "PostgreSQL pronto!"
             return 0
         fi
         sleep 1
     done
-    err "PostgreSQL não ficou pronto em 30s"
+    err "PostgreSQL não ficou pronto em 60s"
+    docker compose -f "$ROOT/docker-compose.yml" logs db --tail 10
     return 1
 }
 
@@ -94,11 +104,11 @@ cmd_restart() {
 }
 
 cmd_status() {
-    echo -e "${CYAN}=== tCloud Planner Status ===${NC}"
+    echo -e "${CYAN}=== MyPlanner Status ===${NC}"
     echo ""
 
     # DB
-    if docker compose -f "$ROOT/docker-compose.yml" exec -T db pg_isready -U tcloud -d tcloud_planner >/dev/null 2>&1; then
+    if docker compose -f "$ROOT/docker-compose.yml" exec -T db pg_isready -U myplanner -d myplanner >/dev/null 2>&1; then
         echo -e "  PostgreSQL:  ${GREEN}●${NC} rodando"
     else
         echo -e "  PostgreSQL:  ${RED}●${NC} parado"
@@ -117,7 +127,7 @@ cmd_status() {
     local token
     token=$(curl -sf http://localhost:8080/api/v1/auth/login \
         -H 'Content-Type: application/json' \
-        -d '{"email":"admin@tcloud.local","senha":"admin123"}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || true)
+        -d '{"email":"admin@myplanner.local","senha":"Totvs@123"}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || true)
 
     if [ -n "$token" ]; then
         local fontes
@@ -167,7 +177,7 @@ cmd_clean() {
         log "Cancelado."
         return 0
     fi
-    docker compose -f "$ROOT/docker-compose.yml" exec -T db psql -U tcloud -d tcloud_planner -c \
+    docker compose -f "$ROOT/docker-compose.yml" exec -T db psql -U myplanner -d myplanner -c \
         "TRUNCATE tarefas, tarefa_produtos, sprints, projetos, membros, sync_logs, disponibilidade, equipes, equipe_membros, limites_alerta, produtos, usuario_projetos CASCADE;"
     log "Dados sincronizados limpos! (usuarios e fonte_dados preservados)"
 }
@@ -179,7 +189,7 @@ cmd_cleanall() {
         log "Cancelado."
         return 0
     fi
-    docker compose -f "$ROOT/docker-compose.yml" exec -T db psql -U tcloud -d tcloud_planner -c \
+    docker compose -f "$ROOT/docker-compose.yml" exec -T db psql -U myplanner -d myplanner -c \
         "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
     log "Schema zerado! Rode: ./dev.sh migrate"
 }
@@ -192,7 +202,7 @@ cmd_up() {
     echo ""
     cmd_status
     log "Acesse: http://localhost:8080"
-    log "Login: admin@tcloud.local / admin123"
+    log "Login: admin@myplanner.local / Totvs@123"
 }
 
 cmd_down() {
@@ -200,7 +210,7 @@ cmd_down() {
 }
 
 cmd_help() {
-    echo -e "${CYAN}tCloud Planner — Dev Script${NC}"
+    echo -e "${CYAN}MyPlanner — Dev Script${NC}"
     echo ""
     echo "Uso: ./dev.sh <comando>"
     echo ""
