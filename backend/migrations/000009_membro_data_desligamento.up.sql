@@ -1,0 +1,1 @@
+ALTER TABLE membros ADD COLUMN IF NOT EXISTS data_desligamento DATE DEFAULT NULL;

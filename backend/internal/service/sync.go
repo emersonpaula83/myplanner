@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -585,6 +586,16 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 		dataInicioExecucao = extractFirstInProgressDate(issue.Changelog)
 	}
 
+	var dataEntradaSprint *time.Time
+	if sprintID != nil && f.Sprint != nil {
+		if issue.Changelog != nil {
+			dataEntradaSprint = extractSprintEntryDate(issue.Changelog, f.Sprint.Name)
+		}
+		if dataEntradaSprint == nil {
+			dataEntradaSprint = &dataCriacao
+		}
+	}
+
 	params := &repository.UpsertTarefaParams{
 		FonteDadosID:       fonte.ID,
 		ProjetoID:          projetoID,
@@ -608,6 +619,7 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 		StatusCategoria:    &statusCat,
 		CamposExtras:       json.RawMessage(`{}`),
 		DataInicioExecucao: dataInicioExecucao,
+		DataEntradaSprint:  dataEntradaSprint,
 	}
 
 	return s.repo.UpsertTarefa(ctx, params)
@@ -618,6 +630,25 @@ var inProgressStatuses = map[string]bool{
 	"Em Andamento":     true,
 	"Desenvolvimento":  true,
 	"Em Desenvolvimento": true,
+}
+
+func extractSprintEntryDate(cl *jira.JiraChangelog, sprintName string) *time.Time {
+	var latest *time.Time
+	for _, h := range cl.Histories {
+		for _, item := range h.Items {
+			if item.Field != "Sprint" {
+				continue
+			}
+			if !strings.Contains(item.ToString, sprintName) {
+				continue
+			}
+			t := parseOptionalJiraTime(h.Created)
+			if t != nil && (latest == nil || t.After(*latest)) {
+				latest = t
+			}
+		}
+	}
+	return latest
 }
 
 func extractFirstInProgressDate(cl *jira.JiraChangelog) *time.Time {

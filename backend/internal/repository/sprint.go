@@ -94,7 +94,7 @@ func (r *SprintRepository) ListByProjeto(ctx context.Context, projetoID uuid.UUI
 
 	query += `
 		GROUP BY s.id, s.nome, s.estado, s.data_inicio, s.data_fim
-		ORDER BY s.data_inicio DESC NULLS LAST
+		ORDER BY s.data_inicio ASC NULLS LAST
 	`
 
 	rows, err := r.pool.Query(ctx, query, args...)
@@ -142,7 +142,11 @@ func (r *SprintRepository) ListSprints(ctx context.Context, equipeID *uuid.UUID,
 		argN++
 	}
 
-	query += " ORDER BY s.data_inicio DESC NULLS LAST"
+	if estado != nil && *estado == "closed" {
+		query += " ORDER BY s.data_fim DESC NULLS LAST"
+	} else {
+		query += " ORDER BY s.data_inicio ASC NULLS LAST"
+	}
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -200,15 +204,59 @@ func (r *SprintRepository) GetTarefasCapacityBySprint(ctx context.Context, sprin
 	return result, nil
 }
 
+type TarefaDetail struct {
+	ID             uuid.UUID `json:"id"`
+	NumeroTicket   string    `json:"numero_ticket"`
+	Resumo         string    `json:"resumo"`
+	Tipo           string    `json:"tipo"`
+	Status         string    `json:"status"`
+	Prioridade     *string   `json:"prioridade"`
+	Segundos       int64     `json:"estimativa_tempo"`
+	ProjetoID      uuid.UUID `json:"projeto_id"`
+	ProjetoChave   string    `json:"projeto_chave"`
+	ProjetoNome    string    `json:"projeto_nome"`
+	ResponsavelID  uuid.UUID `json:"-"`
+}
+
+func (r *SprintRepository) GetTarefasDetailBySprint(ctx context.Context, sprintID uuid.UUID) ([]TarefaDetail, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.status, t.prioridade,
+		       COALESCE(t.estimativa_tempo, 0),
+		       p.id, p.chave, p.nome,
+		       t.responsavel_id
+		FROM tarefas t
+		INNER JOIN projetos p ON p.id = t.projeto_id
+		WHERE t.sprint_id = $1 AND t.responsavel_id IS NOT NULL
+		ORDER BY p.chave, t.numero_ticket
+	`, sprintID)
+	if err != nil {
+		return nil, fmt.Errorf("getting tarefas detail: %w", err)
+	}
+	defer rows.Close()
+
+	var result []TarefaDetail
+	for rows.Next() {
+		var td TarefaDetail
+		if err := rows.Scan(&td.ID, &td.NumeroTicket, &td.Resumo, &td.Tipo, &td.Status,
+			&td.Prioridade, &td.Segundos, &td.ProjetoID, &td.ProjetoChave, &td.ProjetoNome,
+			&td.ResponsavelID); err != nil {
+			return nil, fmt.Errorf("scanning tarefa detail: %w", err)
+		}
+		result = append(result, td)
+	}
+	return result, nil
+}
+
 type MembroInfo struct {
-	ID        uuid.UUID
-	Nome      string
-	AvatarURL *string
+	ID               uuid.UUID
+	Nome             string
+	AvatarURL        *string
+	DataDesligamento *time.Time
 }
 
 func (r *SprintRepository) GetMembrosFromSprint(ctx context.Context, sprintID uuid.UUID) ([]MembroInfo, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT DISTINCT m.id, m.nome, m.avatar_url
+		SELECT DISTINCT m.id, m.nome, m.avatar_url, m.data_desligamento
 		FROM membros m
 		INNER JOIN tarefas t ON t.responsavel_id = m.id
 		WHERE t.sprint_id = $1
@@ -222,7 +270,7 @@ func (r *SprintRepository) GetMembrosFromSprint(ctx context.Context, sprintID uu
 	result := make([]MembroInfo, 0)
 	for rows.Next() {
 		var m MembroInfo
-		if err := rows.Scan(&m.ID, &m.Nome, &m.AvatarURL); err != nil {
+		if err := rows.Scan(&m.ID, &m.Nome, &m.AvatarURL, &m.DataDesligamento); err != nil {
 			return nil, fmt.Errorf("scanning membro info: %w", err)
 		}
 		result = append(result, m)
@@ -260,6 +308,271 @@ func (r *SprintRepository) GetAusenciasNoPeriodo(ctx context.Context, membroIDs 
 			return nil, fmt.Errorf("scanning ausencia: %w", err)
 		}
 		result = append(result, a)
+	}
+	return result, nil
+}
+
+type FeriadoRecord struct {
+	Data time.Time
+	Nome string
+}
+
+func (r *SprintRepository) GetFeriadosNoPeriodo(ctx context.Context, inicio, fim time.Time) ([]FeriadoRecord, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT data, nome FROM feriados
+		WHERE data >= $1::date AND data <= $2::date
+		ORDER BY data
+	`, inicio, fim)
+	if err != nil {
+		return nil, fmt.Errorf("getting feriados: %w", err)
+	}
+	defer rows.Close()
+
+	var result []FeriadoRecord
+	for rows.Next() {
+		var f FeriadoRecord
+		if err := rows.Scan(&f.Data, &f.Nome); err != nil {
+			return nil, fmt.Errorf("scanning feriado: %w", err)
+		}
+		result = append(result, f)
+	}
+	return result, nil
+}
+
+func (r *SprintRepository) GetMembrosEquipeIDs(ctx context.Context, equipeID uuid.UUID, dataFim time.Time) (map[uuid.UUID]bool, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT em.membro_id FROM equipe_membros em
+		JOIN membros m ON m.id = em.membro_id
+		WHERE em.equipe_id = $1
+		  AND (m.data_desligamento IS NULL OR m.data_desligamento > $2)
+	`, equipeID, dataFim)
+	if err != nil {
+		return nil, fmt.Errorf("getting equipe membro ids: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make(map[uuid.UUID]bool)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning equipe membro id: %w", err)
+		}
+		ids[id] = true
+	}
+	return ids, nil
+}
+
+type UnplannedStats struct {
+	TotalTarefas          int
+	TarefasNaoPlanejadas  int
+	HorasNaoPlanejadas    float64
+	HorasTotalSprint      float64
+}
+
+func (r *SprintRepository) GetUnplannedStats(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*UnplannedStats, error) {
+	var baseQuery string
+	var args []interface{}
+
+	if equipeID != nil {
+		baseQuery = `
+			SELECT
+				COUNT(*) AS total_tarefas,
+				COUNT(*) FILTER (WHERE
+					t.data_entrada_sprint > s.data_inicio
+					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+				) AS tarefas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE
+					t.data_entrada_sprint > s.data_inicio
+					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+				), 0) / 3600.0 AS horas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total
+			FROM tarefas t
+			INNER JOIN sprints s ON s.id = t.sprint_id
+			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id
+			WHERE t.sprint_id = $1 AND t.responsavel_id IS NOT NULL
+			  AND s.data_inicio IS NOT NULL AND em.equipe_id = $2
+		`
+		args = []interface{}{sprintID, *equipeID}
+	} else {
+		baseQuery = `
+			SELECT
+				COUNT(*) AS total_tarefas,
+				COUNT(*) FILTER (WHERE
+					t.data_entrada_sprint > s.data_inicio
+					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+				) AS tarefas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE
+					t.data_entrada_sprint > s.data_inicio
+					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+				), 0) / 3600.0 AS horas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total
+			FROM tarefas t
+			INNER JOIN sprints s ON s.id = t.sprint_id
+			WHERE t.sprint_id = $1 AND t.responsavel_id IS NOT NULL
+			  AND s.data_inicio IS NOT NULL
+		`
+		args = []interface{}{sprintID}
+	}
+
+	var stats UnplannedStats
+	err := r.pool.QueryRow(ctx, baseQuery, args...).Scan(
+		&stats.TotalTarefas,
+		&stats.TarefasNaoPlanejadas,
+		&stats.HorasNaoPlanejadas,
+		&stats.HorasTotalSprint,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getting unplanned stats: %w", err)
+	}
+	return &stats, nil
+}
+
+type HistoricalUnplannedItem struct {
+	SprintID           uuid.UUID
+	SprintNome         string
+	HorasNaoPlanejadas float64
+	HorasTotal         float64
+	DiasUteis          int
+	TotalMembros       int
+}
+
+func (r *SprintRepository) GetHistoricalUnplanned(ctx context.Context, projetoID uuid.UUID, equipeID *uuid.UUID, currentSprintID uuid.UUID, limit int) ([]HistoricalUnplannedItem, error) {
+	var query string
+	var args []interface{}
+
+	if equipeID != nil {
+		query = `
+			SELECT s.id, s.nome,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE
+					t.data_entrada_sprint > s.data_inicio
+					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+				), 0) / 3600.0 AS horas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total,
+				COUNT(DISTINCT t.responsavel_id) FILTER (WHERE em.equipe_id = $2) AS total_membros
+			FROM sprints s
+			INNER JOIN tarefas t ON t.sprint_id = s.id AND t.responsavel_id IS NOT NULL
+			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.equipe_id = $2
+			WHERE s.projeto_id = $1 AND s.estado = 'closed'
+			  AND s.data_inicio IS NOT NULL AND s.data_fim IS NOT NULL
+			  AND s.id != $3
+			GROUP BY s.id, s.nome, s.data_fim
+			ORDER BY s.data_fim DESC
+			LIMIT $4
+		`
+		args = []interface{}{projetoID, *equipeID, currentSprintID, limit}
+	} else {
+		query = `
+			SELECT s.id, s.nome,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE
+					t.data_entrada_sprint > s.data_inicio
+					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+				), 0) / 3600.0 AS horas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total,
+				COUNT(DISTINCT t.responsavel_id) AS total_membros
+			FROM sprints s
+			INNER JOIN tarefas t ON t.sprint_id = s.id AND t.responsavel_id IS NOT NULL
+			WHERE s.projeto_id = $1 AND s.estado = 'closed'
+			  AND s.data_inicio IS NOT NULL AND s.data_fim IS NOT NULL
+			  AND s.id != $2
+			GROUP BY s.id, s.nome, s.data_fim
+			ORDER BY s.data_fim DESC
+			LIMIT $3
+		`
+		args = []interface{}{projetoID, currentSprintID, limit}
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("getting historical unplanned: %w", err)
+	}
+	defer rows.Close()
+
+	var result []HistoricalUnplannedItem
+	for rows.Next() {
+		var item HistoricalUnplannedItem
+		if err := rows.Scan(&item.SprintID, &item.SprintNome, &item.HorasNaoPlanejadas, &item.HorasTotal, &item.TotalMembros); err != nil {
+			return nil, fmt.Errorf("scanning historical unplanned: %w", err)
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+func (r *SprintRepository) GetEquipeNome(ctx context.Context, equipeID uuid.UUID) (string, error) {
+	var nome string
+	err := r.pool.QueryRow(ctx, `SELECT nome FROM equipes WHERE id = $1`, equipeID).Scan(&nome)
+	if err != nil {
+		return "", fmt.Errorf("getting equipe nome: %w", err)
+	}
+	return nome, nil
+}
+
+func (r *SprintRepository) GetSprintProjetoID(ctx context.Context, sprintID uuid.UUID) (*uuid.UUID, error) {
+	var projetoID *uuid.UUID
+	err := r.pool.QueryRow(ctx, `SELECT projeto_id FROM sprints WHERE id = $1`, sprintID).Scan(&projetoID)
+	if err != nil {
+		return nil, fmt.Errorf("getting sprint projeto_id: %w", err)
+	}
+	return projetoID, nil
+}
+
+func (r *SprintRepository) GetMembrosEquipeInfo(ctx context.Context, equipeID uuid.UUID, dataFim time.Time) ([]MembroInfo, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT m.id, m.nome, m.avatar_url, m.data_desligamento
+		FROM membros m
+		INNER JOIN equipe_membros em ON em.membro_id = m.id
+		WHERE em.equipe_id = $1
+		  AND (m.data_desligamento IS NULL OR m.data_desligamento > $2)
+		ORDER BY m.nome
+	`, equipeID, dataFim)
+	if err != nil {
+		return nil, fmt.Errorf("getting equipe membros info: %w", err)
+	}
+	defer rows.Close()
+
+	var result []MembroInfo
+	for rows.Next() {
+		var m MembroInfo
+		if err := rows.Scan(&m.ID, &m.Nome, &m.AvatarURL, &m.DataDesligamento); err != nil {
+			return nil, fmt.Errorf("scanning equipe membro info: %w", err)
+		}
+		result = append(result, m)
+	}
+	return result, nil
+}
+
+type BurndownTarefa struct {
+	EstimativaSegundos int
+	DataResolvido      *time.Time
+	DataEntradaSprint  *time.Time
+	Status             string
+}
+
+func (r *SprintRepository) GetBurndownTarefas(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) ([]BurndownTarefa, error) {
+	query := `
+		SELECT COALESCE(t.estimativa_tempo, 0), t.data_resolvido, t.data_entrada_sprint, t.status
+		FROM tarefas t
+		WHERE t.sprint_id = $1 AND t.status != 'Cancelado'
+	`
+	args := []any{sprintID}
+	if equipeID != nil {
+		query += ` AND t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $2)`
+		args = append(args, *equipeID)
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("getting burndown tarefas: %w", err)
+	}
+	defer rows.Close()
+
+	var result []BurndownTarefa
+	for rows.Next() {
+		var bt BurndownTarefa
+		if err := rows.Scan(&bt.EstimativaSegundos, &bt.DataResolvido, &bt.DataEntradaSprint, &bt.Status); err != nil {
+			return nil, fmt.Errorf("scanning burndown tarefa: %w", err)
+		}
+		result = append(result, bt)
 	}
 	return result, nil
 }

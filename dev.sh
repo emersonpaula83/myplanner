@@ -6,6 +6,13 @@ BACKEND="$ROOT/backend"
 PID_FILE="/tmp/myplanner.pid"
 BIN="/tmp/myplanner-dev"
 
+# Exportar variáveis do .env para docker compose
+if [ -f "$ROOT/.env" ]; then
+    set -a
+    source "$ROOT/.env"
+    set +a
+fi
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -68,6 +75,12 @@ cmd_migrate() {
     log "Rodando migrations..."
     cd "$BACKEND" && go run ./cmd/migrate -direction up
     log "Migrations aplicadas!"
+}
+
+cmd_seed() {
+    log "Criando usuário admin..."
+    cd "$BACKEND" && go run ./cmd/seed
+    log "Seed concluído!"
 }
 
 cmd_build() {
@@ -198,6 +211,7 @@ cmd_up() {
     log "Subindo tudo..."
     cmd_db
     cmd_migrate
+    cmd_seed
     cmd_start
     echo ""
     cmd_status
@@ -222,6 +236,7 @@ cmd_help() {
     echo "  restart   Recompila e reinicia"
     echo "  db        Sobe só o PostgreSQL"
     echo "  migrate   Roda migrations"
+    echo "  seed      Cria usuário admin (usa PASS_APP do .env)"
     echo "  build     Compila o backend"
     echo "  test      Roda testes"
     echo "  status    Mostra status dos serviços"
@@ -240,6 +255,7 @@ case "${1:-help}" in
     restart) cmd_restart ;;
     db)      cmd_db ;;
     migrate) cmd_migrate ;;
+    seed)    cmd_seed ;;
     build)   cmd_build ;;
     test)    cmd_test ;;
     status)  cmd_status ;;

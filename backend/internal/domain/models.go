@@ -29,16 +29,17 @@ type FonteDados struct {
 }
 
 type Membro struct {
-	ID            uuid.UUID  `json:"id" db:"id"`
-	FonteDadosID  uuid.UUID  `json:"fonte_dados_id" db:"fonte_dados_id"`
-	JiraAccountID string     `json:"jira_account_id" db:"jira_account_id"`
-	Nome          string     `json:"nome" db:"nome"`
-	Email         *string    `json:"email" db:"email"`
-	AvatarURL     *string    `json:"avatar_url" db:"avatar_url"`
-	Team          *string    `json:"team" db:"team"`
-	Ativo         bool       `json:"ativo" db:"ativo"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
+	ID               uuid.UUID  `json:"id" db:"id"`
+	FonteDadosID     uuid.UUID  `json:"fonte_dados_id" db:"fonte_dados_id"`
+	JiraAccountID    string     `json:"jira_account_id" db:"jira_account_id"`
+	Nome             string     `json:"nome" db:"nome"`
+	Email            *string    `json:"email" db:"email"`
+	AvatarURL        *string    `json:"avatar_url" db:"avatar_url"`
+	Team             *string    `json:"team" db:"team"`
+	Ativo            bool       `json:"ativo" db:"ativo"`
+	DataDesligamento *time.Time `json:"data_desligamento" db:"data_desligamento"`
+	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type Projeto struct {
@@ -113,6 +114,7 @@ type Tarefa struct {
 	ParentID           *uuid.UUID `json:"parent_id" db:"parent_id"`
 	Apelido            *string    `json:"apelido" db:"apelido"`
 	DataInicioExecucao *time.Time `json:"data_inicio_execucao" db:"data_inicio_execucao"`
+	DataEntradaSprint  *time.Time `json:"data_entrada_sprint" db:"data_entrada_sprint"`
 }
 
 type Disponibilidade struct {

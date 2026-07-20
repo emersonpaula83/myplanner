@@ -15,7 +15,9 @@ type SprintStore interface {
 	ListProjetosComSprints(ctx context.Context, equipeID *uuid.UUID) ([]repository.ProjetoComSprints, error)
 	ListByProjeto(ctx context.Context, projetoID uuid.UUID, estado *string) ([]repository.SprintListItem, error)
 	ListSprints(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]repository.SprintListItem, error)
-	GetCapacity(ctx context.Context, sprintID uuid.UUID) (*service.SprintCapacityResult, error)
+	GetCapacity(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.SprintCapacityResult, error)
+	GetUnplannedAnalysis(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.UnplannedAnalysisResult, error)
+	GetBurndown(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.BurndownResult, error)
 }
 
 type SprintHandler struct {
@@ -97,10 +99,68 @@ func (h *SprintHandler) GetCapacity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.store.GetCapacity(r.Context(), sprintID)
+	var equipeID *uuid.UUID
+	if e := r.URL.Query().Get("equipe"); e != "" {
+		id, err := uuid.Parse(e)
+		if err == nil {
+			equipeID = &id
+		}
+	}
+
+	result, err := h.store.GetCapacity(r.Context(), sprintID, equipeID)
 	if err != nil {
 		h.logger.Error("getting sprint capacity", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to get capacity")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *SprintHandler) GetUnplanned(w http.ResponseWriter, r *http.Request) {
+	sprintID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid sprint id")
+		return
+	}
+
+	var equipeID *uuid.UUID
+	if e := r.URL.Query().Get("equipe"); e != "" {
+		id, err := uuid.Parse(e)
+		if err == nil {
+			equipeID = &id
+		}
+	}
+
+	result, err := h.store.GetUnplannedAnalysis(r.Context(), sprintID, equipeID)
+	if err != nil {
+		h.logger.Error("getting unplanned analysis", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "failed to get unplanned analysis")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *SprintHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
+	sprintID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid sprint id")
+		return
+	}
+
+	var equipeID *uuid.UUID
+	if e := r.URL.Query().Get("equipe"); e != "" {
+		id, err := uuid.Parse(e)
+		if err == nil {
+			equipeID = &id
+		}
+	}
+
+	result, err := h.store.GetBurndown(r.Context(), sprintID, equipeID)
+	if err != nil {
+		h.logger.Error("getting burndown", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "failed to get burndown")
 		return
 	}
 

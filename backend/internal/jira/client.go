@@ -320,7 +320,23 @@ func tryParseSprintValue(v json.RawMessage) *JiraSprint {
 	}
 	var arr []json.RawMessage
 	if json.Unmarshal(v, &arr) == nil && len(arr) > 0 {
-		return tryParseSprint(arr[0])
+		var active, latest *JiraSprint
+		for _, raw := range arr {
+			sp := tryParseSprint(raw)
+			if sp == nil {
+				continue
+			}
+			if sp.State == "active" {
+				active = sp
+			}
+			if latest == nil || sp.ID > latest.ID {
+				latest = sp
+			}
+		}
+		if active != nil {
+			return active
+		}
+		return latest
 	}
 	return nil
 }

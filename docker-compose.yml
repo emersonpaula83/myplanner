@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: myplanner
-      POSTGRES_PASSWORD: myplanner_dev
+      POSTGRES_PASSWORD: ${PASS_DB}
       POSTGRES_DB: myplanner
     network_mode: host
     volumes:

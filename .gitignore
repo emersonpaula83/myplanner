@@ -34,3 +34,6 @@ docker-compose.override.yml
 # Binary
 backend/bin/
 backend/migrate
+backend/api
+backend/myplanner
+backend/seed

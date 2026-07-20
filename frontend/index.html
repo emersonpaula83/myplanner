@@ -96,14 +96,23 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .app-shell { display: flex; min-height: 100vh; }
 .app-shell.hidden { display: none; }
 
-.sidebar { width: 56px; background: var(--sidebar-bg); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 4px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,.06); }
-.sidebar-logo { width: 32px; height: 32px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; font-weight: 700; font-size: 14px; color: #fff; letter-spacing: -.5px; }
-.sidebar-item { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; position: relative; border: none; background: none; padding: 0; }
-.sidebar-item svg { width: 20px; height: 20px; stroke: var(--sidebar-icon); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sidebar { width: 56px; background: var(--sidebar-bg); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 4px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,.06); transition: width .2s ease; overflow: hidden; }
+.sidebar.expanded { width: 200px; align-items: stretch; padding: 16px 12px; }
+.sidebar-logo { width: 32px; height: 32px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; font-weight: 700; font-size: 14px; color: #fff; letter-spacing: -.5px; flex-shrink: 0; align-self: center; }
+.sidebar-toggle { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; background: none; padding: 0; margin-bottom: 8px; align-self: center; }
+.sidebar-toggle svg { width: 20px; height: 20px; stroke: var(--sidebar-icon); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sidebar-toggle:hover { background: rgba(255,255,255,.08); }
+.sidebar-item { height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; position: relative; border: none; background: none; padding: 0; flex-shrink: 0; gap: 10px; }
+.sidebar.expanded .sidebar-item { justify-content: flex-start; padding: 0 10px; width: auto; }
+.sidebar:not(.expanded) .sidebar-item { width: 36px; }
+.sidebar-item svg { width: 20px; height: 20px; stroke: var(--sidebar-icon); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.sidebar-item-label { font-size: 13px; color: var(--sidebar-icon); white-space: nowrap; opacity: 0; width: 0; overflow: hidden; transition: opacity .15s, width .2s; }
+.sidebar.expanded .sidebar-item-label { opacity: 1; width: auto; }
 .sidebar-item:hover { background: rgba(255,255,255,.08); }
 .sidebar-item.active { background: rgba(13,124,102,.2); }
 .sidebar-item.active svg { stroke: var(--sidebar-active); }
-.sidebar-item.active::before { content: ''; position: absolute; left: -10px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 2px 2px 0; background: var(--sidebar-active); }
+.sidebar-item.active .sidebar-item-label { color: var(--sidebar-active); }
+.sidebar-item.active::before { content: ''; position: absolute; left: -12px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 2px 2px 0; background: var(--sidebar-active); }
 .sidebar-spacer { flex: 1; }
 @media (max-width: 700px) { .sidebar { display: none; } }
 
@@ -125,6 +134,12 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 
 .filter-select { padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-primary); font-size: 13px; font-family: inherit; cursor: pointer; appearance: auto; }
 .filter-select:focus { outline: none; border-color: var(--accent); }
+.multi-select-wrap { position: relative; }
+.multi-select-btn { text-align: left; min-width: 200px; }
+.multi-select-dropdown { position: absolute; top: 100%; left: 0; z-index: 50; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.15); padding: 8px 0; min-width: 220px; max-height: 300px; overflow-y: auto; }
+.multi-select-dropdown label { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+.multi-select-dropdown label:hover { background: var(--surface-raised); }
+.multi-select-dropdown input[type="checkbox"] { accent-color: var(--accent); }
 
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
 @media (max-width: 800px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -218,6 +233,23 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .capacity-under { background: var(--accent-soft); }
 .capacity-under .capacity-month-delta { color: var(--accent); }
 .capacity-zero .capacity-month-delta { color: var(--text-tertiary); }
+.capacity-warn { background: var(--amber-soft); }
+.capacity-warn .capacity-month-delta { color: var(--amber); }
+.capacity-danger { background: var(--red-soft); }
+.capacity-danger .capacity-month-delta { color: var(--red); }
+.capacity-ok { background: var(--accent-soft); }
+.capacity-ok .capacity-month-delta { color: var(--accent); }
+.gantt-bar.ferias { background: var(--blue); }
+.gantt-bar.licenca_medica { background: var(--red); }
+.gantt-bar.licenca_paternidade, .gantt-bar.licenca_maternidade { background: #9C27B0; }
+.gantt-bar.dayoff { background: var(--amber); }
+.gantt-bar.desligamento { background: #555; opacity: .5; }
+.gantt-avatar { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: var(--chip-bg); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); cursor: help; }
+.gantt-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.gantt-legend { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.gantt-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+.gantt-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.cap-tip { display: none !important; }
 
 .fonte-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 .fonte-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-card); transition: box-shadow .2s; }
@@ -237,6 +269,12 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .fonte-card-sync-dot.partial { background: var(--amber); }
 .fonte-card-sync-dot.error { background: var(--red); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.sync-progress-bar { width: 100%; height: 3px; border-radius: 2px; background: var(--border-subtle); overflow: hidden; margin: 6px 0; transition: opacity .3s; }
+.sync-progress-bar-inner { width: 40%; height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--blue)); animation: shimmer 1.5s ease-in-out infinite; }
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+.fonte-card-stats.syncing span::before { content: "↻ "; color: var(--blue); }
+@keyframes counter-bump { 0% { transform: scale(1); } 50% { transform: scale(1.1); color: var(--accent); } 100% { transform: scale(1); } }
+.counter-bump { animation: counter-bump .3s ease-out; display: inline-block; }
 .fonte-card-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px; font-variant-numeric: tabular-nums; }
 .fonte-card-stat b { color: var(--text-primary); font-weight: 600; }
 .fonte-card-actions { display: flex; gap: 8px; }
@@ -288,10 +326,6 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .analysis-popup { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 16px; box-shadow: var(--shadow-card); white-space: pre-wrap; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
 
 /* Sprint */
-.page-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
-.page-tab { padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--text-tertiary); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -2px; font-family: inherit; transition: all .15s; }
-.page-tab:hover { color: var(--text-primary); }
-.page-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .sprint-filters { display: flex; gap: 6px; margin-bottom: 16px; }
 .sprint-list { display: flex; flex-direction: column; gap: 8px; }
 .sprint-item { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; cursor: pointer; transition: all .15s; box-shadow: var(--shadow-card); }
@@ -317,7 +351,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .capacity-panel-title { font-size: 15px; font-weight: 650; color: var(--text-primary); }
 .capacity-panel-sub { font-size: 12px; color: var(--text-tertiary); }
 .capacity-members { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.capacity-card { background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px; }
+.capacity-card { background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px; cursor: pointer; transition: all .15s; }
 .capacity-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .capacity-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--accent); overflow: hidden; flex-shrink: 0; }
 .capacity-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -336,6 +370,59 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .capacity-badge { display: inline-flex; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
 .capacity-badge.absence { background: var(--amber-soft); color: var(--amber); }
 .capacity-badge.overcapacity { background: var(--red-soft); color: var(--red); text-transform: uppercase; letter-spacing: .3px; }
+.capacity-card:hover { border-color: var(--accent); }
+.capacity-card.absent-full { opacity: 0.45; pointer-events: none; }
+.unplanned-disclaimer { background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 6px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: #1565c0; line-height: 1.5; display: flex; gap: 10px; align-items: flex-start; }
+.unplanned-disclaimer-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.unplanned-disclaimer.warn { background: #fff8e1; border-left-color: #ffa000; color: #e65100; }
+.unplanned-disclaimer.danger { background: #ffebee; border-left-color: #d32f2f; color: #b71c1c; }
+.unplanned-badge { display: inline-flex; align-items: center; gap: 3px; background: #fff3e0; color: #e65100; border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600; margin-left: 4px; }
+@media (prefers-color-scheme: dark) {
+  .unplanned-disclaimer { background: #0d47a120; border-left-color: #42a5f5; color: #90caf9; }
+  .unplanned-disclaimer.warn { background: #ff6f0018; border-left-color: #ffb74d; color: #ffcc80; }
+  .unplanned-disclaimer.danger { background: #d32f2f18; border-left-color: #ef5350; color: #ef9a9a; }
+  .unplanned-badge { background: #e6510020; color: #ffab40; }
+}
+:root[data-theme="dark"] .unplanned-disclaimer { background: #0d47a120; border-left-color: #42a5f5; color: #90caf9; }
+:root[data-theme="dark"] .unplanned-disclaimer.warn { background: #ff6f0018; border-left-color: #ffb74d; color: #ffcc80; }
+:root[data-theme="dark"] .unplanned-disclaimer.danger { background: #d32f2f18; border-left-color: #ef5350; color: #ef9a9a; }
+:root[data-theme="dark"] .unplanned-badge { background: #e6510020; color: #ffab40; }
+.sprint-detail-layout { display: flex; flex-direction: column; gap: 20px; }
+.sprint-charts-panel { display: flex; flex-direction: column; gap: 16px; }
+.sprint-chart-card { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; }
+.sprint-chart-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; }
+.capacity-card.expanded { grid-column: 1 / -1; }
+.capacity-tarefas { margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 12px; }
+.capacity-projeto-group { margin-bottom: 10px; }
+.capacity-projeto-label { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.capacity-projeto-label span { font-weight: 400; color: var(--text-tertiary); text-transform: none; letter-spacing: 0; font-size: 11px; }
+.capacity-projeto-label.manutencao { color: var(--amber); }
+.capacity-projeto-label.manutencao span { color: var(--text-tertiary); }
+.capacity-tarefa-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; font-size: 12px; transition: background .1s; }
+.capacity-tarefa-row:hover { background: var(--chip-bg); }
+.capacity-tarefa-ticket { font-weight: 600; color: var(--accent); min-width: 80px; flex-shrink: 0; }
+.capacity-tarefa-resumo { flex: 1; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.capacity-tarefa-tipo { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; background: var(--chip-bg); color: var(--text-secondary); flex-shrink: 0; }
+.capacity-tarefa-status { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; }
+.capacity-tarefa-status.done { background: var(--accent-soft); color: var(--accent); }
+.capacity-tarefa-status.inprogress { background: var(--blue-soft); color: var(--blue); }
+.capacity-tarefa-status.todo { background: var(--chip-bg); color: var(--text-tertiary); }
+.capacity-tarefa-horas { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; flex-shrink: 0; }
+.capacity-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; padding: 16px; background: var(--chip-bg); border-radius: 8px; }
+.capacity-summary-item { }
+.capacity-summary-label { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; }
+.capacity-summary-value { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.capacity-summary-value.green { color: var(--accent); }
+.capacity-summary-value.amber { color: var(--amber); }
+.capacity-summary-value.red { color: var(--red); }
+.capacity-summary-detail { font-size: 11px; color: var(--text-tertiary); }
+.capacity-summary-feriado { font-size: 12px; color: var(--amber); font-weight: 500; }
+.capacity-summary-item.has-tip { position: relative; cursor: help; }
+.capacity-summary-tip { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: var(--tooltip-bg); color: var(--tooltip-text); padding: 12px 16px; border-radius: 8px; font-size: 12px; z-index: 60; width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,.25); line-height: 1.5; }
+.capacity-summary-item.has-tip:hover .capacity-summary-tip { display: block; }
+.capacity-external-label { font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .3px; margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.capacity-card.external { opacity: 0.7; }
+.capacity-card.desligado { opacity: 0.5; border-left: 3px solid var(--red); }
 .capacity-back-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; transition: all .15s; margin-bottom: 16px; }
 .capacity-back-btn:hover { border-color: var(--accent); color: var(--accent); }
 
@@ -429,26 +516,39 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 </div>
 
 <div class="app-shell hidden" id="app-shell">
-  <nav class="sidebar" aria-label="Navegação">
+  <nav class="sidebar" id="sidebar" aria-label="Navegação">
     <div class="sidebar-logo">MP</div>
+    <button class="sidebar-toggle" title="Expandir menu" onclick="toggleSidebar()">
+      <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
     <button class="sidebar-item active" data-page="equipes" title="Equipes" onclick="navigate('equipes')">
       <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
+      <span class="sidebar-item-label">Equipes</span>
     </button>
     <button class="sidebar-item" data-page="timeline" title="Timeline" onclick="navigate('timeline')">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+      <span class="sidebar-item-label">Timeline</span>
     </button>
     <button class="sidebar-item" data-page="projetos" title="Projetos" onclick="navigate('projetos')">
       <svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
+      <span class="sidebar-item-label">Projetos</span>
+    </button>
+    <button class="sidebar-item" data-page="sprints" title="Sprints" onclick="navigate('sprints')">
+      <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      <span class="sidebar-item-label">Sprints</span>
     </button>
     <button class="sidebar-item" data-page="usuarios" title="Usuários" onclick="navigate('usuarios')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg>
+      <span class="sidebar-item-label">Usuários</span>
     </button>
     <button class="sidebar-item" data-page="fontes" title="Fontes de Dados" onclick="navigate('fontes')">
       <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+      <span class="sidebar-item-label">Fontes de Dados</span>
     </button>
     <div class="sidebar-spacer"></div>
     <button class="sidebar-item" title="Sair" onclick="logout()">
       <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="sidebar-item-label">Sair</span>
     </button>
   </nav>
 
@@ -466,6 +566,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <div class="equipe-create-wrap">
           <input class="equipe-create-input" id="equipe-new-name" placeholder="Nova equipe..." />
           <button class="btn-add" onclick="createEquipe()">+ Criar</button>
+          <button class="btn-sm" onclick="openFeriadoModal()" style="margin-left:8px">Cadastrar Feriados</button>
         </div>
       </div>
       <div id="equipe-content">
@@ -477,7 +578,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="page" id="page-timeline">
       <div class="page-header-row"><h1 class="page-title">Timeline de Capacidade</h1></div>
       <div class="timeline-filters">
-        <select class="filter-select" id="timeline-equipe" onchange="loadTimeline()"><option value="">Equipe...</option></select>
+        <div class="multi-select-wrap" id="timeline-equipe-wrap">
+          <button class="filter-select multi-select-btn" id="timeline-equipe-btn" onclick="toggleMultiSelect('timeline-equipe-dropdown')">Selecionar equipes...</button>
+          <div class="multi-select-dropdown" id="timeline-equipe-dropdown" style="display:none"></div>
+        </div>
         <select class="filter-select" id="timeline-ano" onchange="loadTimeline()"></select>
       </div>
       <div id="timeline-content">
@@ -488,28 +592,27 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <!-- PROJETOS -->
     <div class="page" id="page-projetos">
       <div class="page-header-row"><h1 class="page-title">Projetos</h1></div>
-      <div class="page-tabs">
-        <button class="page-tab active" onclick="switchProjetosTab('epicos')">Épicos</button>
-        <button class="page-tab" onclick="switchProjetosTab('sprints')">Sprints</button>
+      <div class="timeline-filters">
+        <select class="filter-select" id="projetos-equipe" onchange="loadProjetos()"><option value="">Todas as equipes</option></select>
+        <input class="filter-select" id="projetos-search" placeholder="Pesquisar projetos..." oninput="filterProjetos()" style="min-width:220px">
+        <button class="btn-sm" onclick="openFeriadoModal()">Cadastrar Feriados</button>
       </div>
-      <div id="projetos-tab-epicos">
-        <div class="timeline-filters">
-          <select class="filter-select" id="projetos-equipe" onchange="loadProjetos()"><option value="">Todas as equipes</option></select>
-        </div>
-        <div id="projetos-content"><div class="loading"><div class="spinner"></div></div></div>
+      <div id="projetos-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- SPRINTS -->
+    <div class="page" id="page-sprints">
+      <div class="page-header-row"><h1 class="page-title">Sprints</h1></div>
+      <div class="timeline-filters">
+        <select class="filter-select" id="sprints-equipe" onchange="loadSprints()"><option value="">Selecione uma equipe</option></select>
       </div>
-      <div id="projetos-tab-sprints" style="display:none">
-        <div class="timeline-filters">
-          <select class="filter-select" id="sprints-equipe" onchange="loadSprints()"><option value="">Selecione uma equipe</option></select>
-        </div>
-        <div class="sprint-filters" id="sprint-estado-filters">
-          <button class="period-chip" onclick="filterSprints('')">Todas</button>
-          <button class="period-chip active" onclick="filterSprints('active')">Ativas</button>
-          <button class="period-chip" onclick="filterSprints('future')">Futuras</button>
-          <button class="period-chip" onclick="filterSprints('closed')">Concluídas</button>
-        </div>
-        <div id="sprints-content"></div>
+      <div class="sprint-filters" id="sprint-estado-filters">
+        <button class="period-chip" onclick="filterSprints('')">Todas</button>
+        <button class="period-chip active" onclick="filterSprints('active')">Ativas</button>
+        <button class="period-chip" onclick="filterSprints('future')">Futuras</button>
+        <button class="period-chip" onclick="filterSprints('closed')">Concluídas</button>
       </div>
+      <div id="sprints-content"></div>
     </div>
 
     <!-- USUARIOS -->
@@ -632,13 +735,6 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
   </div>
 </div>
 
-<div class="modal-overlay" id="analise-modal" onclick="if(event.target===this)closeAnaliseModal()">
-  <div class="modal" style="max-width:560px">
-    <div class="modal-title" id="analise-title">Análise de Capacidade</div>
-    <div id="analise-content"><div class="loading"><div class="spinner"></div></div></div>
-    <div class="modal-actions"><button class="btn-cancel" type="button" onclick="closeAnaliseModal()">Fechar</button></div>
-  </div>
-</div>
 
 <div class="modal-overlay" id="disp-modal" onclick="if(event.target===this)closeDispModal()">
   <div class="modal">
@@ -663,6 +759,21 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <button class="btn-primary" type="submit" style="width:auto">Salvar</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="feriado-modal" onclick="if(event.target===this)closeFeriadoModal()">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">Cadastrar Feriados</div>
+    <form id="feriado-form" onsubmit="return handleFeriadoSubmit(event)">
+      <div class="form-group"><label class="form-label">Data</label><input class="form-input" type="date" id="feriado-data" required></div>
+      <div class="form-group"><label class="form-label">Nome</label><input class="form-input" type="text" id="feriado-nome" placeholder="Ex: Natal, Tiradentes..." required></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeFeriadoModal()">Cancelar</button>
+        <button class="btn-primary" type="submit" style="width:auto">Adicionar</button>
+      </div>
+    </form>
+    <div id="feriados-list" style="margin-top:20px"></div>
   </div>
 </div>
 
@@ -706,9 +817,20 @@ async function handleLogin(e) {
   return false;
 }
 function logout() { token = null; currentUser = null; localStorage.removeItem('myplanner_token'); document.getElementById('login-page').style.display = 'flex'; document.getElementById('app-shell').classList.add('hidden'); }
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('expanded');
+  localStorage.setItem('myplanner_sidebar', sb.classList.contains('expanded') ? 'expanded' : 'collapsed');
+}
+function restoreSidebar() {
+  if (localStorage.getItem('myplanner_sidebar') === 'expanded') {
+    document.getElementById('sidebar').classList.add('expanded');
+  }
+}
 function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app-shell').classList.remove('hidden');
+  restoreSidebar();
   loadEquipes(); loadTimelineFilters(); loadAllMembros();
   handleOAuthReturn();
 }
@@ -733,6 +855,7 @@ function navigate(page) {
   if (page === 'usuarios') loadUsuarios();
   if (page === 'fontes') loadFontes();
   if (page === 'projetos') loadProjetos();
+  if (page === 'sprints') loadSprints();
 }
 
 // === EQUIPES ===
@@ -745,7 +868,6 @@ async function loadEquipes() {
     const equipes = await api('/equipes');
     const fills = [
       {sel: document.getElementById('equipe-select'), def: 'Todos os membros'},
-      {sel: document.getElementById('timeline-equipe'), def: 'Equipe...'},
       {sel: document.getElementById('projetos-equipe'), def: 'Todas as equipes'},
       {sel: document.getElementById('sprints-equipe'), def: 'Todas as equipes'}
     ];
@@ -753,6 +875,7 @@ async function loadEquipes() {
       sel.innerHTML = '<option value="">' + def + '</option>';
       (equipes || []).forEach(e => { sel.innerHTML += '<option value="' + e.id + '">' + esc(e.nome) + '</option>'; });
     });
+    populateTimelineEquipes(equipes || []);
   } catch (e) { console.error(e); }
 }
 
@@ -950,105 +1073,224 @@ function renderEquipeResumo(r, equipeId, activePeriod) {
 
 // === TIMELINE ===
 let timelineData = null;
+let timelineSelectedEquipes = [];
+
+function populateTimelineEquipes(equipes) {
+  const dd = document.getElementById('timeline-equipe-dropdown');
+  let html = '<label style="border-bottom:1px solid var(--border-subtle);padding-bottom:6px;margin-bottom:2px"><input type="checkbox" value="__all__" onchange="toggleTimelineAll(this)"> <b>Todas</b></label>';
+  equipes.forEach(e => {
+    html += '<label><input type="checkbox" value="' + e.id + '" onchange="onTimelineEquipeChange()"> ' + esc(e.nome) + '</label>';
+  });
+  dd.innerHTML = html;
+}
+
+function toggleMultiSelect(id) {
+  const dd = document.getElementById(id);
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleTimelineAll(cb) {
+  const dd = document.getElementById('timeline-equipe-dropdown');
+  dd.querySelectorAll('input[type="checkbox"]').forEach(c => { if (c.value !== '__all__') c.checked = cb.checked; });
+  onTimelineEquipeChange();
+}
+
+function onTimelineEquipeChange() {
+  const dd = document.getElementById('timeline-equipe-dropdown');
+  const checked = Array.from(dd.querySelectorAll('input[type="checkbox"]:checked')).filter(c => c.value !== '__all__').map(c => c.value);
+  timelineSelectedEquipes = checked;
+  const btn = document.getElementById('timeline-equipe-btn');
+  btn.textContent = checked.length === 0 ? 'Selecionar equipes...' : checked.length + ' equipe(s)';
+  const allCb = dd.querySelector('input[value="__all__"]');
+  const total = dd.querySelectorAll('input[type="checkbox"]').length - 1;
+  if (allCb) allCb.checked = checked.length === total && total > 0;
+  loadTimeline();
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.multi-select-wrap')) {
+    document.querySelectorAll('.multi-select-dropdown').forEach(d => d.style.display = 'none');
+  }
+});
+
 function loadTimelineFilters() {
   const sel = document.getElementById('timeline-ano'); const year = new Date().getFullYear(); sel.innerHTML = '';
   for (let y = year - 2; y <= year + 2; y++) sel.innerHTML += '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + y + '</option>';
 }
+
 async function loadTimeline() {
-  const equipe = document.getElementById('timeline-equipe').value;
+  if (timelineSelectedEquipes.length === 0) {
+    document.getElementById('timeline-content').innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Selecione equipe(s) para ver a timeline</div></div>';
+    return;
+  }
   const ano = document.getElementById('timeline-ano').value;
-  if (!equipe || !ano) return;
+  if (!ano) return;
   document.getElementById('timeline-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    timelineData = await api('/timeline-capacidade?equipe=' + encodeURIComponent(equipe) + '&ano=' + ano);
-    timelineData._equipe = equipe; timelineData._ano = parseInt(ano);
+    const equipeParam = timelineSelectedEquipes.join(',');
+    timelineData = await api('/timeline-capacidade?equipe=' + encodeURIComponent(equipeParam) + '&ano=' + ano);
+    timelineData._equipes = timelineSelectedEquipes;
+    timelineData._ano = parseInt(ano);
     renderTimeline(timelineData);
   } catch (e) { document.getElementById('timeline-content').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function capacityGradientColor(pct) {
+  if (pct <= 0) return 'var(--text-tertiary)';
+  if (pct >= 100) return 'hsl(145,55%,38%)';
+  if (pct < 60) return 'hsl(0,65%,48%)';
+  var t = (pct - 60) / 40;
+  var hue = Math.round(t * 145);
+  return 'hsl(' + hue + ',' + Math.round(55 + (1 - t) * 10) + '%,' + Math.round(38 + (1 - t) * 10) + '%)';
+}
+function capacityGradientBg(pct) {
+  if (pct <= 0) return 'var(--chip-bg)';
+  if (pct >= 100) return 'hsla(145,55%,38%,0.1)';
+  if (pct < 60) return 'hsla(0,65%,48%,0.1)';
+  var t = (pct - 60) / 40;
+  var hue = Math.round(t * 145);
+  return 'hsla(' + hue + ',' + Math.round(55 + (1 - t) * 10) + '%,' + Math.round(38 + (1 - t) * 10) + '%,0.1)';
 }
 
 function renderTimeline(data) {
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   let capacityHtml = '';
   (data.capacidade_mensal || []).forEach(m => {
-    const cls = m.horas_disponiveis === 0 && m.horas_estimadas === 0 ? 'capacity-zero' : m.horas_estimadas > m.horas_disponiveis ? 'capacity-over' : 'capacity-under';
-    const sign = m.percentual_delta > 0 ? '+' : '';
-    capacityHtml += '<div class="capacity-month ' + cls + '">' +
+    const pctCap = m.percentual_cap || 0;
+    const color = capacityGradientColor(pctCap);
+    const bgColor = capacityGradientBg(pctCap);
+    const ausentes = (m.membros_ausentes || []);
+    const totalDiasAus = ausentes.reduce((s, a) => s + a.dias, 0);
+    let tipHtml = '';
+    if (ausentes.length > 0) {
+      tipHtml += '<b>Ausências:</b> ' + totalDiasAus + ' dia(s)<br>';
+      ausentes.forEach(a => { tipHtml += '• ' + esc(a.nome) + ' — ' + esc(a.tipo) + ' (' + a.dias + 'd)<br>'; });
+    }
+    capacityHtml += '<div class="capacity-month" style="background:' + bgColor + ';position:relative"' +
+      ' onmouseenter="showCapTip(event,this)" onmouseleave="hideCapTip(this)">' +
       '<div class="capacity-month-name">' + meses[m.mes - 1] + '</div>' +
-      '<div class="capacity-month-delta">' + sign + m.percentual_delta.toFixed(0) + '%</div>' +
-      '<div class="capacity-month-hours">' + m.horas_estimadas.toFixed(0) + 'h / ' + m.horas_disponiveis.toFixed(0) + 'h</div>' +
-      '<button class="capacity-month-btn" onclick="analisarMes(' + m.mes + ')">Analisar</button>' +
+      '<div class="capacity-month-delta" style="color:' + color + '">' + pctCap.toFixed(0) + '%</div>' +
+      '<div class="capacity-month-hours">' + (m.horas_disponiveis||0).toFixed(0) + 'h / ' + (m.horas_maximas||0).toFixed(0) + 'h</div>' +
+      (tipHtml ? '<div class="cap-tip" style="display:none">' + tipHtml + '</div>' : '') +
     '</div>';
   });
 
-  // Gantt chart
+  // Gantt — Membros com ausências
   const ano = data._ano || new Date().getFullYear();
   const anoStart = new Date(ano, 0, 1).getTime();
-  const anoEnd = new Date(ano, 11, 31).getTime();
+  const anoEnd = new Date(ano + 1, 0, 0).getTime();
   const totalMs = anoEnd - anoStart;
-  const projetos = (data.projetos || []).filter(p => p.data_inicio_execucao || p.data_limite);
+  const membros = data.membros_timeline || [];
 
-  let ganttHeader = '<div class="gantt-header"><div style="width:140px;flex-shrink:0"></div>';
+  let ganttHeader = '<div class="gantt-header"><div style="width:50px;flex-shrink:0"></div>';
   meses.forEach(m => { ganttHeader += '<div class="gantt-header-cell">' + m + '</div>'; });
   ganttHeader += '</div>';
 
+  const ausenciaCores = {ferias:'ferias',licenca_medica:'licenca_medica',licenca_paternidade:'licenca_paternidade',licenca_maternidade:'licenca_maternidade',dayoff:'dayoff',desligamento:'desligamento'};
+  const ausenciaLabels = {ferias:'Férias',licenca_medica:'Licença Médica',licenca_paternidade:'Lic. Paternidade',licenca_maternidade:'Lic. Maternidade',dayoff:'Day Off',desligamento:'Desligamento'};
+
   let ganttRows = '';
-  projetos.forEach(p => {
-    const label = esc(p.apelido || p.numero_ticket || '—');
-    const star = p.projeto_ci ? '<span class="gantt-star" title="Projeto CI — ' + esc(p.projeto_ci_ticket || '') + '">★</span>' : '';
-    const startDate = p.data_inicio_execucao ? new Date(p.data_inicio_execucao).getTime() : null;
-    const endDate = p.data_limite ? new Date(p.data_limite).getTime() : null;
-    let barHtml = '';
-    if (startDate && endDate && endDate > startDate) {
-      const left = Math.max(0, (startDate - anoStart) / totalMs * 100);
-      const width = Math.min(100 - left, (endDate - startDate) / totalMs * 100);
-      const tipoDemanda = p.tipo_demanda || '—';
-      const dias = (p.total_dias_estimados || 0).toFixed(0);
-      const dlStr = p.data_limite || '—';
-      barHtml = '<div class="gantt-bar" style="left:' + left + '%;width:' + Math.max(1, width) + '%" ' +
-        'onmouseenter="showGanttTip(event,\'' + esc(label) + '\',\'' + dias + 'd\',\'' + esc(dlStr) + '\',\'' + esc(tipoDemanda) + '\')" onmouseleave="hideGanttTip()">' +
-        '<span class="gantt-bar-text">' + esc(p.resumo || '') + '</span></div>';
-    }
-    ganttRows += '<div class="gantt-row"><div class="gantt-label">' + star + label + '</div><div class="gantt-bar-area">' + barHtml + '</div></div>';
+  membros.forEach(m => {
+    const initials = (m.nome || '').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+    const avatarHtml = m.avatar_url
+      ? '<div class="gantt-avatar" title="' + esc(m.nome) + (m.equipe_nome ? ' — ' + esc(m.equipe_nome) : '') + '"><img src="' + esc(m.avatar_url) + '"></div>'
+      : '<div class="gantt-avatar" title="' + esc(m.nome) + (m.equipe_nome ? ' — ' + esc(m.equipe_nome) : '') + '">' + initials + '</div>';
+
+    let barsHtml = '';
+    (m.ausencias || []).forEach(a => {
+      const st = new Date(a.data_inicio + 'T00:00:00').getTime();
+      const en = new Date(a.data_fim + 'T23:59:59').getTime();
+      if (en < anoStart || st > anoEnd) return;
+      const left = Math.max(0, (Math.max(st, anoStart) - anoStart) / totalMs * 100);
+      const right = Math.min(100, (Math.min(en, anoEnd) - anoStart) / totalMs * 100);
+      const width = Math.max(0.3, right - left);
+      const cls = ausenciaCores[a.tipo] || 'dayoff';
+      const label = ausenciaLabels[a.tipo] || a.tipo;
+      const diasAus = Math.round((new Date(a.data_fim + 'T12:00:00') - new Date(a.data_inicio + 'T12:00:00')) / 86400000) + 1;
+      barsHtml += '<div class="gantt-bar ' + cls + '" style="left:' + left + '%;width:' + width + '%" ' +
+        'onmouseenter="showAusenciaTip(event,\'' + esc(m.nome) + '\',\'' + esc(label) + '\',\'' + esc(a.data_inicio) + '\',\'' + esc(a.data_fim) + '\',' + diasAus + ')" onmouseleave="hideGanttTip()">' +
+        '</div>';
+    });
+
+    ganttRows += '<div class="gantt-row"><div class="gantt-label" style="width:50px;justify-content:center;padding:0">' + avatarHtml + '</div><div class="gantt-bar-area">' + barsHtml + '</div></div>';
   });
 
-  let ganttHtml = '';
+  let ganttLegend = '<div class="gantt-legend">';
+  ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--blue)"></div>Férias</div>';
+  ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--red)"></div>Licença Médica</div>';
+  ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:#9C27B0"></div>Lic. Pat./Mat.</div>';
+  ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--amber)"></div>Day Off</div>';
+  ganttLegend += '</div>';
+
+  let ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Ausências — Membros</div><div class="gantt-wrap"><div class="gantt">' + ganttHeader + '<div class="gantt-rows">' + ganttRows + '</div></div></div>' + ganttLegend + '</div>';
+  if (membros.length === 0) {
+    ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Ausências — Membros</div><div class="empty-state" style="padding:30px"><div class="empty-state-text">Nenhum membro encontrado</div></div></div>';
+  }
+
+  // Gantt — Épicos
+  const projetos = (data.projetos || []).filter(p => p.data_inicio_execucao || p.data_limite);
+  let epicosHtml = '';
   if (projetos.length > 0) {
-    ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Gantt — Épicos</div><div class="gantt-wrap"><div class="gantt">' + ganttHeader + '<div class="gantt-rows">' + ganttRows + '</div></div></div></div>';
-  } else {
-    ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Gantt — Épicos</div><div class="empty-state" style="padding:30px"><div class="empty-state-text">Nenhum épico com datas definidas</div></div></div>';
+    let epicoHeader = '<div class="gantt-header"><div style="width:140px;flex-shrink:0"></div>';
+    meses.forEach(m => { epicoHeader += '<div class="gantt-header-cell">' + m + '</div>'; });
+    epicoHeader += '</div>';
+    let epicoRows = '';
+    projetos.forEach(p => {
+      const label = esc(p.apelido || p.numero_ticket || '—');
+      const star = p.projeto_ci ? '<span class="gantt-star" title="Projeto CI — ' + esc(p.projeto_ci_ticket || '') + '">★</span>' : '';
+      const startDate = p.data_inicio_execucao ? new Date(p.data_inicio_execucao).getTime() : null;
+      const endDate = p.data_limite ? new Date(p.data_limite).getTime() : null;
+      let barHtml = '';
+      if (startDate && endDate && endDate > startDate) {
+        const left = Math.max(0, (startDate - anoStart) / totalMs * 100);
+        const width = Math.min(100 - left, (endDate - startDate) / totalMs * 100);
+        const tipoDemanda = p.tipo_demanda || '—';
+        const dias = (p.total_dias_estimados || 0).toFixed(0);
+        const dlStr = p.data_limite || '—';
+        barHtml = '<div class="gantt-bar" style="left:' + left + '%;width:' + Math.max(1, width) + '%" ' +
+          'onmouseenter="showGanttTip(event,\'' + esc(label) + '\',\'' + dias + 'd\',\'' + esc(dlStr) + '\',\'' + esc(tipoDemanda) + '\')" onmouseleave="hideGanttTip()">' +
+          '<span class="gantt-bar-text">' + esc(p.resumo || '') + '</span></div>';
+      }
+      epicoRows += '<div class="gantt-row"><div class="gantt-label">' + star + label + '</div><div class="gantt-bar-area">' + barHtml + '</div></div>';
+    });
+    epicosHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Gantt — Épicos</div><div class="gantt-wrap"><div class="gantt">' + epicoHeader + '<div class="gantt-rows">' + epicoRows + '</div></div></div></div>';
   }
 
   document.getElementById('timeline-content').innerHTML =
     '<div class="timeline-card fade-in"><div class="timeline-card-title">Capacidade Mensal</div><div class="capacity-grid">' + capacityHtml + '</div></div>' +
     ganttHtml +
-    '<div id="analise-inline"></div>';
+    epicosHtml +
+    '';
 }
 
 function showGanttTip(e, label, dias, dataLimite, tipo) {
   const tip = document.getElementById('gantt-tooltip');
-  tip.innerHTML = '<b>' + label + '</b><br>Dias estimados: ' + dias + '<br>Data limite: ' + dataLimite + '<br>Tipo: ' + tipo;
+  tip.innerHTML = '<b>' + label + '</b><br>Dias estimados: ' + dias + '<br>Data limite: ' + dataLimite + (tipo ? '<br>Tipo: ' + tipo : '');
+  tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX + 12, window.innerWidth - 300) + 'px';
+  tip.style.top = (e.clientY + 12) + 'px';
+}
+function showAusenciaTip(e, nome, tipo, dataInicio, dataFim, dias) {
+  const tip = document.getElementById('gantt-tooltip');
+  const di = new Date(dataInicio + 'T12:00:00').toLocaleDateString('pt-BR');
+  const df = new Date(dataFim + 'T12:00:00').toLocaleDateString('pt-BR');
+  tip.innerHTML = '<b>' + nome + '</b><br>Tipo: ' + tipo + '<br>Período: ' + di + ' a ' + df + '<br>Dias ausente: <b>' + dias + '</b>';
   tip.style.display = 'block';
   tip.style.left = Math.min(e.clientX + 12, window.innerWidth - 300) + 'px';
   tip.style.top = (e.clientY + 12) + 'px';
 }
 function hideGanttTip() { document.getElementById('gantt-tooltip').style.display = 'none'; }
 
-async function analisarMes(mes) {
-  if (!timelineData) return;
-  document.getElementById('analise-title').textContent = 'Análise — ' + ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][mes-1] + '/' + timelineData._ano;
-  document.getElementById('analise-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  document.getElementById('analise-modal').classList.add('open');
-  try {
-    const result = await api('/timeline-capacidade/analisar', {
-      method: 'POST',
-      body: JSON.stringify({ equipe: timelineData._equipe, ano: timelineData._ano, mes: mes })
-    });
-    document.getElementById('analise-content').innerHTML = '<div class="analysis-popup">' + esc(result.analise) + '</div>';
-  } catch (err) {
-    document.getElementById('analise-content').innerHTML = '<div class="empty-state" style="padding:20px"><div class="empty-state-text">' + esc(err.message) + '</div></div>';
-  }
+function showCapTip(e, el) {
+  const tipEl = el.querySelector('.cap-tip');
+  if (!tipEl) return;
+  const tip = document.getElementById('gantt-tooltip');
+  tip.innerHTML = tipEl.innerHTML;
+  tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX + 12, window.innerWidth - 300) + 'px';
+  tip.style.top = (e.clientY + 12) + 'px';
 }
-function closeAnaliseModal() { document.getElementById('analise-modal').classList.remove('open'); }
+function hideCapTip(el) { document.getElementById('gantt-tooltip').style.display = 'none'; }
 
 // === PROJETOS ===
 async function loadProjetos() {
@@ -1075,6 +1317,15 @@ async function loadProjetos() {
     });
     el.innerHTML = '<div class="users-table-wrap fade-in"><table class="users-table"><thead><tr><th>Ticket</th><th>Apelido</th><th>Resumo</th><th>Tipo</th><th>Status</th><th>Início Exec.</th><th>Data Limite</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function filterProjetos() {
+  const term = (document.getElementById('projetos-search').value || '').toLowerCase();
+  const rows = document.querySelectorAll('#projetos-content .users-table tbody tr');
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(term) ? '' : 'none';
+  });
 }
 
 function openProjMetaModal(id, ticket, apelido, dataInicio) {
@@ -1104,15 +1355,6 @@ async function handleProjMetaSubmit(e) {
 
 // === SPRINTS ===
 let sprintEstadoFilter = 'active';
-
-function switchProjetosTab(tab) {
-  const tabs = document.querySelectorAll('#page-projetos .page-tab');
-  tabs.forEach(t => t.classList.remove('active'));
-  document.getElementById('projetos-tab-epicos').style.display = tab === 'epicos' ? '' : 'none';
-  document.getElementById('projetos-tab-sprints').style.display = tab === 'sprints' ? '' : 'none';
-  tabs[tab === 'epicos' ? 0 : 1].classList.add('active');
-  if (tab === 'sprints') loadSprints();
-}
 
 function filterSprints(estado) {
   sprintEstadoFilter = estado;
@@ -1158,7 +1400,8 @@ async function loadSprintAusencias(sprintID) {
   const el = document.getElementById('sprint-aus-' + sprintID);
   if (!el) return;
   try {
-    const data = await api('/sprints/' + sprintID + '/capacity');
+    const equipe = document.getElementById('sprints-equipe').value;
+    const data = await api('/sprints/' + sprintID + '/capacity' + (equipe ? '?equipe=' + equipe : ''));
     if (!data.membros) return;
     const aus = data.membros.filter(m => m.ausencias && m.ausencias.length > 0);
     if (aus.length === 0) return;
@@ -1192,41 +1435,335 @@ async function openSprintCapacity(sprintID) {
   const el = document.getElementById('sprints-content');
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const data = await api('/sprints/' + sprintID + '/capacity');
+    const equipe = document.getElementById('sprints-equipe').value;
+    const qs = equipe ? '?equipe=' + equipe : '';
+    const [data, unplanned, burndown] = await Promise.all([
+      api('/sprints/' + sprintID + '/capacity' + qs),
+      api('/sprints/' + sprintID + '/unplanned' + qs).catch(() => null),
+      api('/sprints/' + sprintID + '/burndown' + qs).catch(() => null)
+    ]);
     let html = '<button class="capacity-back-btn" onclick="loadSprints()">← Voltar</button>';
+    html += '<div class="sprint-detail-layout">';
     html += '<div class="capacity-panel">';
     html += '<div class="capacity-panel-header"><div><div class="capacity-panel-title">' + esc(data.sprint.nome) + '</div>';
     html += '<div class="capacity-panel-sub">' + formatSprintDates(data.sprint.data_inicio, data.sprint.data_fim) + ' • ' + data.dias_uteis + ' dias úteis</div></div>';
     const estado = data.sprint.estado || 'future';
     html += '<span class="sprint-state-badge ' + estado + '">' + formatEstado(estado) + '</span></div>';
 
-    if (!data.membros || data.membros.length === 0) {
-      html += '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Nenhum membro com tarefas nesta sprint</div></div>';
-    } else {
-      html += '<div class="capacity-members">';
-      data.membros.forEach(m => {
-        const pctClass = m.percentual_alocacao > 100 ? 'red' : m.percentual_alocacao > 80 ? 'amber' : 'green';
-        const barWidth = Math.min(m.percentual_alocacao, 150);
-        const initials = m.nome.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
-        const avatar = m.avatar_url ? '<img src="' + esc(m.avatar_url) + '" alt="">' : initials;
-        html += '<div class="capacity-card">';
-        html += '<div class="capacity-card-header"><div class="capacity-avatar">' + avatar + '</div>';
-        html += '<div class="capacity-card-name">' + esc(m.nome) + '</div>';
-        html += '<div class="capacity-card-pct ' + pctClass + '">' + m.percentual_alocacao.toFixed(1) + '%</div></div>';
-        html += '<div class="capacity-bar"><div class="capacity-bar-fill ' + pctClass + '" style="width:' + barWidth + '%"></div></div>';
-        html += '<div class="capacity-card-detail">' + m.horas_estimadas.toFixed(1) + 'h estimadas / ' + m.horas_disponiveis.toFixed(1) + 'h disponíveis</div>';
-        html += '<div class="capacity-badges">';
-        if (m.overcapacity) html += '<span class="capacity-badge overcapacity">Overcapacity</span>';
-        m.ausencias.forEach(a => {
-          html += '<span class="capacity-badge absence">' + formatTipoAusencia(a.tipo) + ' ' + a.dias + 'd</span>';
-        });
-        html += '</div></div>';
+    // Sprint summary
+    const pctGeral = data.horas_total_sprint > 0 ? (data.horas_alocadas / data.horas_total_sprint * 100) : 0;
+    const pctGeralClass = pctGeral > 100 ? 'red' : pctGeral > 80 ? 'amber' : 'green';
+    html += '<div class="capacity-summary">';
+    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">Membros da equipe</div><div class="capacity-summary-value">' + data.total_membros_equipe + '</div></div>';
+    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">Capacidade da Sprint</div><div class="capacity-summary-value">' + data.horas_total_sprint.toFixed(1) + 'h</div><div class="capacity-summary-detail">' + data.dias_uteis + ' dias úteis — capacidade disponível</div></div>';
+    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Horas Alocadas</div><div class="capacity-summary-value ' + pctGeralClass + '">' + pctGeral.toFixed(1) + '%</div><div class="capacity-summary-detail">' + data.horas_alocadas.toFixed(1) + 'h alocadas</div></div>';
+    const horasExec = data.horas_executadas || 0;
+    const pctExec = data.horas_total_sprint > 0 ? (horasExec / data.horas_total_sprint * 100) : 0;
+    const pctExecClass = pctExec > 70 ? 'green' : pctExec > 40 ? 'amber' : 'red';
+    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Horas Já Executadas</div><div class="capacity-summary-value ' + pctExecClass + '">' + pctExec.toFixed(1) + '%</div><div class="capacity-summary-detail">' + horasExec.toFixed(1) + 'h executadas</div></div>';
+    const pctDisponivel = data.horas_total_sprint > 0 ? Math.max(0, (data.horas_total_sprint - data.horas_alocadas) / data.horas_total_sprint * 100) : 0;
+    const pctDispClass = pctDisponivel < 10 ? 'red' : pctDisponivel < 30 ? 'amber' : 'green';
+    const horasLivres = Math.max(0, data.horas_total_sprint - data.horas_alocadas);
+    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Disponível</div><div class="capacity-summary-value ' + pctDispClass + '">' + pctDisponivel.toFixed(1) + '%</div><div class="capacity-summary-detail">' + horasLivres.toFixed(1) + 'h livres</div></div>';
+    const horasPendentes = Math.max(0, data.horas_alocadas - horasExec);
+    const pctPendente = data.horas_total_sprint > 0 ? (horasPendentes / data.horas_total_sprint * 100) : 0;
+    const pctPendenteClass = pctPendente > 60 ? 'red' : pctPendente > 30 ? 'amber' : 'green';
+    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Pendente de Execução</div><div class="capacity-summary-value ' + pctPendenteClass + '">' + pctPendente.toFixed(1) + '%</div><div class="capacity-summary-detail">' + horasPendentes.toFixed(1) + 'h pendentes</div></div>';
+    let horasEmRevisao = 0;
+    (data.membros || []).forEach(m => {
+      (m.tarefas || []).forEach(t => {
+        const st = (t.status || '').toLowerCase();
+        if (st === 'code review' || st === 'teste') horasEmRevisao += t.horas;
+      });
+    });
+    const pctRevisao = data.horas_total_sprint > 0 ? (horasEmRevisao / data.horas_total_sprint * 100) : 0;
+    const pctRevisaoClass = pctRevisao > 50 ? 'amber' : 'green';
+    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Em Teste/Code Review</div><div class="capacity-summary-value ' + pctRevisaoClass + '">' + pctRevisao.toFixed(1) + '%</div><div class="capacity-summary-detail">' + horasEmRevisao.toFixed(1) + 'h em revisão</div></div>';
+    if (unplanned && unplanned.media_historica && unplanned.media_historica.sprints_analisadas >= 3) {
+      const mh = unplanned.media_historica;
+      const teamName = unplanned.equipe_nome || 'equipe';
+      html += '<div class="capacity-summary-item has-tip"><div class="capacity-summary-label">% Alocação Sugerida / Pessoa</div>';
+      html += '<div class="capacity-summary-value">' + mh.percentual_alocacao_sugerido.toFixed(0) + '%</div>';
+      html += '<div class="capacity-summary-detail">baseado em ' + mh.sprints_analisadas + ' sprints</div>';
+      html += '<div class="capacity-summary-tip">';
+      html += 'Baseada nas últimas <b>' + mh.sprints_analisadas + '</b> sprints do time <b>' + esc(teamName) + '</b>, ';
+      html += 'existe uma média de <b>' + mh.media_horas_nao_planejadas.toFixed(1) + ' horas</b> de tarefas incluídas no decorrer da Sprint sem planejamento prévio. ';
+      html += 'Considere manter apenas <b>' + mh.percentual_alocacao_sugerido.toFixed(0) + '%</b> de horas alocadas para cada membro desta equipe no planejamento de Sprints.';
+      html += '</div></div>';
+    }
+    if (data.feriados && data.feriados.length > 0) {
+      html += '<div class="capacity-summary-item"><div class="capacity-summary-label">Feriados</div>';
+      data.feriados.forEach(f => {
+        const d = new Date(f.data + 'T12:00:00');
+        html += '<div class="capacity-summary-feriado">' + d.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}) + ' — ' + esc(f.nome) + '</div>';
       });
       html += '</div>';
     }
     html += '</div>';
+
+    // Breakdown por tipo (stacked bar)
+    let horasManutencao = 0, horasMelhorias = 0, horasSuporte = 0;
+    (data.membros || []).forEach(m => {
+      (m.tarefas || []).forEach(t => {
+        const tipo = (t.tipo || '').toLowerCase();
+        if (tipo === 'bug' || tipo.includes('incidente')) horasManutencao += t.horas;
+        else if (tipo === 'melhoria' || tipo === 'história' || tipo === 'historia') horasMelhorias += t.horas;
+        else horasSuporte += t.horas;
+      });
+    });
+    const horasBreakdownTotal = horasManutencao + horasMelhorias + horasSuporte;
+    if (horasBreakdownTotal > 0) {
+      const pctMan = (horasManutencao / horasBreakdownTotal * 100);
+      const pctMel = (horasMelhorias / horasBreakdownTotal * 100);
+      const pctSup = (horasSuporte / horasBreakdownTotal * 100);
+      html += '<div class="breakdown-section fade-in" style="margin-top:16px"><div class="breakdown-header"><span class="breakdown-title">Distribuição por Tipo</span><span class="breakdown-total">' + horasBreakdownTotal.toFixed(1) + 'h</span></div>';
+      html += '<div class="breakdown-legend" style="margin-bottom:12px">';
+      html += '<div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div><span class="legend-label">Manutenção</span><span class="legend-value">' + pctMan.toFixed(1) + '% (' + horasManutencao.toFixed(1) + 'h)</span></div>';
+      html += '<div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div><span class="legend-label">Melhorias e Inovação</span><span class="legend-value">' + pctMel.toFixed(1) + '% (' + horasMelhorias.toFixed(1) + 'h)</span></div>';
+      html += '<div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div><span class="legend-label">Suporte</span><span class="legend-value">' + pctSup.toFixed(1) + '% (' + horasSuporte.toFixed(1) + 'h)</span></div>';
+      html += '</div>';
+      html += '<div class="stacked-bar"><div class="stacked-segment" style="width:' + pctMan.toFixed(1) + '%;background:var(--red)"></div><div class="stacked-segment" style="width:' + pctMel.toFixed(1) + '%;background:var(--accent)"></div><div class="stacked-segment" style="width:' + pctSup.toFixed(1) + '%;background:var(--blue)"></div></div>';
+      html += '</div>';
+    }
+
+    if (unplanned && unplanned.sprint_atual && unplanned.sprint_atual.tarefas_nao_planejadas > 0) {
+      const sa = unplanned.sprint_atual;
+      html += '<div class="unplanned-disclaimer warn"><span class="unplanned-disclaimer-icon">⚡</span><div>';
+      html += 'Nesta sprint: <b>' + sa.tarefas_nao_planejadas + '</b> tarefa(s) não planejada(s) (' + sa.horas_nao_planejadas.toFixed(1) + 'h — ' + sa.percentual_nao_planejadas.toFixed(1) + '% do total)';
+      html += '</div></div>';
+    }
+
+    if (data.membros_ausentes_com_cards && data.membros_ausentes_com_cards.length > 0) {
+      const nomes = data.membros_ausentes_com_cards.map(m => '<b>' + esc(m.nome) + '</b>');
+      const nomesStr = nomes.length === 1 ? nomes[0] : nomes.slice(0, -1).join(', ') + ' e ' + nomes[nomes.length - 1];
+      const verbo = data.membros_ausentes_com_cards.length === 1 ? 'está ausente durante toda a sprint e possui' : 'estão ausentes durante toda a sprint e possuem';
+      html += '<div class="unplanned-disclaimer danger"><span class="unplanned-disclaimer-icon">⚠</span><div>';
+      html += nomesStr + ' ' + verbo + ' cards atribuídos.';
+      html += '</div></div>';
+    }
+
+    if (!data.membros || data.membros.length === 0) {
+      html += '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Nenhum membro com tarefas nesta sprint</div></div>';
+    } else {
+      const membrosEquipe = data.membros.filter(m => m.da_equipe).sort((a, b) => (b.percentual_alocacao || 0) - (a.percentual_alocacao || 0));
+      const membrosExternos = data.membros.filter(m => !m.da_equipe).sort((a, b) => (b.percentual_alocacao || 0) - (a.percentual_alocacao || 0));
+
+      if (membrosEquipe.length > 0) {
+        html += '<div class="capacity-members">';
+        membrosEquipe.forEach((m, idx) => { html += renderCapacityCard(m, idx); });
+        html += '</div>';
+      }
+
+      if (membrosExternos.length > 0) {
+        html += '<div class="capacity-external-label">Externos (não contabilizados na equipe)</div>';
+        html += '<div class="capacity-members">';
+        membrosExternos.forEach((m, idx) => { html += renderCapacityCard(m, membrosEquipe.length + idx); });
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+
+    if (burndown && burndown.linha_ideal && burndown.linha_ideal.length > 0) {
+      html += '<div class="sprint-chart-card"><div class="sprint-chart-title">Burndown</div>';
+      html += '<div class="unplanned-disclaimer" style="margin-bottom:12px;font-size:12px"><span class="unplanned-disclaimer-icon">ℹ</span><div>Tarefas em Deploy, Teste ou Validação do Solicitante são consideradas 80% concluídas.</div></div>';
+      html += '<canvas id="burndown-canvas" width="600" height="300" style="width:100%;height:300px"></canvas></div>';
+    }
+    html += '</div>';
+
     el.innerHTML = html;
+
+    if (burndown && burndown.linha_ideal && burndown.linha_ideal.length > 0) {
+      drawBurndown(document.getElementById('burndown-canvas'), burndown);
+    }
   } catch(e) { el.innerHTML = '<button class="capacity-back-btn" onclick="loadSprints()">← Voltar</button><div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
+}
+
+function drawBurndown(canvas, bd) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const w = rect.width, h = rect.height;
+
+  const pad = { top: 10, right: 16, bottom: 40, left: 50 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  const ideal = bd.linha_ideal || [];
+  const real = bd.linha_real || [];
+  if (ideal.length === 0) return;
+  const maxH = Math.max(bd.horas_total, ...(real.length ? real.map(p => p.horas) : [0])) * 1.1;
+  const labels = ideal.map(p => { const d = new Date(p.data + 'T12:00:00'); return (d.getDate() + '').padStart(2, '0') + '/' + (d.getMonth() + 1 + '').padStart(2, '0'); });
+
+  const style = getComputedStyle(document.documentElement);
+  const colGrid = style.getPropertyValue('--border-subtle').trim() || '#333';
+  const colText = style.getPropertyValue('--text-tertiary').trim() || '#888';
+  const colAccent = style.getPropertyValue('--accent').trim() || '#4ade80';
+  const colRed = style.getPropertyValue('--red').trim() || '#ef4444';
+  const colBlue = style.getPropertyValue('--blue').trim() || '#60a5fa';
+
+  ctx.strokeStyle = colGrid;
+  ctx.lineWidth = 0.5;
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = pad.top + (ch / gridLines) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = maxH - (maxH / gridLines) * i;
+    ctx.fillStyle = colText; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(0) + 'h', pad.left - 6, y + 3);
+  }
+
+  ctx.fillStyle = colText; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(labels.length / 8));
+  labels.forEach((lbl, i) => {
+    if (i % step !== 0 && i !== labels.length - 1) return;
+    const x = pad.left + (cw / (labels.length - 1)) * i;
+    ctx.save(); ctx.translate(x, pad.top + ch + 10);
+    ctx.fillText(lbl, 0, 10);
+    ctx.restore();
+  });
+
+  function toXY(arr) {
+    const dateMap = {};
+    ideal.forEach((p, i) => { dateMap[p.data] = i; });
+    return arr.map(p => {
+      const idx = dateMap[p.data] !== undefined ? dateMap[p.data] : 0;
+      return { x: pad.left + (cw / (ideal.length - 1)) * idx, y: pad.top + ch - (p.horas / maxH) * ch };
+    });
+  }
+
+  const idealPts = toXY(ideal);
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = colText; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  idealPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  if (real.length > 0) {
+    const realPts = toXY(real);
+    const lastIdeal = toXY(ideal.filter(p => real.some(r => r.data === p.data)));
+    const lastReal = realPts[realPts.length - 1];
+    const lastIdealPt = lastIdeal.length > 0 ? lastIdeal[lastIdeal.length - 1] : null;
+    const above = lastIdealPt && lastReal.y < lastIdealPt.y;
+    ctx.strokeStyle = above ? colAccent : colRed;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    realPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+
+    realPts.forEach(p => {
+      ctx.fillStyle = above ? colAccent : colRed;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+    });
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const hojeIdx = ideal.findIndex(p => p.data === hoje);
+    if (hojeIdx >= 0) {
+      const x = pad.left + (cw / (ideal.length - 1)) * hojeIdx;
+      ctx.setLineDash([4, 3]); ctx.strokeStyle = colBlue; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ch); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  const tip = document.getElementById('gantt-tooltip');
+  canvas.onmousemove = function(e) {
+    if (!real.length || !tip) return;
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left;
+    const realPts = toXY(real);
+    let closest = null, minD = 20;
+    realPts.forEach((p, i) => { const d = Math.abs(p.x - mx); if (d < minD) { minD = d; closest = i; } });
+    if (closest !== null) {
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 10) + 'px';
+      tip.style.top = (e.clientY - 30) + 'px';
+      const p = real[closest];
+      const d = new Date(p.data + 'T12:00:00');
+      tip.textContent = (d.getDate() + '').padStart(2, '0') + '/' + (d.getMonth() + 1 + '').padStart(2, '0') + ' — ' + p.horas.toFixed(1) + 'h restantes';
+    } else { tip.style.display = 'none'; }
+  };
+  canvas.onmouseleave = function() { if (tip) tip.style.display = 'none'; };
+}
+
+function renderCapacityCard(m, idx) {
+  const initials = m.nome.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+  const avatar = m.avatar_url ? '<img src="' + esc(m.avatar_url) + '" alt="">' : initials;
+  const isDesligado = m.desligado === true;
+  const fullyAbsent = m.horas_disponiveis === 0 && m.ausencias && m.ausencias.length > 0;
+  if (fullyAbsent) {
+    let html = '<div class="capacity-card absent-full' + (m.da_equipe ? '' : ' external') + (isDesligado ? ' desligado' : '') + '" id="cap-card-' + idx + '">';
+    html += '<div class="capacity-card-header"><div class="capacity-avatar">' + avatar + '</div>';
+    html += '<div class="capacity-card-name">' + esc(m.nome) + '</div></div>';
+    html += '<div class="capacity-badges">';
+    m.ausencias.forEach(a => {
+      html += '<span class="capacity-badge absence">' + formatTipoAusencia(a.tipo) + ' ' + a.dias + 'd</span>';
+    });
+    html += '</div></div>';
+    return html;
+  }
+  const pctClass = m.percentual_alocacao > 100 ? 'red' : m.percentual_alocacao > 80 ? 'amber' : 'green';
+  const barWidth = Math.min(m.percentual_alocacao, 150);
+  const hasTarefas = m.tarefas && m.tarefas.length > 0;
+  let html = '<div class="capacity-card' + (m.da_equipe ? '' : ' external') + (isDesligado ? ' desligado' : '') + '" id="cap-card-' + idx + '"' + (hasTarefas ? ' onclick="toggleCapacityTarefas(' + idx + ')"' : '') + '>';
+  html += '<div class="capacity-card-header"><div class="capacity-avatar">' + avatar + '</div>';
+  const desligadoTag = isDesligado ? ' <span style="font-weight:500;color:var(--red);font-size:11px">(Desligado)</span>' : '';
+  html += '<div class="capacity-card-name">' + esc(m.nome) + desligadoTag + (hasTarefas ? ' <span style="font-weight:400;color:var(--text-tertiary);font-size:11px">(' + m.tarefas.length + ' tarefas)</span>' : '') + '</div>';
+  html += '<div class="capacity-card-pct ' + pctClass + '">' + m.percentual_alocacao.toFixed(1) + '%</div></div>';
+  html += '<div class="capacity-bar"><div class="capacity-bar-fill ' + pctClass + '" style="width:' + barWidth + '%"></div></div>';
+  html += '<div class="capacity-card-detail">' + m.horas_alocadas.toFixed(1) + 'h alocadas / ' + (m.horas_executadas || 0).toFixed(1) + 'h executadas / ' + m.horas_disponiveis.toFixed(1) + 'h disponíveis</div>';
+  html += '<div class="capacity-badges">';
+  if (m.overcapacity) html += '<span class="capacity-badge overcapacity">Overcapacity</span>';
+  m.ausencias.forEach(a => {
+    html += '<span class="capacity-badge absence">' + formatTipoAusencia(a.tipo) + ' ' + a.dias + 'd</span>';
+  });
+  html += '</div>';
+  if (hasTarefas) {
+    html += '<div class="capacity-tarefas" id="cap-tarefas-' + idx + '" style="display:none">';
+    const grouped = {};
+    const manutencaoKey = '__MANUTENCAO__';
+    m.tarefas.forEach(t => {
+      const tipo = (t.tipo || '').toLowerCase();
+      const isManutencao = tipo === 'bug' || tipo.includes('incidente');
+      const key = isManutencao ? manutencaoKey : t.projeto_chave;
+      if (!grouped[key]) grouped[key] = { nome: isManutencao ? 'Bugs e Incidentes' : t.projeto_nome, manutencao: isManutencao, tarefas: [] };
+      grouped[key].tarefas.push(t);
+    });
+    const sortedKeys = Object.keys(grouped).sort((a, b) => a === manutencaoKey ? 1 : b === manutencaoKey ? -1 : a.localeCompare(b));
+    sortedKeys.forEach(chave => {
+      const g = grouped[chave];
+      const labelClass = g.manutencao ? ' manutencao' : '';
+      const labelText = g.manutencao ? '🔧 MANUTENÇÃO' : esc(chave);
+      html += '<div class="capacity-projeto-group">';
+      html += '<div class="capacity-projeto-label' + labelClass + '">' + labelText + ' <span>' + esc(g.nome) + ' — ' + g.tarefas.reduce((s,t) => s + t.horas, 0).toFixed(1) + 'h</span></div>';
+      g.tarefas.forEach(t => {
+        const statusClass = (t.status || '').toLowerCase().includes('done') || (t.status || '').toLowerCase().includes('conclu') ? 'done' : (t.status || '').toLowerCase().includes('progress') || (t.status || '').toLowerCase().includes('andamento') ? 'inprogress' : 'todo';
+        html += '<div class="capacity-tarefa-row">';
+        html += '<span class="capacity-tarefa-ticket">' + esc(t.numero_ticket) + '</span>';
+        html += '<span class="capacity-tarefa-resumo" title="' + esc(t.resumo) + '">' + esc(t.resumo) + '</span>';
+        html += '<span class="capacity-tarefa-tipo">' + esc(t.tipo) + '</span>';
+        html += '<span class="capacity-tarefa-status ' + statusClass + '">' + esc(t.status) + '</span>';
+        if (t.horas > 0) html += '<span class="capacity-tarefa-horas">' + t.horas.toFixed(1) + 'h</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function toggleCapacityTarefas(idx) {
+  const card = document.getElementById('cap-card-' + idx);
+  const tarefas = document.getElementById('cap-tarefas-' + idx);
+  if (!tarefas) return;
+  const visible = tarefas.style.display !== 'none';
+  tarefas.style.display = visible ? 'none' : '';
+  card.classList.toggle('expanded', !visible);
 }
 
 function formatTipoAusencia(tipo) {
@@ -1391,7 +1928,14 @@ async function loadMembroDetail(membroId, periodo) {
         '<div class="membro-detail-avatar" style="background:' + stringColor(m.nome) + '">' + avatarHtml + '</div>' +
         '<div class="membro-detail-info"><h2>' + esc(m.nome) + (m.team ? '<span class="team-badge">' + esc(m.team) + '</span>' : '') + '</h2>' +
           '<p>' + esc(m.email||'Sem email') + '</p>' +
+          (m.data_desligamento ? '<p style="color:var(--red);font-size:12px;font-weight:600;margin-top:4px">Desligado em: ' + formatDateShort(m.data_desligamento.substring(0,10)) + '</p>' : '') +
         '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
+        '<label class="form-label" style="margin:0;font-size:12px">Data de Desligamento:</label>' +
+        '<input class="form-input" type="date" id="membro-desligamento" value="' + (m.data_desligamento ? m.data_desligamento.substring(0,10) : '') + '" style="width:160px;padding:5px 10px;font-size:12px">' +
+        '<button class="btn-sm" onclick="salvarDesligamento(\'' + membroId + '\')">Salvar</button>' +
+        (m.data_desligamento ? '<button class="btn-sm danger" onclick="limparDesligamento(\'' + membroId + '\')">Limpar</button>' : '') +
       '</div>' +
       '<div class="membro-detail-period-chips" id="membro-period-chips"><span style="font-size:12px;color:var(--text-secondary);margin-right:4px">Período</span>' + periodChips + '</div>' +
       '<div class="membro-stats-grid">' +
@@ -1489,6 +2033,7 @@ async function loadFontes() {
 
 async function renderFonteCards(fontes, el) {
   let html = '<div class="fonte-cards fade-in">';
+  const _runningFontes = [];
   for (const f of fontes) {
     let syncStatus = null;
     try { syncStatus = await api('/sync/status?fonte_dados_id=' + f.id); } catch(e) {}
@@ -1496,12 +2041,19 @@ async function renderFonteCards(fontes, el) {
     const statusClass = hasSync ? syncStatus.status : 'never';
     const statusLabel = hasSync ? (syncStatus.status === 'success' ? 'Sincronizado' : syncStatus.status === 'running' ? 'Sincronizando...' : syncStatus.status === 'partial' ? 'Parcial' : 'Erro') : 'Nunca sincronizado';
     const lastSync = f.ultimo_sync ? formatDate(f.ultimo_sync) : '—';
-    const statsHtml = '<div class="fonte-card-stats"><span><b>' + (hasSync ? (syncStatus.total_projetos||0) : 0) + '</b> projetos</span><span><b>' + (hasSync ? (syncStatus.total_tarefas||0) : 0) + '</b> tarefas</span><span><b>' + (hasSync ? (syncStatus.total_membros||0) : 0) + '</b> membros</span><span><b>' + (hasSync ? (syncStatus.total_sprints||0) : 0) + '</b> sprints</span></div>';
+    const isRunning = hasSync && syncStatus.status === 'running';
+    if (isRunning) { _runningFontes.push(f.id); }
+    const syncingClass = isRunning ? ' syncing' : '';
+    const progressBarHtml = isRunning ? '<div class="sync-progress-bar"><div class="sync-progress-bar-inner"></div></div>' : '';
+    const statsHtml = '<div class="fonte-card-stats' + syncingClass + '"><span><b>' + (hasSync ? (syncStatus.total_projetos||0) : 0) + '</b> projetos</span><span><b>' + (hasSync ? (syncStatus.total_tarefas||0) : 0) + '</b> tarefas</span><span><b>' + (hasSync ? (syncStatus.total_membros||0) : 0) + '</b> membros</span><span><b>' + (hasSync ? (syncStatus.total_sprints||0) : 0) + '</b> sprints</span></div>';
     const authBadge = f.auth_type === 'oauth2' ? '<span class="auth-badge oauth">OAuth</span>' : '<span class="auth-badge basic">Token</span>';
     const reconnectBtn = f.auth_type === 'oauth2' ? '<button class="btn-sm" onclick="startOAuthConnect(\'' + f.id + '\')">Reconectar</button>' : '';
-    html += '<div class="fonte-card" data-fonte-id="' + f.id + '"><div class="fonte-card-header"><span class="fonte-card-name">' + esc(f.nome) + '</span>' + authBadge + '</div><div class="fonte-card-url">' + esc(f.base_url) + '</div><div class="fonte-card-sync"><span class="fonte-card-sync-dot ' + statusClass + '"></span><span class="fonte-card-sync-label">' + statusLabel + '</span>' + (f.ultimo_sync ? ' — ' + lastSync : '') + '</div>' + statsHtml + '<div class="fonte-card-actions"><button class="btn-sm primary" onclick="openProjectsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Sincronizar Projetos</button>' + reconnectBtn + '<button class="btn-sm" onclick="openLogsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Logs</button><button class="btn-sm danger" onclick="deleteFonte(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Excluir</button></div></div>';
+    html += '<div class="fonte-card" data-fonte-id="' + f.id + '"><div class="fonte-card-header"><span class="fonte-card-name">' + esc(f.nome) + '</span>' + authBadge + '</div><div class="fonte-card-url">' + esc(f.base_url) + '</div><div class="fonte-card-sync"><span class="fonte-card-sync-dot ' + statusClass + '"></span><span class="fonte-card-sync-label">' + statusLabel + '</span>' + (f.ultimo_sync ? ' — ' + lastSync : '') + '</div>' + progressBarHtml + statsHtml + '<div class="fonte-card-actions"><button class="btn-sm primary" onclick="openProjectsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Sincronizar Projetos</button>' + reconnectBtn + '<button class="btn-sm" onclick="openLogsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Logs</button><button class="btn-sm danger" onclick="deleteFonte(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Excluir</button></div></div>';
   }
   html += '</div>'; el.innerHTML = html;
+  for (const f of _runningFontes) {
+    startSyncPolling(f, '', null);
+  }
 }
 
 function openFonteModal() {
@@ -1577,11 +2129,30 @@ async function syncProject(fonteId, projectKey, btnEl) {
 
 function startSyncPolling(fonteId, projectKey, btnEl) {
   const card = document.querySelector('[data-fonte-id="' + fonteId + '"]');
+  let progressBar = null;
   if (card) {
     const dot = card.querySelector('.fonte-card-sync-dot');
     const label = card.querySelector('.fonte-card-sync-label');
     if (dot) { dot.className = 'fonte-card-sync-dot running'; }
-    if (label) { label.textContent = 'Sincronizando...'; }
+    if (label) { label.textContent = 'Sincronizando ' + (projectKey || '') + '...'; }
+    const syncRow = card.querySelector('.fonte-card-sync');
+    if (syncRow && !card.querySelector('.sync-progress-bar')) {
+      progressBar = document.createElement('div');
+      progressBar.className = 'sync-progress-bar';
+      progressBar.innerHTML = '<div class="sync-progress-bar-inner"></div>';
+      syncRow.after(progressBar);
+    }
+    const statsEl = card.querySelector('.fonte-card-stats');
+    if (statsEl) { statsEl.classList.add('syncing'); }
+  }
+  const prev = { tarefas: 0, membros: 0, sprints: 0 };
+  function bumpSpan(statsEl, index) {
+    const span = statsEl && statsEl.children[index];
+    if (!span) return;
+    span.classList.remove('counter-bump');
+    void span.offsetWidth;
+    span.classList.add('counter-bump');
+    setTimeout(() => span.classList.remove('counter-bump'), 300);
   }
   const poll = setInterval(async () => {
     try {
@@ -1589,12 +2160,19 @@ function startSyncPolling(fonteId, projectKey, btnEl) {
       if (!st || st.status === 'never_synced') return;
       if (card) {
         const statsEl = card.querySelector('.fonte-card-stats');
-        const statsHtml = '<span><b>' + (st.total_projetos||0) + '</b> projetos</span><span><b>' + (st.total_tarefas||0) + '</b> tarefas</span><span><b>' + (st.total_membros||0) + '</b> membros</span><span><b>' + (st.total_sprints||0) + '</b> sprints</span>';
-        if (statsEl) { statsEl.innerHTML = statsHtml; }
-        else {
+        const vals = { tarefas: st.total_tarefas||0, membros: st.total_membros||0, sprints: st.total_sprints||0 };
+        const statsHtml = '<span><b>' + (st.total_projetos||0) + '</b> projetos</span><span><b>' + vals.tarefas + '</b> tarefas</span><span><b>' + vals.membros + '</b> membros</span><span><b>' + vals.sprints + '</b> sprints</span>';
+        if (statsEl) {
+          statsEl.innerHTML = statsHtml;
+          if (st.status === 'running') { statsEl.classList.add('syncing'); }
+          if (vals.tarefas !== prev.tarefas) bumpSpan(statsEl, 1);
+          if (vals.membros !== prev.membros) bumpSpan(statsEl, 2);
+          if (vals.sprints !== prev.sprints) bumpSpan(statsEl, 3);
+        } else {
           const actions = card.querySelector('.fonte-card-actions');
-          if (actions) { const div = document.createElement('div'); div.className = 'fonte-card-stats'; div.innerHTML = statsHtml; actions.before(div); }
+          if (actions) { const div = document.createElement('div'); div.className = 'fonte-card-stats' + (st.status === 'running' ? ' syncing' : ''); div.innerHTML = statsHtml; actions.before(div); }
         }
+        prev.tarefas = vals.tarefas; prev.membros = vals.membros; prev.sprints = vals.sprints;
       }
       if (btnEl) { btnEl.textContent = (st.total_tarefas||0) + ' tarefas...'; }
       if (st.status !== 'running') {
@@ -1606,6 +2184,10 @@ function startSyncPolling(fonteId, projectKey, btnEl) {
           btnEl.style.borderColor = st.status === 'success' ? 'var(--accent)' : 'var(--amber, #b8860b)';
         }
         if (card) {
+          const bar = card.querySelector('.sync-progress-bar');
+          if (bar) { bar.style.opacity = '0'; setTimeout(() => bar.remove(), 300); }
+          const statsEl = card.querySelector('.fonte-card-stats');
+          if (statsEl) { statsEl.classList.remove('syncing'); }
           const dot = card.querySelector('.fonte-card-sync-dot');
           const label = card.querySelector('.fonte-card-sync-label');
           if (dot) { dot.className = 'fonte-card-sync-dot ' + st.status; }
@@ -1642,6 +2224,74 @@ async function loadSyncLogs(fonteId) {
     });
     el.innerHTML = html + '</div>';
   } catch (err) { el.innerHTML = '<div class="empty-state" style="padding:30px"><div class="empty-state-text">' + esc(err.message) + '</div></div>'; }
+}
+
+// === DESLIGAMENTO ===
+async function salvarDesligamento(membroId) {
+  const dt = document.getElementById('membro-desligamento').value;
+  if (!dt) { alert('Informe a data de desligamento'); return; }
+  try {
+    await api('/membros/' + membroId + '/desligamento', { method: 'PUT', body: JSON.stringify({ data_desligamento: dt }) });
+    loadMembroDetail(membroId, currentMembroPeriod);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+async function limparDesligamento(membroId) {
+  if (!confirm('Remover data de desligamento?')) return;
+  try {
+    await api('/membros/' + membroId + '/desligamento', { method: 'PUT', body: JSON.stringify({ data_desligamento: null }) });
+    loadMembroDetail(membroId, currentMembroPeriod);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+// === FERIADOS CRUD ===
+function openFeriadoModal() {
+  document.getElementById('feriado-form').reset();
+  loadFeriados();
+  document.getElementById('feriado-modal').classList.add('open');
+}
+function closeFeriadoModal() { document.getElementById('feriado-modal').classList.remove('open'); }
+
+async function loadFeriados() {
+  const el = document.getElementById('feriados-list');
+  el.innerHTML = '<div class="loading" style="padding:20px"><div class="spinner"></div></div>';
+  try {
+    const feriados = await api('/feriados');
+    if (!feriados || feriados.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:16px;font-size:13px">Nenhum feriado cadastrado</div>';
+      return;
+    }
+    let html = '<div style="border-top:1px solid var(--border-subtle);padding-top:12px"><div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Feriados Cadastrados</div>';
+    feriados.forEach(f => {
+      const d = new Date(f.data + 'T12:00:00');
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);font-size:13px">';
+      html += '<span>' + d.toLocaleDateString('pt-BR') + ' — <b>' + esc(f.nome) + '</b></span>';
+      html += '<button class="btn-sm danger" style="padding:3px 8px;font-size:11px" onclick="deleteFeriado(\'' + f.id + '\')">Excluir</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div style="color:var(--red);font-size:13px;padding:8px">' + esc(e.message) + '</div>'; }
+}
+
+async function handleFeriadoSubmit(e) {
+  e.preventDefault();
+  const data = document.getElementById('feriado-data').value;
+  const nome = document.getElementById('feriado-nome').value.trim();
+  if (!data || !nome) return;
+  try {
+    await api('/feriados', { method: 'POST', body: JSON.stringify({ data, nome }) });
+    document.getElementById('feriado-form').reset();
+    loadFeriados();
+  } catch(err) { alert('Erro: ' + err.message); }
+  return false;
+}
+
+async function deleteFeriado(id) {
+  if (!confirm('Excluir este feriado?')) return;
+  try {
+    await api('/feriados/' + id, { method: 'DELETE' });
+    loadFeriados();
+  } catch(err) { alert('Erro: ' + err.message); }
 }
 
 // === MODAL UTILS ===

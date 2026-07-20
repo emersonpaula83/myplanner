@@ -93,6 +93,9 @@ func main() {
 	sprintService := service.NewSprintService(sprintRepo, logger)
 	sprintHandler := handler.NewSprintHandler(sprintService, logger)
 
+	feriadoRepo := repository.NewFeriadoRepository(pool)
+	feriadoHandler := handler.NewFeriadoHandler(feriadoRepo, logger)
+
 	syncRepo := repository.NewSyncRepository(pool)
 	clientFactory := func(baseURL, email, apiToken string, rateLimit int, logger *zap.Logger) jira.Client {
 		return jira.NewHTTPClient(baseURL, email, apiToken, rateLimit, logger)
@@ -186,11 +189,18 @@ func main() {
 			r.Post("/membros/{id}/disponibilidade", membroHandler.CreateDisponibilidade)
 			r.Put("/membros/{id}/disponibilidade/{dispId}", membroHandler.UpdateDisponibilidade)
 			r.Delete("/membros/{id}/disponibilidade/{dispId}", membroHandler.DeleteDisponibilidade)
+			r.Put("/membros/{id}/desligamento", membroHandler.UpdateDataDesligamento)
+
+			r.Get("/feriados", feriadoHandler.List)
+			r.Post("/feriados", feriadoHandler.Create)
+			r.Delete("/feriados/{id}", feriadoHandler.Delete)
 
 			r.Get("/sprints", sprintHandler.ListSprints)
 			r.Get("/sprints/projetos", sprintHandler.ListProjetos)
 			r.Get("/projetos/{id}/sprints", sprintHandler.ListByProjeto)
 			r.Get("/sprints/{id}/capacity", sprintHandler.GetCapacity)
+			r.Get("/sprints/{id}/unplanned", sprintHandler.GetUnplanned)
+			r.Get("/sprints/{id}/burndown", sprintHandler.GetBurndown)
 
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)

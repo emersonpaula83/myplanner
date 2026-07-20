@@ -48,6 +48,7 @@ type UpsertTarefaParams struct {
 	ParentID           *uuid.UUID
 	Apelido            *string
 	DataInicioExecucao *time.Time
+	DataEntradaSprint  *time.Time
 }
 
 type SyncTotals struct {
@@ -120,9 +121,10 @@ func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams
 		                     tipo, status, prioridade, estimativa_pontos, estimativa_tempo, tempo_gasto,
 		                     responsavel_id, relator_id, team, sprint_id, data_criacao, data_limite,
 		                     data_resolvido, data_atualizado, tipo_demanda, data_componente,
-		                     status_categoria, campos_extras, parent_id, apelido, data_inicio_execucao)
+		                     status_categoria, campos_extras, parent_id, apelido, data_inicio_execucao,
+		                     data_entrada_sprint)
 		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-		        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+		        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
 		ON CONFLICT (fonte_dados_id, jira_id)
 		DO UPDATE SET resumo = EXCLUDED.resumo, tipo = EXCLUDED.tipo, status = EXCLUDED.status,
 		              prioridade = EXCLUDED.prioridade, estimativa_pontos = EXCLUDED.estimativa_pontos,
@@ -134,13 +136,15 @@ func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams
 		              data_componente = EXCLUDED.data_componente, status_categoria = EXCLUDED.status_categoria,
 		              parent_id = EXCLUDED.parent_id, apelido = EXCLUDED.apelido,
 		              data_inicio_execucao = EXCLUDED.data_inicio_execucao,
+		              data_entrada_sprint = EXCLUDED.data_entrada_sprint,
 		              campos_extras = EXCLUDED.campos_extras, updated_at = NOW()
 		RETURNING id
 	`, t.FonteDadosID, t.ProjetoID, t.JiraID, t.NumeroTicket, t.Resumo,
 		t.Tipo, t.Status, t.Prioridade, t.EstimativaPontos, t.EstimativaTempo, t.TempoGasto,
 		t.ResponsavelID, t.RelatorID, t.Team, t.SprintID, t.DataCriacao, t.DataLimite,
 		t.DataResolvido, t.DataAtualizado, t.TipoDemanda, t.DataComponente,
-		t.StatusCategoria, ce, t.ParentID, t.Apelido, t.DataInicioExecucao).Scan(&id)
+		t.StatusCategoria, ce, t.ParentID, t.Apelido, t.DataInicioExecucao,
+		t.DataEntradaSprint).Scan(&id)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("upserting tarefa %s: %w", t.NumeroTicket, err)
 	}

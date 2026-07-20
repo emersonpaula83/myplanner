@@ -20,20 +20,3 @@ CREATE TABLE usuario_projetos (
 );
 
 CREATE INDEX idx_usuario_projetos_usuario ON usuario_projetos(usuario_id);
-
--- Seed admin user
--- Password: Totvs@123 (bcrypt cost 12)
-INSERT INTO usuarios (nome_completo, apelido, email, senha_hash, cargo)
-VALUES (
-    'Administrador',
-    'admin',
-    'admin@myplanner.local',
-    '$2a$12$YD27E7brWZvrrq0lVpbsouDUIi3UiwgjT6NsiIOQGPzwDBlvC5DYK',
-    'coordenador'
-);
-
--- Grant admin access to all existing projects
-INSERT INTO usuario_projetos (usuario_id, projeto_id)
-SELECT u.id, p.id
-FROM usuarios u, projetos p
-WHERE u.apelido = 'admin';

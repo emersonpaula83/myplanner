@@ -117,24 +117,14 @@ func buildPrompt(input domain.AnaliseCapacidadeInput) string {
 Equipe: %s
 Período: %s/%d
 Horas disponíveis no mês: %.0f
-Horas estimadas em projetos: %.0f
-Delta de capacidade: %.1f%%
 
 `, input.Equipe, nomeMes(input.Mes), input.Ano,
-		input.HorasDisponiveis, input.HorasEstimadas, input.PercentualDelta)
+		input.HorasDisponiveis)
 
 	if len(input.MembrosAusentes) > 0 {
 		prompt += "Ausências no mês:\n"
 		for _, a := range input.MembrosAusentes {
 			prompt += fmt.Sprintf("- %s: %s (%d dias úteis)\n", a.Nome, a.Tipo, a.Dias)
-		}
-		prompt += "\n"
-	}
-
-	if len(input.Projetos) > 0 {
-		prompt += "Projetos ativos no mês:\n"
-		for _, p := range input.Projetos {
-			prompt += fmt.Sprintf("- %s: %.0fh estimadas — %s\n", p.Apelido, p.HorasMes, p.Resumo)
 		}
 		prompt += "\n"
 	}

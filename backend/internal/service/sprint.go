@@ -15,7 +15,7 @@ const horasPorDia = 6.0
 type SprintStore interface {
 	ListByProjeto(ctx context.Context, projetoID uuid.UUID, estado *string) ([]repository.SprintListItem, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*SprintInfo, error)
-	GetCapacity(ctx context.Context, sprintID uuid.UUID) (*SprintCapacityResult, error)
+	GetCapacity(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*SprintCapacityResult, error)
 }
 
 type SprintInfo struct {
@@ -33,21 +33,56 @@ type AusenciaInfo struct {
 	Dias       int    `json:"dias"`
 }
 
+type FeriadoInfo struct {
+	Data string `json:"data"`
+	Nome string `json:"nome"`
+}
+
+type TarefaCapacityDetail struct {
+	ID           uuid.UUID `json:"id"`
+	NumeroTicket string    `json:"numero_ticket"`
+	Resumo       string    `json:"resumo"`
+	Tipo         string    `json:"tipo"`
+	Status       string    `json:"status"`
+	Prioridade   *string   `json:"prioridade"`
+	Horas        float64   `json:"horas"`
+	ProjetoID    uuid.UUID `json:"projeto_id"`
+	ProjetoChave string    `json:"projeto_chave"`
+	ProjetoNome  string    `json:"projeto_nome"`
+}
+
 type MembroCapacity struct {
-	MembroID            uuid.UUID      `json:"membro_id"`
-	Nome                string         `json:"nome"`
-	AvatarURL           *string        `json:"avatar_url"`
-	HorasEstimadas      float64        `json:"horas_estimadas"`
-	HorasDisponiveis    float64        `json:"horas_disponiveis"`
-	PercentualAlocacao  float64        `json:"percentual_alocacao"`
-	Overcapacity        bool           `json:"overcapacity"`
-	Ausencias           []AusenciaInfo `json:"ausencias"`
+	MembroID            uuid.UUID              `json:"membro_id"`
+	Nome                string                 `json:"nome"`
+	AvatarURL           *string                `json:"avatar_url"`
+	HorasEstimadas      float64                `json:"horas_estimadas"`
+	HorasAlocadas       float64                `json:"horas_alocadas"`
+	HorasExecutadas     float64                `json:"horas_executadas"`
+	HorasDisponiveis    float64                `json:"horas_disponiveis"`
+	PercentualAlocacao  float64                `json:"percentual_alocacao"`
+	PercentualExecutado float64                `json:"percentual_executado"`
+	Overcapacity        bool                   `json:"overcapacity"`
+	DaEquipe            bool                   `json:"da_equipe"`
+	Desligado           bool                   `json:"desligado"`
+	Ausencias           []AusenciaInfo         `json:"ausencias"`
+	Tarefas             []TarefaCapacityDetail `json:"tarefas"`
+}
+
+type MembroAusenteComCards struct {
+	Nome   string `json:"nome"`
+	Motivo string `json:"motivo"`
 }
 
 type SprintCapacityResult struct {
-	Sprint    SprintInfo       `json:"sprint"`
-	DiasUteis int              `json:"dias_uteis"`
-	Membros   []MembroCapacity `json:"membros"`
+	Sprint                SprintInfo             `json:"sprint"`
+	DiasUteis             int                    `json:"dias_uteis"`
+	Feriados              []FeriadoInfo          `json:"feriados"`
+	TotalMembrosEquipe    int                    `json:"total_membros_equipe"`
+	HorasTotalSprint      float64                `json:"horas_total_sprint"`
+	HorasAlocadas         float64                `json:"horas_alocadas"`
+	HorasExecutadas       float64                `json:"horas_executadas"`
+	Membros               []MembroCapacity       `json:"membros"`
+	MembrosAusentesComCards []MembroAusenteComCards `json:"membros_ausentes_com_cards"`
 }
 
 type SprintService struct {
@@ -71,7 +106,7 @@ func (s *SprintService) ListSprints(ctx context.Context, equipeID *uuid.UUID, es
 	return s.repo.ListSprints(ctx, equipeID, estado)
 }
 
-func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID) (*SprintCapacityResult, error) {
+func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*SprintCapacityResult, error) {
 	sprint, err := s.repo.GetByID(ctx, sprintID)
 	if err != nil {
 		return nil, err
@@ -85,29 +120,121 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID) (*S
 		DataFim:    sprint.DataFim,
 	}
 
-	if sprint.DataInicio == nil || sprint.DataFim == nil {
-		return &SprintCapacityResult{Sprint: info, DiasUteis: 0, Membros: []MembroCapacity{}}, nil
+	emptyResult := &SprintCapacityResult{
+		Sprint:   info,
+		Feriados: []FeriadoInfo{},
+		Membros:  []MembroCapacity{},
 	}
 
-	diasUteis := contarDiasUteis(*sprint.DataInicio, *sprint.DataFim)
+	if sprint.DataInicio == nil || sprint.DataFim == nil {
+		return emptyResult, nil
+	}
+
+	feriados, err := s.repo.GetFeriadosNoPeriodo(ctx, *sprint.DataInicio, *sprint.DataFim)
+	if err != nil {
+		return nil, err
+	}
+
+	feriadoSet := make(map[string]bool)
+	var feriadosInfo []FeriadoInfo
+	for _, f := range feriados {
+		key := f.Data.Format("2006-01-02")
+		d, _ := time.Parse("2006-01-02", key)
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+			feriadoSet[key] = true
+			feriadosInfo = append(feriadosInfo, FeriadoInfo{
+				Data: key,
+				Nome: f.Nome,
+			})
+		}
+	}
+	if feriadosInfo == nil {
+		feriadosInfo = []FeriadoInfo{}
+	}
+
+	diasUteis := contarDiasUteisComFeriados(*sprint.DataInicio, *sprint.DataFim, feriadoSet)
+
+	var equipeMembroIDs map[uuid.UUID]bool
+	var equipeMembrosInfo []repository.MembroInfo
+	if equipeID != nil {
+		equipeMembroIDs, err = s.repo.GetMembrosEquipeIDs(ctx, *equipeID, *sprint.DataFim)
+		if err != nil {
+			return nil, err
+		}
+		equipeMembrosInfo, err = s.repo.GetMembrosEquipeInfo(ctx, *equipeID, *sprint.DataFim)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	membros, err := s.repo.GetMembrosFromSprint(ctx, sprintID)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(membros) == 0 {
-		return &SprintCapacityResult{Sprint: info, DiasUteis: diasUteis, Membros: []MembroCapacity{}}, nil
+	membrosSet := make(map[uuid.UUID]bool)
+	for _, m := range membros {
+		membrosSet[m.ID] = true
+	}
+	for _, em := range equipeMembrosInfo {
+		if !membrosSet[em.ID] {
+			membros = append(membros, em)
+		}
 	}
 
-	tarefas, err := s.repo.GetTarefasCapacityBySprint(ctx, sprintID)
+	if len(membros) == 0 {
+		return &SprintCapacityResult{
+			Sprint:             info,
+			DiasUteis:          diasUteis,
+			Feriados:           feriadosInfo,
+			TotalMembrosEquipe: len(equipeMembroIDs),
+			HorasTotalSprint:   float64(diasUteis) * horasPorDia * float64(len(equipeMembroIDs)),
+			Membros:            []MembroCapacity{},
+		}, nil
+	}
+
+	tarefasDetail, err := s.repo.GetTarefasDetailBySprint(ctx, sprintID)
 	if err != nil {
 		return nil, err
 	}
 
-	horasPorMembro := make(map[uuid.UUID]float64)
-	for _, t := range tarefas {
-		horasPorMembro[t.ResponsavelID] += float64(t.Segundos) / 3600.0
+	statusExecutado := map[string]bool{
+		"Code Review": true, "Teste": true, "Validação do Solicitante": true, "Deploy": true, "Concluído": true,
+	}
+	statusAmbos := map[string]bool{
+		"Teste": true, "Validação do Solicitante": true, "Deploy": true,
+	}
+
+	horasAlocadasMembro := make(map[uuid.UUID]float64)
+	horasExecutadasMembro := make(map[uuid.UUID]float64)
+	horasAmbosPorMembro := make(map[uuid.UUID]float64)
+	tarefasPorMembro := make(map[uuid.UUID][]TarefaCapacityDetail)
+	for _, t := range tarefasDetail {
+		if t.Status == "Cancelado" {
+			continue
+		}
+		horas := float64(t.Segundos) / 3600.0
+		if statusAmbos[t.Status] {
+			horasAlocadasMembro[t.ResponsavelID] += horas
+			horasExecutadasMembro[t.ResponsavelID] += horas
+			horasAmbosPorMembro[t.ResponsavelID] += horas
+		} else if statusExecutado[t.Status] {
+			horasExecutadasMembro[t.ResponsavelID] += horas
+		} else {
+			horasAlocadasMembro[t.ResponsavelID] += horas
+		}
+		tarefasPorMembro[t.ResponsavelID] = append(tarefasPorMembro[t.ResponsavelID], TarefaCapacityDetail{
+			ID:           t.ID,
+			NumeroTicket: t.NumeroTicket,
+			Resumo:       t.Resumo,
+			Tipo:         t.Tipo,
+			Status:       t.Status,
+			Prioridade:   t.Prioridade,
+			Horas:        math.Round(horas*10) / 10,
+			ProjetoID:    t.ProjetoID,
+			ProjetoChave: t.ProjetoChave,
+			ProjetoNome:  t.ProjetoNome,
+		})
 	}
 
 	membroIDs := make([]uuid.UUID, len(membros))
@@ -125,8 +252,15 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID) (*S
 		ausenciasPorMembro[a.MembroID] = append(ausenciasPorMembro[a.MembroID], a)
 	}
 
+	var horasAlocadasEquipe float64
+	var horasExecutadasEquipe float64
+	totalMembrosEquipe := 0
+
 	result := make([]MembroCapacity, 0, len(membros))
 	for _, m := range membros {
+		daEquipe := equipeMembroIDs == nil || equipeMembroIDs[m.ID]
+		desligado := m.DataDesligamento != nil && !m.DataDesligamento.After(*sprint.DataFim)
+
 		diasAusencia := 0
 		var ausenciasInfo []AusenciaInfo
 
@@ -139,7 +273,7 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID) (*S
 			if fim.After(*sprint.DataFim) {
 				fim = *sprint.DataFim
 			}
-			dias := contarDiasUteis(inicio, fim)
+			dias := contarDiasUteisComFeriados(inicio, fim, feriadoSet)
 			diasAusencia += dias
 			ausenciasInfo = append(ausenciasInfo, AusenciaInfo{
 				Tipo:       a.Tipo,
@@ -154,43 +288,379 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID) (*S
 			diasDisponiveis = 0
 		}
 		horasDisponiveis := float64(diasDisponiveis) * horasPorDia
-		horasEstimadas := horasPorMembro[m.ID]
+		horasAloc := horasAlocadasMembro[m.ID]
+		horasExec := horasExecutadasMembro[m.ID]
+		horasAmbosMembro := horasAmbosPorMembro[m.ID]
+		horasEstimadas := horasAloc + horasExec - horasAmbosMembro
 
+		horasAlocPura := horasAloc - horasAmbosMembro
 		var pct float64
 		if horasDisponiveis > 0 {
-			pct = math.Round((horasEstimadas/horasDisponiveis)*1000) / 10
-		} else if horasEstimadas > 0 {
+			pct = math.Round((horasAlocPura/horasDisponiveis)*1000) / 10
+		} else if horasAlocPura > 0 {
 			pct = 999.9
+		}
+
+		var pctExec float64
+		if horasDisponiveis > 0 {
+			pctExec = math.Round((horasExec/horasDisponiveis)*1000) / 10
 		}
 
 		if ausenciasInfo == nil {
 			ausenciasInfo = []AusenciaInfo{}
 		}
 
+		memberTarefas := tarefasPorMembro[m.ID]
+		if memberTarefas == nil {
+			memberTarefas = []TarefaCapacityDetail{}
+		}
+
+		if daEquipe && !desligado {
+			horasAlocadasEquipe += math.Round(horasAlocPura*10) / 10
+			horasExecutadasEquipe += math.Round(horasExec*10) / 10
+			totalMembrosEquipe++
+		}
+
 		result = append(result, MembroCapacity{
-			MembroID:           m.ID,
-			Nome:               m.Nome,
-			AvatarURL:          m.AvatarURL,
-			HorasEstimadas:     math.Round(horasEstimadas*10) / 10,
-			HorasDisponiveis:   math.Round(horasDisponiveis*10) / 10,
-			PercentualAlocacao: pct,
-			Overcapacity:       pct > 100,
-			Ausencias:          ausenciasInfo,
+			MembroID:            m.ID,
+			Nome:                m.Nome,
+			AvatarURL:           m.AvatarURL,
+			HorasEstimadas:      math.Round(horasEstimadas*10) / 10,
+			HorasAlocadas:       math.Round(horasAlocPura*10) / 10,
+			HorasExecutadas:     math.Round(horasExec*10) / 10,
+			HorasDisponiveis:    math.Round(horasDisponiveis*10) / 10,
+			PercentualAlocacao:  pct,
+			PercentualExecutado: pctExec,
+			Overcapacity:        pct > 100,
+			DaEquipe:            daEquipe,
+			Desligado:           desligado,
+			Ausencias:           ausenciasInfo,
+			Tarefas:             memberTarefas,
 		})
 	}
 
-	return &SprintCapacityResult{Sprint: info, DiasUteis: diasUteis, Membros: result}, nil
+	if equipeMembroIDs != nil && totalMembrosEquipe == 0 {
+		totalMembrosEquipe = len(equipeMembroIDs)
+	}
+
+	var horasTotalSprint float64
+	for _, mc := range result {
+		if mc.DaEquipe {
+			horasTotalSprint += mc.HorasDisponiveis
+		}
+	}
+
+	var membrosAusentes []MembroAusenteComCards
+	for _, mc := range result {
+		if len(mc.Tarefas) == 0 || mc.HorasDisponiveis > 0 {
+			continue
+		}
+		motivo := "ausente"
+		if len(mc.Ausencias) > 0 {
+			motivo = mc.Ausencias[0].Tipo
+		}
+		membrosAusentes = append(membrosAusentes, MembroAusenteComCards{
+			Nome:   mc.Nome,
+			Motivo: motivo,
+		})
+	}
+	if membrosAusentes == nil {
+		membrosAusentes = []MembroAusenteComCards{}
+	}
+
+	return &SprintCapacityResult{
+		Sprint:                  info,
+		DiasUteis:               diasUteis,
+		Feriados:                feriadosInfo,
+		TotalMembrosEquipe:      totalMembrosEquipe,
+		HorasTotalSprint:        math.Round(horasTotalSprint*10) / 10,
+		HorasAlocadas:           math.Round(horasAlocadasEquipe*10) / 10,
+		HorasExecutadas:         math.Round(horasExecutadasEquipe*10) / 10,
+		Membros:                 result,
+		MembrosAusentesComCards: membrosAusentes,
+	}, nil
 }
 
-func contarDiasUteis(inicio, fim time.Time) int {
+type SprintAtualUnplanned struct {
+	TotalTarefas          int     `json:"total_tarefas"`
+	TarefasNaoPlanejadas  int     `json:"tarefas_nao_planejadas"`
+	PercentualNaoPlanejadas float64 `json:"percentual_nao_planejadas"`
+	HorasNaoPlanejadas    float64 `json:"horas_nao_planejadas"`
+	HorasTotalSprint      float64 `json:"horas_total_sprint"`
+}
+
+type MediaHistorica struct {
+	SprintsAnalisadas         int     `json:"sprints_analisadas"`
+	MediaHorasNaoPlanejadas   float64 `json:"media_horas_nao_planejadas"`
+	MediaPercentualNaoPlanejadas float64 `json:"media_percentual_nao_planejadas"`
+	CapacidadeMediaSprint     float64 `json:"capacidade_media_sprint"`
+	PercentualAlocacaoSugerido float64 `json:"percentual_alocacao_sugerido"`
+}
+
+type UnplannedAnalysisResult struct {
+	SprintAtual    SprintAtualUnplanned `json:"sprint_atual"`
+	MediaHistorica MediaHistorica       `json:"media_historica"`
+	EquipeNome     string               `json:"equipe_nome"`
+}
+
+func (s *SprintService) GetUnplannedAnalysis(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*UnplannedAnalysisResult, error) {
+	stats, err := s.repo.GetUnplannedStats(ctx, sprintID, equipeID)
+	if err != nil {
+		return nil, err
+	}
+
+	var pctNaoPlanejadas float64
+	if stats.TotalTarefas > 0 {
+		pctNaoPlanejadas = math.Round(float64(stats.TarefasNaoPlanejadas)/float64(stats.TotalTarefas)*1000) / 10
+	}
+
+	result := &UnplannedAnalysisResult{
+		SprintAtual: SprintAtualUnplanned{
+			TotalTarefas:          stats.TotalTarefas,
+			TarefasNaoPlanejadas:  stats.TarefasNaoPlanejadas,
+			PercentualNaoPlanejadas: pctNaoPlanejadas,
+			HorasNaoPlanejadas:    math.Round(stats.HorasNaoPlanejadas*10) / 10,
+			HorasTotalSprint:      math.Round(stats.HorasTotalSprint*10) / 10,
+		},
+	}
+
+	var equipeNome string
+	if equipeID != nil {
+		equipeNome, err = s.repo.GetEquipeNome(ctx, *equipeID)
+		if err != nil {
+			s.logger.Warn("could not get equipe nome", zap.Error(err))
+		}
+	}
+	result.EquipeNome = equipeNome
+
+	projetoID, err := s.repo.GetSprintProjetoID(ctx, sprintID)
+	if err != nil || projetoID == nil {
+		return result, nil
+	}
+
+	historico, err := s.repo.GetHistoricalUnplanned(ctx, *projetoID, equipeID, sprintID, 8)
+	if err != nil {
+		s.logger.Warn("could not get historical unplanned", zap.Error(err))
+		return result, nil
+	}
+
+	if len(historico) == 0 {
+		return result, nil
+	}
+
+	sprint, err := s.repo.GetByID(ctx, sprintID)
+	if err != nil {
+		return result, nil
+	}
+
+	feriados, err := s.repo.GetFeriadosNoPeriodo(ctx, *sprint.DataInicio, *sprint.DataFim)
+	if err != nil {
+		feriados = nil
+	}
+	feriadoSet := make(map[string]bool)
+	for _, f := range feriados {
+		key := f.Data.Format("2006-01-02")
+		d, _ := time.Parse("2006-01-02", key)
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+			feriadoSet[key] = true
+		}
+	}
+
+	var somaHorasNaoPlanejadas float64
+	var somaPctNaoPlanejadas float64
+	var somaCapacidade float64
+	for _, h := range historico {
+		somaHorasNaoPlanejadas += h.HorasNaoPlanejadas
+		if h.HorasTotal > 0 {
+			somaPctNaoPlanejadas += h.HorasNaoPlanejadas / h.HorasTotal * 100
+		}
+		sprintInfo, err := s.repo.GetByID(ctx, h.SprintID)
+		if err != nil || sprintInfo.DataInicio == nil || sprintInfo.DataFim == nil {
+			continue
+		}
+		diasUteis := contarDiasUteisComFeriados(*sprintInfo.DataInicio, *sprintInfo.DataFim, feriadoSet)
+		capacidade := float64(diasUteis) * horasPorDia * float64(h.TotalMembros)
+		somaCapacidade += capacidade
+	}
+
+	n := float64(len(historico))
+	mediaHoras := math.Round(somaHorasNaoPlanejadas/n*10) / 10
+	mediaPct := math.Round(somaPctNaoPlanejadas/n*10) / 10
+	mediaCapacidade := math.Round(somaCapacidade/n*10) / 10
+
+	var pctSugerido float64
+	if mediaCapacidade > 0 {
+		pctSugerido = math.Round(100 - (mediaHoras/mediaCapacidade*100))
+	}
+	if pctSugerido < 0 {
+		pctSugerido = 0
+	}
+
+	result.MediaHistorica = MediaHistorica{
+		SprintsAnalisadas:         len(historico),
+		MediaHorasNaoPlanejadas:   mediaHoras,
+		MediaPercentualNaoPlanejadas: mediaPct,
+		CapacidadeMediaSprint:     mediaCapacidade,
+		PercentualAlocacaoSugerido: pctSugerido,
+	}
+
+	return result, nil
+}
+
+func contarDiasUteisComFeriados(inicio, fim time.Time, feriados map[string]bool) int {
 	startDate := time.Date(inicio.Year(), inicio.Month(), inicio.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(fim.Year(), fim.Month(), fim.Day(), 0, 0, 0, 0, time.UTC)
 
 	dias := 0
 	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
-		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
-			dias++
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			continue
 		}
+		if feriados[d.Format("2006-01-02")] {
+			continue
+		}
+		dias++
 	}
 	return dias
+}
+
+type BurndownPoint struct {
+	Data  string  `json:"data"`
+	Horas float64 `json:"horas"`
+}
+
+type BurndownResult struct {
+	SprintNome string          `json:"sprint_nome"`
+	DataInicio string          `json:"data_inicio"`
+	DataFim    string          `json:"data_fim"`
+	HorasTotal float64         `json:"horas_total"`
+	LinhaIdeal []BurndownPoint `json:"linha_ideal"`
+	LinhaReal  []BurndownPoint `json:"linha_real"`
+}
+
+func (s *SprintService) GetBurndown(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*BurndownResult, error) {
+	sprint, err := s.repo.GetByID(ctx, sprintID)
+	if err != nil {
+		return nil, err
+	}
+	if sprint.DataInicio == nil || sprint.DataFim == nil {
+		return &BurndownResult{SprintNome: sprint.Nome}, nil
+	}
+
+	feriados, err := s.repo.GetFeriadosNoPeriodo(ctx, *sprint.DataInicio, *sprint.DataFim)
+	if err != nil {
+		return nil, err
+	}
+	feriadoSet := make(map[string]bool)
+	for _, f := range feriados {
+		key := f.Data.Format("2006-01-02")
+		d, _ := time.Parse("2006-01-02", key)
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+			feriadoSet[key] = true
+		}
+	}
+
+	tarefas, err := s.repo.GetBurndownTarefas(ctx, sprintID, equipeID)
+	if err != nil {
+		return nil, err
+	}
+
+	sprintInicio := sprint.DataInicio.Truncate(24 * time.Hour)
+	sprintFim := sprint.DataFim.Truncate(24 * time.Hour)
+
+	var diasUteis []time.Time
+	for d := sprintInicio; !d.After(sprintFim); d = d.AddDate(0, 0, 1) {
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			continue
+		}
+		if feriadoSet[d.Format("2006-01-02")] {
+			continue
+		}
+		diasUteis = append(diasUteis, d)
+	}
+
+	if len(diasUteis) == 0 {
+		return &BurndownResult{SprintNome: sprint.Nome}, nil
+	}
+
+	var horasIniciais float64
+	for _, t := range tarefas {
+		entrou := sprintInicio
+		if t.DataEntradaSprint != nil {
+			entrou = t.DataEntradaSprint.Truncate(24 * time.Hour)
+		}
+		if !entrou.After(sprintInicio) {
+			horasIniciais += float64(t.EstimativaSegundos) / 3600.0
+		}
+	}
+
+	ideal := make([]BurndownPoint, len(diasUteis))
+	decPerDay := horasIniciais / float64(len(diasUteis)-1)
+	for i, d := range diasUteis {
+		remaining := horasIniciais - decPerDay*float64(i)
+		if i == len(diasUteis)-1 {
+			remaining = 0
+		}
+		ideal[i] = BurndownPoint{
+			Data:  d.Format("2006-01-02"),
+			Horas: math.Round(remaining*10) / 10,
+		}
+	}
+
+	status80pct := map[string]bool{
+		"Teste": true, "Validação do Solicitante": true, "Deploy": true,
+	}
+
+	hoje := time.Now().Truncate(24 * time.Hour)
+	var real []BurndownPoint
+	horasRestantes := horasIniciais
+	for _, d := range diasUteis {
+		if d.After(hoje) {
+			break
+		}
+		for _, t := range tarefas {
+			horas := float64(t.EstimativaSegundos) / 3600.0
+			if t.DataEntradaSprint != nil {
+				entrou := t.DataEntradaSprint.Truncate(24 * time.Hour)
+				if entrou.Equal(d) && entrou.After(sprintInicio) {
+					horasRestantes += horas
+				}
+			}
+			if t.DataResolvido != nil {
+				resolvido := t.DataResolvido.Truncate(24 * time.Hour)
+				if resolvido.Equal(d) {
+					horasRestantes -= horas
+				}
+			}
+		}
+
+		desconto80 := 0.0
+		for _, t := range tarefas {
+			if t.DataResolvido != nil {
+				continue
+			}
+			if !status80pct[t.Status] {
+				continue
+			}
+			horas := float64(t.EstimativaSegundos) / 3600.0
+			desconto80 += horas * 0.8
+		}
+		horasComDesconto := horasRestantes - desconto80
+		if horasComDesconto < 0 {
+			horasComDesconto = 0
+		}
+		real = append(real, BurndownPoint{
+			Data:  d.Format("2006-01-02"),
+			Horas: math.Round(horasComDesconto*10) / 10,
+		})
+	}
+
+	return &BurndownResult{
+		SprintNome: sprint.Nome,
+		DataInicio: sprintInicio.Format("2006-01-02"),
+		DataFim:    sprintFim.Format("2006-01-02"),
+		HorasTotal: math.Round(horasIniciais*10) / 10,
+		LinhaIdeal: ideal,
+		LinhaReal:  real,
+	}, nil
 }

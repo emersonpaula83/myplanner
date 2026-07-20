@@ -22,7 +22,7 @@ func NewMembroRepository(pool *pgxpool.Pool) *MembroRepository {
 
 func (r *MembroRepository) List(ctx context.Context) ([]domain.Membro, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, created_at, updated_at
+		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, data_desligamento, created_at, updated_at
 		FROM membros
 		WHERE ativo = true
 		ORDER BY nome
@@ -35,7 +35,7 @@ func (r *MembroRepository) List(ctx context.Context) ([]domain.Membro, error) {
 	result := make([]domain.Membro, 0)
 	for rows.Next() {
 		var m domain.Membro
-		if err := rows.Scan(&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email, &m.AvatarURL, &m.Team, &m.Ativo, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email, &m.AvatarURL, &m.Team, &m.Ativo, &m.DataDesligamento, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning membro: %w", err)
 		}
 		result = append(result, m)
@@ -46,9 +46,9 @@ func (r *MembroRepository) List(ctx context.Context) ([]domain.Membro, error) {
 func (r *MembroRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
 	var m domain.Membro
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, created_at, updated_at
+		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, data_desligamento, created_at, updated_at
 		FROM membros WHERE id = $1
-	`, id).Scan(&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email, &m.AvatarURL, &m.Team, &m.Ativo, &m.CreatedAt, &m.UpdatedAt)
+	`, id).Scan(&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email, &m.AvatarURL, &m.Team, &m.Ativo, &m.DataDesligamento, &m.CreatedAt, &m.UpdatedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -191,7 +191,7 @@ func (r *MembroRepository) UpdateTeam(ctx context.Context, id uuid.UUID, team st
 func (r *MembroRepository) Search(ctx context.Context, query string) ([]domain.Membro, error) {
 	pattern := "%" + query + "%"
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, created_at, updated_at
+		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, data_desligamento, created_at, updated_at
 		FROM membros
 		WHERE ativo = true AND (nome ILIKE $1 OR email ILIKE $1)
 		ORDER BY nome
@@ -205,12 +205,25 @@ func (r *MembroRepository) Search(ctx context.Context, query string) ([]domain.M
 	result := make([]domain.Membro, 0)
 	for rows.Next() {
 		var m domain.Membro
-		if err := rows.Scan(&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email, &m.AvatarURL, &m.Team, &m.Ativo, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email, &m.AvatarURL, &m.Team, &m.Ativo, &m.DataDesligamento, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning membro: %w", err)
 		}
 		result = append(result, m)
 	}
 	return result, rows.Err()
+}
+
+func (r *MembroRepository) UpdateDataDesligamento(ctx context.Context, id uuid.UUID, dataDesligamento *time.Time) error {
+	result, err := r.pool.Exec(ctx, `
+		UPDATE membros SET data_desligamento = $2, updated_at = NOW() WHERE id = $1
+	`, id, dataDesligamento)
+	if err != nil {
+		return fmt.Errorf("updating data_desligamento: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not found", id)
+	}
+	return nil
 }
 
 func (r *MembroRepository) ListTeams(ctx context.Context) ([]string, error) {

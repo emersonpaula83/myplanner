@@ -27,6 +27,9 @@ migrate-up:
 migrate-down:
 	cd backend && go run ./cmd/migrate -direction down
 
+seed:
+	cd backend && go run ./cmd/seed
+
 # Frontend
 frontend-dev:
 	cd frontend && npm run dev

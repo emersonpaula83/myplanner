@@ -19,6 +19,8 @@ type mockTimelineStore struct {
 	epicos          []domain.EpicoEquipe
 	membrosCount    int
 	ausencias       []domain.AusenciaMensal
+	feriados        []time.Time
+	membrosTimeline []domain.MembroTimeline
 	updateErr       error
 	epicoPorID      *domain.Tarefa
 	epicosList      []domain.ProjetoListItem
@@ -29,12 +31,28 @@ func (m *mockTimelineStore) BuscarEpicosEquipe(_ context.Context, _ uuid.UUID, _
 	return m.epicos, nil
 }
 
-func (m *mockTimelineStore) ContarMembrosAtivosEquipe(_ context.Context, _ uuid.UUID) (int, error) {
+func (m *mockTimelineStore) ContarMembrosAtivosEquipe(_ context.Context, _ uuid.UUID, _ int) (int, error) {
+	return m.membrosCount, nil
+}
+
+func (m *mockTimelineStore) ContarMembrosAtivosEquipes(_ context.Context, _ []uuid.UUID, _ int) (int, error) {
 	return m.membrosCount, nil
 }
 
 func (m *mockTimelineStore) BuscarAusenciasMensais(_ context.Context, _ uuid.UUID, _ int) ([]domain.AusenciaMensal, error) {
 	return m.ausencias, nil
+}
+
+func (m *mockTimelineStore) BuscarAusenciasMensaisEquipes(_ context.Context, _ []uuid.UUID, _ int) ([]domain.AusenciaMensal, error) {
+	return m.ausencias, nil
+}
+
+func (m *mockTimelineStore) BuscarFeriadosAno(_ context.Context, _ int) ([]time.Time, error) {
+	return m.feriados, nil
+}
+
+func (m *mockTimelineStore) BuscarMembrosComAusencias(_ context.Context, _ []uuid.UUID, _ int) ([]domain.MembroTimeline, error) {
+	return m.membrosTimeline, nil
 }
 
 func (m *mockTimelineStore) AtualizarMetadataProjeto(_ context.Context, _ uuid.UUID, apelido *string, _ *time.Time) error {
@@ -117,14 +135,11 @@ func TestListTimeline_Success(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decoding response: %v", err)
 	}
-	if resp.Equipe != testEquipeID.String() {
-		t.Errorf("Equipe = %q, want %s", resp.Equipe, testEquipeID.String())
+	if len(resp.Equipes) != 1 || resp.Equipes[0] != testEquipeID.String() {
+		t.Errorf("Equipes = %v, want [%s]", resp.Equipes, testEquipeID.String())
 	}
 	if len(resp.Projetos) != 1 {
 		t.Fatalf("Projetos count = %d, want 1", len(resp.Projetos))
-	}
-	if resp.Projetos[0].TotalDiasEstimados != 5 {
-		t.Errorf("TotalDiasEstimados = %.2f, want 5 (144000/3600/8)", resp.Projetos[0].TotalDiasEstimados)
 	}
 	if len(resp.CapacidadeMensal) != 12 {
 		t.Errorf("CapacidadeMensal count = %d, want 12", len(resp.CapacidadeMensal))

@@ -22,6 +22,7 @@ type MembroStore interface {
 	UpdateDisponibilidade(ctx context.Context, id uuid.UUID, tipo string, dataInicio, dataFim pgtype.Date, descricao *string) error
 	DeleteDisponibilidade(ctx context.Context, id uuid.UUID) error
 	GetMembroStats(ctx context.Context, membroID uuid.UUID, inicio, fim time.Time) (*domain.MembroStats, error)
+	UpdateDataDesligamento(ctx context.Context, id uuid.UUID, dataDesligamento *time.Time) error
 }
 
 type MembroHandler struct {
@@ -210,6 +211,40 @@ func (h *MembroHandler) DeleteDisponibilidade(w http.ResponseWriter, r *http.Req
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "excluído"})
+}
+
+func (h *MembroHandler) UpdateDataDesligamento(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+
+	var req struct {
+		DataDesligamento *string `json:"data_desligamento"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+
+	var dt *time.Time
+	if req.DataDesligamento != nil && *req.DataDesligamento != "" {
+		parsed, err := time.Parse("2006-01-02", *req.DataDesligamento)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "data_desligamento inválida")
+			return
+		}
+		dt = &parsed
+	}
+
+	if err := h.store.UpdateDataDesligamento(r.Context(), id, dt); err != nil {
+		h.logger.Error("failed to update data_desligamento", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao atualizar data de desligamento")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "atualizado"})
 }
 
 func parsePgDate(s string) (pgtype.Date, error) {

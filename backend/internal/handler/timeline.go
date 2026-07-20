@@ -20,8 +20,12 @@ import (
 
 type TimelineStore interface {
 	BuscarEpicosEquipe(ctx context.Context, equipeID uuid.UUID, ano int, projetoIDs []uuid.UUID) ([]domain.EpicoEquipe, error)
-	ContarMembrosAtivosEquipe(ctx context.Context, equipeID uuid.UUID) (int, error)
+	ContarMembrosAtivosEquipe(ctx context.Context, equipeID uuid.UUID, ano int) (int, error)
+	ContarMembrosAtivosEquipes(ctx context.Context, equipeIDs []uuid.UUID, ano int) (int, error)
 	BuscarAusenciasMensais(ctx context.Context, equipeID uuid.UUID, ano int) ([]domain.AusenciaMensal, error)
+	BuscarAusenciasMensaisEquipes(ctx context.Context, equipeIDs []uuid.UUID, ano int) ([]domain.AusenciaMensal, error)
+	BuscarFeriadosAno(ctx context.Context, ano int) ([]time.Time, error)
+	BuscarMembrosComAusencias(ctx context.Context, equipeIDs []uuid.UUID, ano int) ([]domain.MembroTimeline, error)
 	AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time) error
 	BuscarEpicoPorID(ctx context.Context, id uuid.UUID) (*domain.Tarefa, error)
 	ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error)
@@ -37,46 +41,21 @@ func NewTimelineHandler(store TimelineStore, analyzer service.AnalisadorCapacida
 	return &TimelineHandler{store: store, analyzer: analyzer, logger: logger}
 }
 
-type timelineData struct {
-	epicos             []domain.EpicoEquipe
-	membrosCount       int
-	ausencias          []domain.AusenciaMensal
-	projetosCapacidade []domain.ProjetoCapacidade
-}
-
-func (h *TimelineHandler) fetchTimelineData(ctx context.Context, equipeID uuid.UUID, ano int, projetoIDs []uuid.UUID) (*timelineData, error) {
-	epicos, err := h.store.BuscarEpicosEquipe(ctx, equipeID, ano, projetoIDs)
-	if err != nil {
-		return nil, fmt.Errorf("buscando épicos: %w", err)
-	}
-
-	membrosCount, err := h.store.ContarMembrosAtivosEquipe(ctx, equipeID)
-	if err != nil {
-		return nil, fmt.Errorf("contando membros ativos: %w", err)
-	}
-
-	ausencias, err := h.store.BuscarAusenciasMensais(ctx, equipeID, ano)
-	if err != nil {
-		return nil, fmt.Errorf("buscando ausências mensais: %w", err)
-	}
-
-	projetosCapacidade := make([]domain.ProjetoCapacidade, 0)
-	for _, e := range epicos {
-		if e.DataInicioExecucao != nil && e.DataLimite != nil {
-			projetosCapacidade = append(projetosCapacidade, domain.ProjetoCapacidade{
-				DataInicioExecucao: *e.DataInicioExecucao,
-				DataLimite:         *e.DataLimite,
-				HorasEquipe:        float64(e.TotalSegundosEquipe) / 3600.0,
-			})
+func parseEquipeIDs(param string) ([]uuid.UUID, error) {
+	parts := strings.Split(param, ",")
+	ids := make([]uuid.UUID, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
 		}
+		id, err := uuid.Parse(p)
+		if err != nil {
+			return nil, fmt.Errorf("equipe id inválido: %s", p)
+		}
+		ids = append(ids, id)
 	}
-
-	return &timelineData{
-		epicos:             epicos,
-		membrosCount:       membrosCount,
-		ausencias:          ausencias,
-		projetosCapacidade: projetosCapacidade,
-	}, nil
+	return ids, nil
 }
 
 func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
@@ -85,8 +64,9 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "equipe é obrigatório")
 		return
 	}
-	equipeID, err := uuid.Parse(equipeStr)
-	if err != nil {
+
+	equipeIDs, err := parseEquipeIDs(equipeStr)
+	if err != nil || len(equipeIDs) == 0 {
 		respondError(w, http.StatusBadRequest, "equipe id inválido")
 		return
 	}
@@ -103,21 +83,52 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
-	data, err := h.fetchTimelineData(r.Context(), equipeID, ano, projetoIDs)
+
+	membrosCount, err := h.store.ContarMembrosAtivosEquipes(r.Context(), equipeIDs, ano)
 	if err != nil {
-		h.logger.Error("failed to fetch timeline data", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
+		h.logger.Error("failed to count members", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao contar membros")
 		return
 	}
 
-	projetos := make([]domain.ProjetoTimeline, len(data.epicos))
-	for i, e := range data.epicos {
+	ausencias, err := h.store.BuscarAusenciasMensaisEquipes(r.Context(), equipeIDs, ano)
+	if err != nil {
+		h.logger.Error("failed to fetch absences", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar ausências")
+		return
+	}
+
+	feriados, err := h.store.BuscarFeriadosAno(r.Context(), ano)
+	if err != nil {
+		h.logger.Error("failed to fetch feriados", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar feriados")
+		return
+	}
+
+	membrosTimeline, err := h.store.BuscarMembrosComAusencias(r.Context(), equipeIDs, ano)
+	if err != nil {
+		h.logger.Error("failed to fetch membros timeline", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar membros timeline")
+		return
+	}
+
+	var allEpicos []domain.EpicoEquipe
+	for _, eqID := range equipeIDs {
+		epicos, err := h.store.BuscarEpicosEquipe(r.Context(), eqID, ano, projetoIDs)
+		if err != nil {
+			h.logger.Error("failed to fetch epicos", zap.Error(err))
+			continue
+		}
+		allEpicos = append(allEpicos, epicos...)
+	}
+
+	projetos := make([]domain.ProjetoTimeline, len(allEpicos))
+	for i, e := range allEpicos {
 		var dataLimite *string
 		if e.DataLimite != nil {
 			s := e.DataLimite.Format("2006-01-02")
 			dataLimite = &s
 		}
-
 		projetos[i] = domain.ProjetoTimeline{
 			ID:                 e.ID,
 			NumeroTicket:       e.NumeroTicket,
@@ -127,19 +138,25 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 			Status:             e.Status,
 			DataInicioExecucao: e.DataInicioExecucao,
 			DataLimite:         dataLimite,
-			TotalDiasEstimados: float64(e.TotalSegundosEquipe) / 3600.0 / 8.0,
+			TotalDiasEstimados: float64(e.TotalSegundosEquipe) / 3600.0 / 6.0,
 			ProjetoCI:          e.ProjetoCI,
 			ProjetoCITicket:    e.ProjetoCITicket,
 		}
 	}
 
-	capacidade := CalcularCapacidadeMensal(ano, data.membrosCount, data.ausencias, data.projetosCapacidade)
+	capacidade := CalcularCapacidadeMensal(ano, membrosCount, ausencias, feriados)
+
+	equipeStrs := make([]string, len(equipeIDs))
+	for i, id := range equipeIDs {
+		equipeStrs[i] = id.String()
+	}
 
 	respondJSON(w, http.StatusOK, domain.TimelineResponse{
-		Equipe:           equipeStr,
+		Equipes:          equipeStrs,
 		Ano:              ano,
 		Projetos:         projetos,
 		CapacidadeMensal: capacidade,
+		MembrosTimeline:  membrosTimeline,
 	})
 }
 
@@ -267,15 +284,30 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	projetoIDsA := middleware.ProjetoIDsFromContext(r.Context())
-	data, err := h.fetchTimelineData(r.Context(), equipeID, req.Ano, projetoIDsA)
+	equipeIDs := []uuid.UUID{equipeID}
+
+	membrosCount, err := h.store.ContarMembrosAtivosEquipes(r.Context(), equipeIDs, req.Ano)
 	if err != nil {
-		h.logger.Error("failed to fetch timeline data for analysis", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "falha ao buscar dados")
+		h.logger.Error("failed to count members", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao contar membros")
 		return
 	}
 
-	capacidade := CalcularCapacidadeMensal(req.Ano, data.membrosCount, data.ausencias, data.projetosCapacidade)
+	ausencias, err := h.store.BuscarAusenciasMensaisEquipes(r.Context(), equipeIDs, req.Ano)
+	if err != nil {
+		h.logger.Error("failed to fetch absences", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar ausências")
+		return
+	}
+
+	feriados, err := h.store.BuscarFeriadosAno(r.Context(), req.Ano)
+	if err != nil {
+		h.logger.Error("failed to fetch feriados", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar feriados")
+		return
+	}
+
+	capacidade := CalcularCapacidadeMensal(req.Ano, membrosCount, ausencias, feriados)
 
 	var mesCap domain.CapacidadeMes
 	for _, c := range capacidade {
@@ -285,39 +317,12 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	projetosAnalise := make([]domain.ProjetoAnalise, 0)
-	for _, e := range data.epicos {
-		if e.DataInicioExecucao == nil || e.DataLimite == nil {
-			continue
-		}
-		pc := domain.ProjetoCapacidade{
-			DataInicioExecucao: *e.DataInicioExecucao,
-			DataLimite:         *e.DataLimite,
-			HorasEquipe:        float64(e.TotalSegundosEquipe) / 3600.0,
-		}
-		dist := DistribuirHorasPorMes([]domain.ProjetoCapacidade{pc}, req.Ano)
-		if horasMes, ok := dist[req.Mes]; ok && horasMes > 0 {
-			apelido := e.NumeroTicket
-			if e.Apelido != nil {
-				apelido = *e.Apelido
-			}
-			projetosAnalise = append(projetosAnalise, domain.ProjetoAnalise{
-				Apelido:  apelido,
-				HorasMes: horasMes,
-				Resumo:   e.Resumo,
-			})
-		}
-	}
-
 	input := domain.AnaliseCapacidadeInput{
 		Equipe:           req.Equipe,
 		Ano:              req.Ano,
 		Mes:              req.Mes,
 		HorasDisponiveis: mesCap.HorasDisponiveis,
-		HorasEstimadas:   mesCap.HorasEstimadas,
-		PercentualDelta:  mesCap.PercentualDelta,
 		MembrosAusentes:  mesCap.MembrosAusentes,
-		Projetos:         projetosAnalise,
 	}
 
 	analise, err := h.analyzer.Analisar(r.Context(), input)

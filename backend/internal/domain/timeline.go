@@ -7,10 +7,25 @@ import (
 )
 
 type TimelineResponse struct {
-	Equipe           string            `json:"equipe"`
-	Ano              int               `json:"ano"`
-	Projetos         []ProjetoTimeline `json:"projetos"`
-	CapacidadeMensal []CapacidadeMes   `json:"capacidade_mensal"`
+	Equipes          []string             `json:"equipes"`
+	Ano              int                  `json:"ano"`
+	Projetos         []ProjetoTimeline    `json:"projetos"`
+	CapacidadeMensal []CapacidadeMes      `json:"capacidade_mensal"`
+	MembrosTimeline  []MembroTimeline     `json:"membros_timeline"`
+}
+
+type MembroTimeline struct {
+	ID        uuid.UUID           `json:"id"`
+	Nome      string              `json:"nome"`
+	AvatarURL *string             `json:"avatar_url"`
+	EquipeNome string             `json:"equipe_nome"`
+	Ausencias []AusenciaTimeline  `json:"ausencias"`
+}
+
+type AusenciaTimeline struct {
+	Tipo       string `json:"tipo"`
+	DataInicio string `json:"data_inicio"`
+	DataFim    string `json:"data_fim"`
 }
 
 type ProjetoTimeline struct {
@@ -30,8 +45,8 @@ type ProjetoTimeline struct {
 type CapacidadeMes struct {
 	Mes              int             `json:"mes"`
 	HorasDisponiveis float64         `json:"horas_disponiveis"`
-	HorasEstimadas   float64         `json:"horas_estimadas"`
-	PercentualDelta  float64         `json:"percentual_delta"`
+	HorasMaximas     float64         `json:"horas_maximas"`
+	PercentualCap    float64         `json:"percentual_cap"`
 	MembrosAusentes  []MembroAusente `json:"membros_ausentes"`
 }
 
@@ -100,10 +115,7 @@ type AnaliseCapacidadeInput struct {
 	Ano              int
 	Mes              int
 	HorasDisponiveis float64
-	HorasEstimadas   float64
-	PercentualDelta  float64
 	MembrosAusentes  []MembroAusente
-	Projetos         []ProjetoAnalise
 }
 
 type ProjetoAnalise struct {

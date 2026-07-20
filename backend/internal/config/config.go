@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	PassApp        string
 	DB             DBConfig
 	Server         ServerConfig
 	Jira           JiraConfig
@@ -76,7 +77,6 @@ func Load() (*Config, error) {
 	viper.SetDefault("DB_HOST", "localhost")
 	viper.SetDefault("DB_PORT", 5432)
 	viper.SetDefault("DB_USER", "myplanner")
-	viper.SetDefault("DB_PASSWORD", "myplanner_dev")
 	viper.SetDefault("DB_NAME", "myplanner")
 	viper.SetDefault("DB_SSLMODE", "disable")
 	viper.SetDefault("SERVER_PORT", "8080")
@@ -92,11 +92,12 @@ func Load() (*Config, error) {
 	_ = viper.ReadInConfig()
 
 	return &Config{
+		PassApp: viper.GetString("PASS_APP"),
 		DB: DBConfig{
 			Host:     viper.GetString("DB_HOST"),
 			Port:     viper.GetInt("DB_PORT"),
 			User:     viper.GetString("DB_USER"),
-			Password: viper.GetString("DB_PASSWORD"),
+			Password: viper.GetString("PASS_DB"),
 			Name:     viper.GetString("DB_NAME"),
 			SSLMode:  viper.GetString("DB_SSLMODE"),
 		},
