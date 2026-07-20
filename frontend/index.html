@@ -243,7 +243,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .gantt-bar.licenca_medica { background: var(--red); }
 .gantt-bar.licenca_paternidade, .gantt-bar.licenca_maternidade { background: #9C27B0; }
 .gantt-bar.dayoff { background: var(--amber); }
-.gantt-bar.desligamento { background: #555; opacity: .5; }
+.gantt-bar.desligamento { background: var(--red); opacity: .7; background-image: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,.15) 4px, rgba(255,255,255,.15) 8px); }
 .gantt-avatar { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: var(--chip-bg); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); cursor: help; }
 .gantt-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .gantt-legend { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
@@ -1220,6 +1220,7 @@ function renderTimeline(data) {
   ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--red)"></div>Licença Médica</div>';
   ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:#9C27B0"></div>Lic. Pat./Mat.</div>';
   ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--amber)"></div>Day Off</div>';
+  ganttLegend += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--red);opacity:.7"></div>Desligamento</div>';
   ganttLegend += '</div>';
 
   let ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Ausências — Membros</div><div class="gantt-wrap"><div class="gantt">' + ganttHeader + '<div class="gantt-rows">' + ganttRows + '</div></div></div>' + ganttLegend + '</div>';

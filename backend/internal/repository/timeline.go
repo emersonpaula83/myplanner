@@ -195,7 +195,7 @@ func (r *TimelineRepository) BuscarMembrosComAusencias(ctx context.Context, equi
 	fimAno := time.Date(ano, 12, 31, 0, 0, 0, 0, time.UTC)
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT m.id, m.nome, m.avatar_url, e.nome AS equipe_nome
+		SELECT m.id, m.nome, m.avatar_url, e.nome AS equipe_nome, m.data_desligamento
 		FROM membros m
 		JOIN equipe_membros em ON em.membro_id = m.id
 		JOIN equipes e ON e.id = em.equipe_id
@@ -212,10 +212,18 @@ func (r *TimelineRepository) BuscarMembrosComAusencias(ctx context.Context, equi
 	membros := make([]domain.MembroTimeline, 0)
 	for rows.Next() {
 		var mt domain.MembroTimeline
-		if err := rows.Scan(&mt.ID, &mt.Nome, &mt.AvatarURL, &mt.EquipeNome); err != nil {
+		var dataDesligamento *time.Time
+		if err := rows.Scan(&mt.ID, &mt.Nome, &mt.AvatarURL, &mt.EquipeNome, &dataDesligamento); err != nil {
 			return nil, fmt.Errorf("scanning membro timeline: %w", err)
 		}
 		mt.Ausencias = make([]domain.AusenciaTimeline, 0)
+		if dataDesligamento != nil && dataDesligamento.Before(fimAno.AddDate(0, 0, 1)) {
+			mt.Ausencias = append(mt.Ausencias, domain.AusenciaTimeline{
+				Tipo:       "desligamento",
+				DataInicio: dataDesligamento.Format("2006-01-02"),
+				DataFim:    fimAno.Format("2006-01-02"),
+			})
+		}
 		membros = append(membros, mt)
 	}
 	if err := rows.Err(); err != nil {
