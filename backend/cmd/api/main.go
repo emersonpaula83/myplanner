@@ -96,6 +96,9 @@ func main() {
 	feriadoRepo := repository.NewFeriadoRepository(pool)
 	feriadoHandler := handler.NewFeriadoHandler(feriadoRepo, logger)
 
+	checkpointRepo := repository.NewCheckpointRepository(pool)
+	checkpointHandler := handler.NewCheckpointHandler(checkpointRepo, logger)
+
 	syncRepo := repository.NewSyncRepository(pool)
 	clientFactory := func(baseURL, email, apiToken string, rateLimit int, logger *zap.Logger) jira.Client {
 		return jira.NewHTTPClient(baseURL, email, apiToken, rateLimit, logger)
@@ -122,6 +125,8 @@ func main() {
 	syncService := service.NewSyncService(syncRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	syncHandler := handler.NewSyncHandler(syncService, logger)
 
+	sprintGenService := service.NewSprintGenerationService(fonteDadosRepo, equipeRepo, syncRepo, sprintRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
+	sprintGenHandler := handler.NewSprintGenerationHandler(sprintGenService, logger)
 
 	r := chi.NewRouter()
 
@@ -195,8 +200,16 @@ func main() {
 			r.Post("/feriados", feriadoHandler.Create)
 			r.Delete("/feriados/{id}", feriadoHandler.Delete)
 
+			r.Get("/checkpoints", checkpointHandler.List)
+			r.Post("/checkpoints", checkpointHandler.Create)
+			r.Delete("/checkpoints/{id}", checkpointHandler.Delete)
+
 			r.Get("/sprints", sprintHandler.ListSprints)
 			r.Get("/sprints/projetos", sprintHandler.ListProjetos)
+			r.Get("/sprints/timeline", sprintHandler.GetSprintsTimeline)
+			r.Get("/sprints/boards", sprintGenHandler.GetBoards)
+			r.Post("/sprints/generate/preview", sprintGenHandler.Preview)
+			r.Post("/sprints/generate", sprintGenHandler.Generate)
 			r.Get("/projetos/{id}/sprints", sprintHandler.ListByProjeto)
 			r.Get("/sprints/{id}/capacity", sprintHandler.GetCapacity)
 			r.Get("/sprints/{id}/unplanned", sprintHandler.GetUnplanned)
