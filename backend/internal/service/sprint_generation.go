@@ -56,8 +56,10 @@ type SprintSlot struct {
 }
 
 type PreviewResult struct {
-	Sprints             []SprintSlot `json:"sprints"`
-	ExistentesIgnoradas int          `json:"existentes_ignoradas"`
+	PrefixoDetectado     string       `json:"prefixo_detectado"`
+	DuracaoDetectadaDias int          `json:"duracao_detectada_dias"`
+	Sprints              []SprintSlot `json:"sprints"`
+	ExistentesIgnoradas  int          `json:"existentes_ignoradas"`
 }
 
 type GenerateResult struct {
@@ -158,93 +160,84 @@ func (s *SprintGenerationService) GetBoardsForEquipe(ctx context.Context, equipe
 	return boards, nil
 }
 
-func (s *SprintGenerationService) PreviewSprints(ctx context.Context, equipeID uuid.UUID, boardID int, prefixo string) (*PreviewResult, error) {
-	localSprints, err := s.sprintRepo.ListSprints(ctx, &equipeID, nil)
+func (s *SprintGenerationService) PreviewSprints(ctx context.Context, equipeID uuid.UUID, boardID int, startDate time.Time) (*PreviewResult, error) {
+	fdID, err := s.getFonteDadosForEquipe(ctx, equipeID)
 	if err != nil {
-		return nil, fmt.Errorf("listing local sprints: %w", err)
+		return nil, err
+	}
+	client, err := s.buildClient(ctx, fdID)
+	if err != nil {
+		return nil, err
+	}
+	return s.previewSprintsWithClient(ctx, client, boardID, startDate)
+}
+
+func (s *SprintGenerationService) previewSprintsWithClient(ctx context.Context, client jira.Client, boardID int, startDate time.Time) (*PreviewResult, error) {
+	existing, err := client.GetBoardSprints(ctx, boardID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching board sprints from JIRA: %w", err)
 	}
 
-	var existing []jira.JiraSprint
-	for _, ls := range localSprints {
-		js := jira.JiraSprint{Name: ls.Nome}
-		if ls.DataInicio != nil {
-			sd := ls.DataInicio.Format(time.RFC3339)
-			js.StartDate = &sd
-		}
-		if ls.DataFim != nil {
-			ed := ls.DataFim.Format(time.RFC3339)
-			js.EndDate = &ed
-		}
-		existing = append(existing, js)
+	prefix, durationDays, err := detectSprintPattern(existing)
+	if err != nil {
+		return nil, err
 	}
 
-	now := time.Now()
-	ano := now.Year()
-	slots := generateSprintSlots(now, 12, ano)
+	year := startDate.Year()
+	slots := generateSprintSlots(startDate, durationDays, year)
 	missing, ignored := filterExistingSlots(slots, existing)
 
 	result := &PreviewResult{
-		Sprints:             make([]SprintSlot, 0, len(missing)),
-		ExistentesIgnoradas: ignored,
+		PrefixoDetectado:     prefix,
+		DuracaoDetectadaDias: durationDays,
+		Sprints:              make([]SprintSlot, 0, len(missing)),
+		ExistentesIgnoradas:  ignored,
 	}
 	for _, slot := range missing {
 		result.Sprints = append(result.Sprints, SprintSlot{
-			Nome:       formatSprintName(prefixo, slot.start, slot.end, ano),
-			DataInicio: slot.start.Format("2006-01-02"),
-			DataFim:    slot.end.Format("2006-01-02"),
+			Nome:       formatSprintName(prefix, slot.start, slot.end, year),
+			DataInicio: slot.start.Format(time.RFC3339),
+			DataFim:    slot.end.Format(time.RFC3339),
 		})
 	}
 	return result, nil
 }
 
-func (s *SprintGenerationService) GenerateSprints(ctx context.Context, equipeID uuid.UUID, boardID int, prefixo string) (*GenerateResult, error) {
+func (s *SprintGenerationService) GenerateSprints(ctx context.Context, equipeID uuid.UUID, boardID int, startDate time.Time) (*GenerateResult, error) {
 	fdID, err := s.getFonteDadosForEquipe(ctx, equipeID)
 	if err != nil {
 		return nil, err
 	}
-
 	client, err := s.buildClient(ctx, fdID)
 	if err != nil {
 		return nil, err
 	}
 
-	localSprints, err := s.sprintRepo.ListSprints(ctx, &equipeID, nil)
+	existing, err := client.GetBoardSprints(ctx, boardID)
 	if err != nil {
-		return nil, fmt.Errorf("listing local sprints: %w", err)
-	}
-	var existing []jira.JiraSprint
-	for _, ls := range localSprints {
-		js := jira.JiraSprint{Name: ls.Nome}
-		if ls.DataInicio != nil {
-			sd := ls.DataInicio.Format(time.RFC3339)
-			js.StartDate = &sd
-		}
-		if ls.DataFim != nil {
-			ed := ls.DataFim.Format(time.RFC3339)
-			js.EndDate = &ed
-		}
-		existing = append(existing, js)
+		return nil, fmt.Errorf("fetching board sprints from JIRA: %w", err)
 	}
 
-	now := time.Now()
-	ano := now.Year()
-	slots := generateSprintSlots(now, 12, ano)
+	prefix, durationDays, err := detectSprintPattern(existing)
+	if err != nil {
+		return nil, err
+	}
+
+	year := startDate.Year()
+	slots := generateSprintSlots(startDate, durationDays, year)
 	missing, _ := filterExistingSlots(slots, existing)
 
 	result := &GenerateResult{Erros: make([]string, 0)}
 	for _, slot := range missing {
-		name := formatSprintName(prefixo, slot.start, slot.end, ano)
-		startDate := time.Date(slot.start.Year(), slot.start.Month(), slot.start.Day(), 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(slot.end.Year(), slot.end.Month(), slot.end.Day(), 18, 0, 0, 0, time.UTC)
-
-		created, err := client.CreateSprint(ctx, boardID, name, startDate, endDate)
+		name := formatSprintName(prefix, slot.start, slot.end, year)
+		created, err := client.CreateSprint(ctx, boardID, name, slot.start, slot.end)
 		if err != nil {
 			result.Erros = append(result.Erros, fmt.Sprintf("%s: %v", name, err))
 			s.logger.Warn("failed to create sprint", zap.String("name", name), zap.Error(err))
 			continue
 		}
 
-		_, upsertErr := s.syncRepo.UpsertSprint(ctx, fdID, created.ID, name, nil, &startDate, &endDate, nil, &boardID, nil)
+		_, upsertErr := s.syncRepo.UpsertSprint(ctx, fdID, created.ID, name, nil, &slot.start, &slot.end, nil, &boardID, nil)
 		if upsertErr != nil {
 			s.logger.Warn("sprint created in jira but failed local upsert", zap.String("name", name), zap.Error(upsertErr))
 		}
@@ -305,8 +298,8 @@ func filterExistingSlots(slots []sprintSlot, existing []jira.JiraSprint) ([]spri
 	for _, slot := range slots {
 		overlaps := false
 		for _, ex := range existing {
-			exStart := parseOptionalDate(ex.StartDate)
-			exEnd := parseOptionalDate(ex.EndDate)
+			exStart := parseJiraDate(ex.StartDate)
+			exEnd := parseJiraDate(ex.EndDate)
 			if exStart == nil || exEnd == nil {
 				continue
 			}

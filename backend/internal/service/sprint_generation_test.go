@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/jira"
+	"go.uber.org/zap"
 )
 
 func TestDetectSprintPattern_PrefixAndDuration(t *testing.T) {
@@ -136,6 +138,53 @@ func TestGenerateSprintSlots_StopsAtYearEnd(t *testing.T) {
 
 	if len(slots) != 1 {
 		t.Errorf("expected 1 slot (Dec 21 is Monday, end Dec 31), got %d", len(slots))
+	}
+}
+
+func TestPreviewSprints_UsesJiraAPI(t *testing.T) {
+	sd1 := "2026-07-07T11:30:00.000-0300"
+	ed1 := "2026-07-18T21:30:00.000-0300"
+	sd2 := "2026-07-21T11:30:00.000-0300"
+	ed2 := "2026-08-01T21:30:00.000-0300"
+	mockClient := &mockJiraClient{
+		sprints: []jira.JiraSprint{
+			{ID: 1, Name: "RM Dev 07/07 - 18/07 [2026]", StartDate: &sd1, EndDate: &ed1},
+			{ID: 2, Name: "RM Dev 21/07 - 01/08 [2026]", StartDate: &sd2, EndDate: &ed2},
+		},
+	}
+
+	svc := &SprintGenerationService{
+		logger: zap.NewNop(),
+	}
+
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	startDate := time.Date(2026, 8, 3, 0, 0, 0, 0, loc)
+
+	result, err := svc.previewSprintsWithClient(context.Background(), mockClient, 424, startDate)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PrefixoDetectado != "RM Dev" {
+		t.Errorf("prefixo = %q, want %q", result.PrefixoDetectado, "RM Dev")
+	}
+	if result.DuracaoDetectadaDias != 12 {
+		t.Errorf("duracao = %d, want 12", result.DuracaoDetectadaDias)
+	}
+	// The two existing JIRA sprints end 2026-08-01, while generated slots start
+	// from startDate (2026-08-03) forward, so they can never overlap: ignored is 0.
+	if result.ExistentesIgnoradas != 0 {
+		t.Errorf("ignoradas = %d, want 0", result.ExistentesIgnoradas)
+	}
+	if len(result.Sprints) == 0 {
+		t.Fatal("expected at least one sprint to create")
+	}
+	for _, s := range result.Sprints {
+		if s.Nome == "" {
+			t.Error("sprint nome is empty")
+		}
+		if s.DataInicio == "" || s.DataFim == "" {
+			t.Error("sprint dates are empty")
+		}
 	}
 }
 
