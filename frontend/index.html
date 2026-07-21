@@ -626,6 +626,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <select class="filter-select" id="stl-equipe" onchange="loadSprintsTimeline()"><option value="">Selecione uma equipe</option></select>
         <button class="btn-sm" id="stl-sync-btn" style="display:none;font-size:12px;padding:4px 12px" onclick="syncSprintsTimeline()">⟳ Sincronizar</button>
         <button class="btn-sm" id="stl-gen-btn" style="display:none;font-size:12px;padding:4px 12px;background:var(--blue);color:#fff" onclick="openGerarSprintsForm()">+ Gerar Sprints</button>
+        <button class="btn-sm" id="stl-cp-btn" style="display:none;font-size:12px;padding:4px 12px;background:var(--accent);color:#fff" onclick="openCheckpointForm()">+ Checkpoint</button>
         <span id="stl-sync-ts" style="font-size:11px;color:var(--text-muted);opacity:0.7"></span>
       </div>
       <div id="stl-content" style="margin-top:12px"></div>
@@ -2299,13 +2300,14 @@ async function syncSprint(sprintID, fonteId, projectKey) {
 
 // === SPRINTS TIMELINE ===
 let stlData = null;
+let stlCheckpoints = [];
 let stlAno = new Date().getFullYear();
 let stlResizeTimer = null;
 window.addEventListener('resize', function() {
   clearTimeout(stlResizeTimer);
   stlResizeTimer = setTimeout(function() {
     var c = document.getElementById('stl-canvas');
-    if (c && stlData !== null) drawSprintsTimeline(c, stlData, stlAno);
+    if (c && stlData !== null) drawSprintsTimeline(c, stlData, stlAno, stlCheckpoints);
   }, 150);
 });
 
@@ -2317,6 +2319,7 @@ async function loadSprintsTimeline() {
   const syncTs = document.getElementById('stl-sync-ts');
   syncBtn.style.display = 'none';
   genBtn.style.display = 'none';
+  document.getElementById('stl-cp-btn').style.display = 'none';
   syncTs.textContent = '';
 
   if (!equipe) {
@@ -2324,11 +2327,16 @@ async function loadSprintsTimeline() {
     return;
   }
   genBtn.style.display = '';
+  document.getElementById('stl-cp-btn').style.display = '';
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     stlAno = new Date().getFullYear();
     const data = await api('/sprints/timeline?equipe=' + equipe + '&ano=' + stlAno);
     stlData = data;
+    try {
+      stlCheckpoints = await api('/checkpoints?equipe_id=' + equipe + '&ano=' + stlAno);
+      if (!stlCheckpoints) stlCheckpoints = [];
+    } catch(e) { stlCheckpoints = []; }
     if (data && data.length > 0) {
       const first = data[0];
       if (first.fonte_dados_id) {
@@ -2345,7 +2353,7 @@ async function loadSprintsTimeline() {
       }
     }
     el.innerHTML = '<canvas id="stl-canvas" style="width:100%;"></canvas>';
-    drawSprintsTimeline(document.getElementById('stl-canvas'), data || [], stlAno);
+    drawSprintsTimeline(document.getElementById('stl-canvas'), data || [], stlAno, stlCheckpoints);
   } catch (err) {
     el.innerHTML = '<div class="empty-state"><p>Erro: ' + esc(err.message) + '</p></div>';
   }
@@ -2411,10 +2419,80 @@ function cancelGerarSprints() {
     el.innerHTML = el.dataset.prevHtml;
     if (stlData !== null) {
       var c = document.getElementById('stl-canvas');
-      if (c) drawSprintsTimeline(c, stlData, stlAno);
+      if (c) drawSprintsTimeline(c, stlData, stlAno, stlCheckpoints);
     }
   } else {
     loadSprintsTimeline();
+  }
+}
+
+function openCheckpointForm() {
+  var equipe = document.getElementById('stl-equipe').value;
+  if (!equipe) { alert('Selecione uma equipe primeiro.'); return; }
+  var el = document.getElementById('stl-content');
+  var prevHTML = el.innerHTML;
+  el.innerHTML = '<div style="background:var(--card-bg);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;max-width:700px">'
+    + '<h3 style="margin:0 0 16px">Criar Checkpoint</h3>'
+    + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'
+    + '<div><label style="font-size:12px;color:var(--text-secondary)">Nome (máx 15)</label><br>'
+    + '<input id="cp-nome" type="text" maxlength="15" placeholder="Ex: Deploy v2" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:140px"></div>'
+    + '<div><label style="font-size:12px;color:var(--text-secondary)">Resumo (máx 50)</label><br>'
+    + '<input id="cp-resumo" type="text" maxlength="50" placeholder="Descrição breve" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:220px"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">'
+    + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Início</label><br>'
+    + '<input id="cp-inicio" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:150px"></div>'
+    + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Fim (opcional)</label><br>'
+    + '<input id="cp-fim" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:150px"></div>'
+    + '<label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input id="cp-global" type="checkbox"> Global (todas equipes)</label>'
+    + '</div>'
+    + '<div style="margin-top:16px;display:flex;gap:8px">'
+    + '<button class="btn-sm" style="padding:6px 16px;font-size:13px;background:var(--accent);color:#fff" onclick="criarCheckpoint()">Criar</button>'
+    + '<button class="btn-sm" style="padding:6px 16px;font-size:13px;background:var(--border-subtle)" onclick="cancelCheckpointForm()">Cancelar</button>'
+    + '</div></div>';
+  el.dataset.prevHtml = prevHTML;
+}
+
+function cancelCheckpointForm() {
+  var el = document.getElementById('stl-content');
+  if (el.dataset.prevHtml) {
+    el.innerHTML = el.dataset.prevHtml;
+    if (stlData !== null) {
+      var c = document.getElementById('stl-canvas');
+      if (c) drawSprintsTimeline(c, stlData, stlAno, stlCheckpoints);
+    }
+  } else {
+    loadSprintsTimeline();
+  }
+}
+
+async function criarCheckpoint() {
+  var equipe = document.getElementById('stl-equipe').value;
+  var nome = document.getElementById('cp-nome').value.trim();
+  var resumo = document.getElementById('cp-resumo').value.trim();
+  var inicio = document.getElementById('cp-inicio').value;
+  var fim = document.getElementById('cp-fim').value || null;
+  var global = document.getElementById('cp-global').checked;
+
+  if (!nome) { alert('Informe o nome.'); return; }
+  if (!resumo) { alert('Informe o resumo.'); return; }
+  if (!inicio) { alert('Informe a data de início.'); return; }
+
+  try {
+    await api('/checkpoints', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        equipe_id: global ? null : equipe,
+        nome: nome,
+        resumo: resumo,
+        data_inicio: inicio,
+        data_fim: fim
+      })
+    });
+    loadSprintsTimeline();
+  } catch(err) {
+    alert('Erro: ' + err.message);
   }
 }
 
@@ -2481,7 +2559,8 @@ async function executarGerarSprints() {
   }
 }
 
-function drawSprintsTimeline(canvas, data, ano) {
+function drawSprintsTimeline(canvas, data, ano, checkpoints) {
+  checkpoints = checkpoints || [];
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   const W = rect.width;
