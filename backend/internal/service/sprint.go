@@ -69,20 +69,25 @@ type MembroCapacity struct {
 }
 
 type MembroAusenteComCards struct {
-	Nome   string `json:"nome"`
-	Motivo string `json:"motivo"`
+	Nome        string `json:"nome"`
+	Motivo      string `json:"motivo"`
+	DiasAusente int    `json:"dias_ausente"`
+	SprintInteira bool `json:"sprint_inteira"`
 }
 
 type SprintCapacityResult struct {
-	Sprint                SprintInfo             `json:"sprint"`
-	DiasUteis             int                    `json:"dias_uteis"`
-	Feriados              []FeriadoInfo          `json:"feriados"`
-	TotalMembrosEquipe    int                    `json:"total_membros_equipe"`
-	HorasTotalSprint      float64                `json:"horas_total_sprint"`
-	HorasAlocadas         float64                `json:"horas_alocadas"`
-	HorasExecutadas       float64                `json:"horas_executadas"`
-	Membros               []MembroCapacity       `json:"membros"`
-	MembrosAusentesComCards []MembroAusenteComCards `json:"membros_ausentes_com_cards"`
+	Sprint                  SprintInfo               `json:"sprint"`
+	DiasUteis               int                      `json:"dias_uteis"`
+	Feriados                []FeriadoInfo            `json:"feriados"`
+	TotalMembrosEquipe      int                      `json:"total_membros_equipe"`
+	HorasTotalSprint        float64                  `json:"horas_total_sprint"`
+	HorasAlocadas           float64                  `json:"horas_alocadas"`
+	HorasExecutadas         float64                  `json:"horas_executadas"`
+	HorasPendentesExecucao  float64                  `json:"horas_pendentes_execucao"`
+	Membros                 []MembroCapacity         `json:"membros"`
+	MembrosAusentesComCards []MembroAusenteComCards   `json:"membros_ausentes_com_cards"`
+	FonteDadosID            uuid.UUID                `json:"fonte_dados_id"`
+	ProjetoChave            string                   `json:"projeto_chave"`
 }
 
 type SprintService struct {
@@ -120,10 +125,19 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 		DataFim:    sprint.DataFim,
 	}
 
+	var projetoChave string
+	if sprint.ProjetoID != nil {
+		if chave, err := s.repo.GetProjetoChave(ctx, *sprint.ProjetoID); err == nil {
+			projetoChave = chave
+		}
+	}
+
 	emptyResult := &SprintCapacityResult{
-		Sprint:   info,
-		Feriados: []FeriadoInfo{},
-		Membros:  []MembroCapacity{},
+		Sprint:       info,
+		Feriados:     []FeriadoInfo{},
+		Membros:      []MembroCapacity{},
+		FonteDadosID: sprint.FonteDadosID,
+		ProjetoChave: projetoChave,
 	}
 
 	if sprint.DataInicio == nil || sprint.DataFim == nil {
@@ -204,10 +218,14 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 	statusAmbos := map[string]bool{
 		"Teste": true, "Validação do Solicitante": true, "Deploy": true,
 	}
+	statusPendente := map[string]bool{
+		"Backlog": true, "Desenvolvimento": true, "Em Desenvolvimento": true, "A Fazer": true,
+	}
 
 	horasAlocadasMembro := make(map[uuid.UUID]float64)
 	horasExecutadasMembro := make(map[uuid.UUID]float64)
 	horasAmbosPorMembro := make(map[uuid.UUID]float64)
+	horasPendentesMembro := make(map[uuid.UUID]float64)
 	tarefasPorMembro := make(map[uuid.UUID][]TarefaCapacityDetail)
 	for _, t := range tarefasDetail {
 		if t.Status == "Cancelado" {
@@ -222,6 +240,9 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 			horasExecutadasMembro[t.ResponsavelID] += horas
 		} else {
 			horasAlocadasMembro[t.ResponsavelID] += horas
+			if statusPendente[t.Status] {
+				horasPendentesMembro[t.ResponsavelID] += horas
+			}
 		}
 		tarefasPorMembro[t.ResponsavelID] = append(tarefasPorMembro[t.ResponsavelID], TarefaCapacityDetail{
 			ID:           t.ID,
@@ -254,6 +275,7 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 
 	var horasAlocadasEquipe float64
 	var horasExecutadasEquipe float64
+	var horasPendentesEquipe float64
 	totalMembrosEquipe := 0
 
 	result := make([]MembroCapacity, 0, len(membros))
@@ -318,6 +340,7 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 		if daEquipe && !desligado {
 			horasAlocadasEquipe += math.Round(horasAlocPura*10) / 10
 			horasExecutadasEquipe += math.Round(horasExec*10) / 10
+			horasPendentesEquipe += math.Round(horasPendentesMembro[m.ID]*10) / 10
 			totalMembrosEquipe++
 		}
 
@@ -352,16 +375,21 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 
 	var membrosAusentes []MembroAusenteComCards
 	for _, mc := range result {
-		if len(mc.Tarefas) == 0 || mc.HorasDisponiveis > 0 {
+		if len(mc.Ausencias) == 0 || len(mc.Tarefas) == 0 {
 			continue
 		}
+		totalDias := 0
 		motivo := "ausente"
-		if len(mc.Ausencias) > 0 {
-			motivo = mc.Ausencias[0].Tipo
+		for _, a := range mc.Ausencias {
+			totalDias += a.Dias
+			motivo = a.Tipo
 		}
+		sprintInteira := mc.HorasDisponiveis <= 0
 		membrosAusentes = append(membrosAusentes, MembroAusenteComCards{
-			Nome:   mc.Nome,
-			Motivo: motivo,
+			Nome:          mc.Nome,
+			Motivo:        motivo,
+			DiasAusente:   totalDias,
+			SprintInteira: sprintInteira,
 		})
 	}
 	if membrosAusentes == nil {
@@ -376,17 +404,24 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 		HorasTotalSprint:        math.Round(horasTotalSprint*10) / 10,
 		HorasAlocadas:           math.Round(horasAlocadasEquipe*10) / 10,
 		HorasExecutadas:         math.Round(horasExecutadasEquipe*10) / 10,
+		HorasPendentesExecucao:  math.Round(horasPendentesEquipe*10) / 10,
 		Membros:                 result,
 		MembrosAusentesComCards: membrosAusentes,
+		FonteDadosID:            sprint.FonteDadosID,
+		ProjetoChave:            projetoChave,
 	}, nil
 }
 
 type SprintAtualUnplanned struct {
-	TotalTarefas          int     `json:"total_tarefas"`
-	TarefasNaoPlanejadas  int     `json:"tarefas_nao_planejadas"`
+	TotalTarefas            int     `json:"total_tarefas"`
+	TarefasNaoPlanejadas    int     `json:"tarefas_nao_planejadas"`
 	PercentualNaoPlanejadas float64 `json:"percentual_nao_planejadas"`
-	HorasNaoPlanejadas    float64 `json:"horas_nao_planejadas"`
-	HorasTotalSprint      float64 `json:"horas_total_sprint"`
+	HorasNaoPlanejadas      float64 `json:"horas_nao_planejadas"`
+	HorasTotalSprint        float64 `json:"horas_total_sprint"`
+	ManutencaoCount         int     `json:"manutencao_count"`
+	ManutencaoHoras         float64 `json:"manutencao_horas"`
+	OutrasCount             int     `json:"outras_count"`
+	OutrasHoras             float64 `json:"outras_horas"`
 }
 
 type MediaHistorica struct {
@@ -416,11 +451,15 @@ func (s *SprintService) GetUnplannedAnalysis(ctx context.Context, sprintID uuid.
 
 	result := &UnplannedAnalysisResult{
 		SprintAtual: SprintAtualUnplanned{
-			TotalTarefas:          stats.TotalTarefas,
-			TarefasNaoPlanejadas:  stats.TarefasNaoPlanejadas,
+			TotalTarefas:            stats.TotalTarefas,
+			TarefasNaoPlanejadas:    stats.TarefasNaoPlanejadas,
 			PercentualNaoPlanejadas: pctNaoPlanejadas,
-			HorasNaoPlanejadas:    math.Round(stats.HorasNaoPlanejadas*10) / 10,
-			HorasTotalSprint:      math.Round(stats.HorasTotalSprint*10) / 10,
+			HorasNaoPlanejadas:      math.Round(stats.HorasNaoPlanejadas*10) / 10,
+			HorasTotalSprint:        math.Round(stats.HorasTotalSprint*10) / 10,
+			ManutencaoCount:         stats.ManutencaoCount,
+			ManutencaoHoras:         math.Round(stats.ManutencaoHoras*10) / 10,
+			OutrasCount:             stats.OutrasCount,
+			OutrasHoras:             math.Round(stats.OutrasHoras*10) / 10,
 		},
 	}
 
@@ -530,12 +569,13 @@ type BurndownPoint struct {
 }
 
 type BurndownResult struct {
-	SprintNome string          `json:"sprint_nome"`
-	DataInicio string          `json:"data_inicio"`
-	DataFim    string          `json:"data_fim"`
-	HorasTotal float64         `json:"horas_total"`
-	LinhaIdeal []BurndownPoint `json:"linha_ideal"`
-	LinhaReal  []BurndownPoint `json:"linha_real"`
+	SprintNome     string          `json:"sprint_nome"`
+	DataInicio     string          `json:"data_inicio"`
+	DataFim        string          `json:"data_fim"`
+	HorasTotal     float64         `json:"horas_total"`
+	LinhaIdeal     []BurndownPoint `json:"linha_ideal"`
+	LinhaReal      []BurndownPoint `json:"linha_real"`
+	LinhaUnplanned []BurndownPoint `json:"linha_nao_planejadas"`
 }
 
 func (s *SprintService) GetBurndown(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*BurndownResult, error) {
@@ -655,12 +695,212 @@ func (s *SprintService) GetBurndown(ctx context.Context, sprintID uuid.UUID, equ
 		})
 	}
 
+	var unplanned []BurndownPoint
+	horasNaoPlan := 0.0
+	for _, d := range diasUteis {
+		if d.After(hoje) {
+			break
+		}
+		for _, t := range tarefas {
+			entrou := sprintInicio
+			if t.DataEntradaSprint != nil {
+				entrou = t.DataEntradaSprint.Truncate(24 * time.Hour)
+			}
+			if !entrou.After(sprintInicio) {
+				continue
+			}
+			horas := float64(t.EstimativaSegundos) / 3600.0
+			if entrou.Equal(d) {
+				horasNaoPlan += horas
+			}
+			if t.DataResolvido != nil {
+				resolvido := t.DataResolvido.Truncate(24 * time.Hour)
+				if resolvido.Equal(d) {
+					horasNaoPlan -= horas
+				}
+			}
+		}
+		val := horasNaoPlan
+		if val < 0 {
+			val = 0
+		}
+		unplanned = append(unplanned, BurndownPoint{
+			Data:  d.Format("2006-01-02"),
+			Horas: math.Round(val*10) / 10,
+		})
+	}
+
 	return &BurndownResult{
-		SprintNome: sprint.Nome,
-		DataInicio: sprintInicio.Format("2006-01-02"),
-		DataFim:    sprintFim.Format("2006-01-02"),
-		HorasTotal: math.Round(horasIniciais*10) / 10,
-		LinhaIdeal: ideal,
-		LinhaReal:  real,
+		SprintNome:     sprint.Nome,
+		DataInicio:     sprintInicio.Format("2006-01-02"),
+		DataFim:        sprintFim.Format("2006-01-02"),
+		HorasTotal:     math.Round(horasIniciais*10) / 10,
+		LinhaIdeal:     ideal,
+		LinhaReal:      real,
+		LinhaUnplanned: unplanned,
 	}, nil
+}
+
+type SprintTimelineItem struct {
+	SprintID            uuid.UUID `json:"sprint_id"`
+	SprintNome          string    `json:"sprint_nome"`
+	DataInicio          string    `json:"data_inicio"`
+	DataFim             string    `json:"data_fim"`
+	Estado              string    `json:"estado"`
+	HorasMaximoTeorico  float64   `json:"horas_maximo_teorico"`
+	HorasCapacidade     float64   `json:"horas_capacidade"`
+	HorasAlocadas       float64   `json:"horas_alocadas"`
+	Headcount           int       `json:"headcount"`
+	FonteDadosID        string    `json:"fonte_dados_id"`
+	ProjetoChave        string    `json:"projeto_chave"`
+}
+
+func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UUID, ano int) ([]SprintTimelineItem, error) {
+	allSprints, err := s.repo.ListSprintsIncludeEmpty(ctx, &equipeID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	anoInicio := time.Date(ano, 1, 1, 0, 0, 0, 0, time.UTC)
+	anoFim := time.Date(ano, 12, 31, 23, 59, 59, 0, time.UTC)
+	sprints := make([]repository.SprintListItem, 0)
+	for _, sp := range allSprints {
+		if sp.DataInicio == nil || sp.DataFim == nil {
+			continue
+		}
+		if sp.DataFim.Before(anoInicio) || sp.DataInicio.After(anoFim) {
+			continue
+		}
+		sprints = append(sprints, sp)
+	}
+
+	allMembros, err := s.repo.GetAllMembrosEquipe(ctx, equipeID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(sprints) == 0 || len(allMembros) == 0 {
+		return []SprintTimelineItem{}, nil
+	}
+
+	var minDate, maxDate time.Time
+	for _, sp := range sprints {
+		if sp.DataInicio == nil || sp.DataFim == nil {
+			continue
+		}
+		if minDate.IsZero() || sp.DataInicio.Before(minDate) {
+			minDate = *sp.DataInicio
+		}
+		if maxDate.IsZero() || sp.DataFim.After(maxDate) {
+			maxDate = *sp.DataFim
+		}
+	}
+
+	feriados, err := s.repo.GetFeriadosNoPeriodo(ctx, minDate, maxDate)
+	if err != nil {
+		return nil, err
+	}
+	feriadoSet := make(map[string]bool)
+	for _, f := range feriados {
+		key := f.Data.Format("2006-01-02")
+		d, _ := time.Parse("2006-01-02", key)
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+			feriadoSet[key] = true
+		}
+	}
+
+	membroIDs := make([]uuid.UUID, len(allMembros))
+	for i, m := range allMembros {
+		membroIDs[i] = m.ID
+	}
+
+	ausencias, err := s.repo.GetAusenciasNoPeriodo(ctx, membroIDs, minDate, maxDate)
+	if err != nil {
+		return nil, err
+	}
+
+	sprintIDs := make([]uuid.UUID, 0, len(sprints))
+	for _, sp := range sprints {
+		sprintIDs = append(sprintIDs, sp.ID)
+	}
+
+	horasAlocMap, err := s.repo.GetHorasAlocadasPorSprint(ctx, sprintIDs, membroIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]SprintTimelineItem, 0, len(sprints))
+	for _, sp := range sprints {
+		if sp.DataInicio == nil || sp.DataFim == nil {
+			continue
+		}
+
+		diasUteis := contarDiasUteisComFeriados(*sp.DataInicio, *sp.DataFim, feriadoSet)
+
+		headcount := 0
+		var horasCapacidade float64
+		for _, m := range allMembros {
+			if m.DataDesligamento != nil && !m.DataDesligamento.After(*sp.DataFim) {
+				continue
+			}
+			headcount++
+
+			diasAusencia := 0
+			for _, a := range ausencias {
+				if a.MembroID != m.ID {
+					continue
+				}
+				inicio := a.DataInicio
+				if inicio.Before(*sp.DataInicio) {
+					inicio = *sp.DataInicio
+				}
+				fim := a.DataFim
+				if fim.After(*sp.DataFim) {
+					fim = *sp.DataFim
+				}
+				if !inicio.After(fim) {
+					diasAusencia += contarDiasUteisComFeriados(inicio, fim, feriadoSet)
+				}
+			}
+
+			diasDisp := diasUteis - diasAusencia
+			if diasDisp < 0 {
+				diasDisp = 0
+			}
+			horasCapacidade += float64(diasDisp) * horasPorDia
+		}
+
+		horasMaxTeorico := float64(headcount) * float64(diasUteis) * horasPorDia
+
+		estado := "future"
+		if sp.Estado != nil {
+			estado = *sp.Estado
+		}
+
+		fonteDadosID := ""
+		if sp.FonteDadosID != nil {
+			fonteDadosID = sp.FonteDadosID.String()
+		}
+		projetoChave := ""
+		if sp.ProjetoChave != nil {
+			projetoChave = *sp.ProjetoChave
+		}
+
+		item := SprintTimelineItem{
+			SprintID:            sp.ID,
+			SprintNome:          sp.Nome,
+			DataInicio:          sp.DataInicio.Format("2006-01-02"),
+			DataFim:             sp.DataFim.Format("2006-01-02"),
+			Estado:              estado,
+			HorasMaximoTeorico:  math.Round(horasMaxTeorico*10) / 10,
+			HorasCapacidade:     math.Round(horasCapacidade*10) / 10,
+			HorasAlocadas:       math.Round(horasAlocMap[sp.ID]*10) / 10,
+			Headcount:           headcount,
+			FonteDadosID:        fonteDadosID,
+			ProjetoChave:        projetoChave,
+		}
+		result = append(result, item)
+	}
+
+	return result, nil
 }

@@ -91,6 +91,25 @@ func (r *FonteDadosRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 	return &fd, nil
 }
 
+func (r *FonteDadosRepository) GetByBaseURL(ctx context.Context, baseURL string) (*domain.FonteDados, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, nome, tipo, base_url, auth_type, api_token, user_email,
+		       oauth2_client_id, oauth2_client_secret, oauth2_access_token,
+		       oauth2_refresh_token, oauth2_token_expiry, custom_field_map,
+		       ativo, ultimo_sync, created_at, updated_at
+		FROM fonte_dados
+		WHERE base_url = $1
+		LIMIT 1
+	`, baseURL)
+
+	fd, err := scanFonteDadosRow(row)
+	if err != nil {
+		return nil, err
+	}
+
+	return &fd, nil
+}
+
 func (r *FonteDadosRepository) Create(ctx context.Context, req *CreateFonteDadosRequest) (*domain.FonteDados, error) {
 	cfm := req.CustomFieldMap
 	if cfm == nil {

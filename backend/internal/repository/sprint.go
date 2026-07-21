@@ -27,6 +27,7 @@ type SprintListItem struct {
 	TotalTarefas int        `json:"total_tarefas"`
 	ProjetoChave *string    `json:"projeto_chave,omitempty"`
 	ProjetoNome  *string    `json:"projeto_nome,omitempty"`
+	FonteDadosID *uuid.UUID `json:"fonte_dados_id,omitempty"`
 }
 
 type ProjetoComSprints struct {
@@ -115,10 +116,18 @@ func (r *SprintRepository) ListByProjeto(ctx context.Context, projetoID uuid.UUI
 }
 
 func (r *SprintRepository) ListSprints(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]SprintListItem, error) {
+	return r.listSprints(ctx, equipeID, estado, false)
+}
+
+func (r *SprintRepository) ListSprintsIncludeEmpty(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]SprintListItem, error) {
+	return r.listSprints(ctx, equipeID, estado, true)
+}
+
+func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID, estado *string, includeEmpty bool) ([]SprintListItem, error) {
 	query := `
 		SELECT s.id, s.nome, s.estado, s.data_inicio, s.data_fim,
 		       (SELECT COUNT(*) FROM tarefas t WHERE t.sprint_id = s.id) AS total_tarefas,
-		       p.chave, p.nome
+		       p.chave, p.nome, s.fonte_dados_id
 		FROM sprints s
 		INNER JOIN projetos p ON p.id = s.projeto_id
 		WHERE 1=1
@@ -127,11 +136,30 @@ func (r *SprintRepository) ListSprints(ctx context.Context, equipeID *uuid.UUID,
 	argN := 1
 
 	if equipeID != nil {
-		query += fmt.Sprintf(` AND EXISTS (
-			SELECT 1 FROM tarefas t2
-			INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id
-			WHERE t2.sprint_id = s.id AND em.equipe_id = $%d
-		)`, argN)
+		if includeEmpty {
+			query += fmt.Sprintf(` AND (
+				EXISTS (
+					SELECT 1 FROM tarefas t2
+					INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id
+					WHERE t2.sprint_id = s.id AND em.equipe_id = $%d
+				)
+				OR (
+					NOT EXISTS (SELECT 1 FROM tarefas t3 WHERE t3.sprint_id = s.id)
+					AND EXISTS (
+						SELECT 1 FROM sprints s2
+						INNER JOIN tarefas t4 ON t4.sprint_id = s2.id
+						INNER JOIN equipe_membros em2 ON em2.membro_id = t4.responsavel_id
+						WHERE s2.projeto_id = s.projeto_id AND em2.equipe_id = $%d
+					)
+				)
+			)`, argN, argN)
+		} else {
+			query += fmt.Sprintf(` AND EXISTS (
+				SELECT 1 FROM tarefas t2
+				INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id
+				WHERE t2.sprint_id = s.id AND em.equipe_id = $%d
+			)`, argN)
+		}
 		args = append(args, *equipeID)
 		argN++
 	}
@@ -157,7 +185,7 @@ func (r *SprintRepository) ListSprints(ctx context.Context, equipeID *uuid.UUID,
 	result := make([]SprintListItem, 0)
 	for rows.Next() {
 		var item SprintListItem
-		if err := rows.Scan(&item.ID, &item.Nome, &item.Estado, &item.DataInicio, &item.DataFim, &item.TotalTarefas, &item.ProjetoChave, &item.ProjetoNome); err != nil {
+		if err := rows.Scan(&item.ID, &item.Nome, &item.Estado, &item.DataInicio, &item.DataFim, &item.TotalTarefas, &item.ProjetoChave, &item.ProjetoNome, &item.FonteDadosID); err != nil {
 			return nil, fmt.Errorf("scanning sprint: %w", err)
 		}
 		result = append(result, item)
@@ -367,50 +395,64 @@ type UnplannedStats struct {
 	TarefasNaoPlanejadas  int
 	HorasNaoPlanejadas    float64
 	HorasTotalSprint      float64
+	ManutencaoCount       int
+	ManutencaoHoras       float64
+	OutrasCount           int
+	OutrasHoras           float64
 }
 
 func (r *SprintRepository) GetUnplannedStats(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*UnplannedStats, error) {
 	var baseQuery string
 	var args []interface{}
 
+	naoPlanejadasFilter := `
+		t.data_entrada_sprint > s.data_inicio
+		OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+	`
+	manutencaoFilter := `LOWER(t.tipo) IN ('bug') OR LOWER(t.tipo) LIKE '%incidente%'`
+
 	if equipeID != nil {
-		baseQuery = `
+		baseQuery = fmt.Sprintf(`
 			SELECT
 				COUNT(*) AS total_tarefas,
-				COUNT(*) FILTER (WHERE
-					t.data_entrada_sprint > s.data_inicio
-					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
-				) AS tarefas_nao_planejadas,
-				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE
-					t.data_entrada_sprint > s.data_inicio
-					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
-				), 0) / 3600.0 AS horas_nao_planejadas,
-				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total
+				COUNT(*) FILTER (WHERE %s) AS tarefas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE %s), 0) / 3600.0 AS horas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total,
+				COUNT(*) FILTER (WHERE (%s) AND (%s)) AS manutencao_count,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE (%s) AND (%s)), 0) / 3600.0 AS manutencao_horas,
+				COUNT(*) FILTER (WHERE (%s) AND NOT (%s)) AS outras_count,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE (%s) AND NOT (%s)), 0) / 3600.0 AS outras_horas
 			FROM tarefas t
 			INNER JOIN sprints s ON s.id = t.sprint_id
 			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id
 			WHERE t.sprint_id = $1 AND t.responsavel_id IS NOT NULL
 			  AND s.data_inicio IS NOT NULL AND em.equipe_id = $2
-		`
+		`, naoPlanejadasFilter, naoPlanejadasFilter,
+			naoPlanejadasFilter, manutencaoFilter,
+			naoPlanejadasFilter, manutencaoFilter,
+			naoPlanejadasFilter, manutencaoFilter,
+			naoPlanejadasFilter, manutencaoFilter)
 		args = []interface{}{sprintID, *equipeID}
 	} else {
-		baseQuery = `
+		baseQuery = fmt.Sprintf(`
 			SELECT
 				COUNT(*) AS total_tarefas,
-				COUNT(*) FILTER (WHERE
-					t.data_entrada_sprint > s.data_inicio
-					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
-				) AS tarefas_nao_planejadas,
-				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE
-					t.data_entrada_sprint > s.data_inicio
-					OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
-				), 0) / 3600.0 AS horas_nao_planejadas,
-				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total
+				COUNT(*) FILTER (WHERE %s) AS tarefas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE %s), 0) / 3600.0 AS horas_nao_planejadas,
+				COALESCE(SUM(t.estimativa_tempo), 0) / 3600.0 AS horas_total,
+				COUNT(*) FILTER (WHERE (%s) AND (%s)) AS manutencao_count,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE (%s) AND (%s)), 0) / 3600.0 AS manutencao_horas,
+				COUNT(*) FILTER (WHERE (%s) AND NOT (%s)) AS outras_count,
+				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE (%s) AND NOT (%s)), 0) / 3600.0 AS outras_horas
 			FROM tarefas t
 			INNER JOIN sprints s ON s.id = t.sprint_id
 			WHERE t.sprint_id = $1 AND t.responsavel_id IS NOT NULL
 			  AND s.data_inicio IS NOT NULL
-		`
+		`, naoPlanejadasFilter, naoPlanejadasFilter,
+			naoPlanejadasFilter, manutencaoFilter,
+			naoPlanejadasFilter, manutencaoFilter,
+			naoPlanejadasFilter, manutencaoFilter,
+			naoPlanejadasFilter, manutencaoFilter)
 		args = []interface{}{sprintID}
 	}
 
@@ -420,6 +462,10 @@ func (r *SprintRepository) GetUnplannedStats(ctx context.Context, sprintID uuid.
 		&stats.TarefasNaoPlanejadas,
 		&stats.HorasNaoPlanejadas,
 		&stats.HorasTotalSprint,
+		&stats.ManutencaoCount,
+		&stats.ManutencaoHoras,
+		&stats.OutrasCount,
+		&stats.OutrasHoras,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("getting unplanned stats: %w", err)
@@ -516,6 +562,15 @@ func (r *SprintRepository) GetSprintProjetoID(ctx context.Context, sprintID uuid
 	return projetoID, nil
 }
 
+func (r *SprintRepository) GetProjetoChave(ctx context.Context, projetoID uuid.UUID) (string, error) {
+	var chave string
+	err := r.pool.QueryRow(ctx, `SELECT chave FROM projetos WHERE id = $1`, projetoID).Scan(&chave)
+	if err != nil {
+		return "", fmt.Errorf("getting projeto chave: %w", err)
+	}
+	return chave, nil
+}
+
 func (r *SprintRepository) GetMembrosEquipeInfo(ctx context.Context, equipeID uuid.UUID, dataFim time.Time) ([]MembroInfo, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT m.id, m.nome, m.avatar_url, m.data_desligamento
@@ -537,6 +592,64 @@ func (r *SprintRepository) GetMembrosEquipeInfo(ctx context.Context, equipeID uu
 			return nil, fmt.Errorf("scanning equipe membro info: %w", err)
 		}
 		result = append(result, m)
+	}
+	return result, nil
+}
+
+func (r *SprintRepository) GetAllMembrosEquipe(ctx context.Context, equipeID uuid.UUID) ([]MembroInfo, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT m.id, m.nome, m.avatar_url, m.data_desligamento
+		FROM membros m
+		INNER JOIN equipe_membros em ON em.membro_id = m.id
+		WHERE em.equipe_id = $1
+		ORDER BY m.nome
+	`, equipeID)
+	if err != nil {
+		return nil, fmt.Errorf("getting all equipe membros: %w", err)
+	}
+	defer rows.Close()
+
+	var result []MembroInfo
+	for rows.Next() {
+		var m MembroInfo
+		if err := rows.Scan(&m.ID, &m.Nome, &m.AvatarURL, &m.DataDesligamento); err != nil {
+			return nil, fmt.Errorf("scanning equipe membro: %w", err)
+		}
+		result = append(result, m)
+	}
+	return result, nil
+}
+
+type SprintHorasAlocadas struct {
+	SprintID uuid.UUID
+	Horas    float64
+}
+
+func (r *SprintRepository) GetHorasAlocadasPorSprint(ctx context.Context, sprintIDs []uuid.UUID, membroIDs []uuid.UUID) (map[uuid.UUID]float64, error) {
+	if len(sprintIDs) == 0 || len(membroIDs) == 0 {
+		return make(map[uuid.UUID]float64), nil
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.sprint_id, COALESCE(SUM(t.estimativa_tempo), 0)
+		FROM tarefas t
+		WHERE t.sprint_id = ANY($1)
+		  AND (t.responsavel_id = ANY($2) OR t.responsavel_id IS NULL)
+		  AND t.status != 'Cancelado'
+		GROUP BY t.sprint_id
+	`, sprintIDs, membroIDs)
+	if err != nil {
+		return nil, fmt.Errorf("getting horas alocadas por sprint: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]float64)
+	for rows.Next() {
+		var sprintID uuid.UUID
+		var segundos int64
+		if err := rows.Scan(&sprintID, &segundos); err != nil {
+			return nil, fmt.Errorf("scanning horas alocadas: %w", err)
+		}
+		result[sprintID] = float64(segundos) / 3600.0
 	}
 	return result, nil
 }

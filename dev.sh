@@ -89,7 +89,15 @@ cmd_build() {
     log "Build OK → $BIN"
 }
 
+cmd_ensure_db() {
+    if ! docker compose -f "$ROOT/docker-compose.yml" exec -T db pg_isready -U myplanner -d myplanner >/dev/null 2>&1; then
+        warn "PostgreSQL fora do ar, subindo..."
+        cmd_db
+    fi
+}
+
 cmd_start() {
+    cmd_ensure_db
     stop_server
     cmd_build
     log "Iniciando servidor em http://localhost:8080 ..."

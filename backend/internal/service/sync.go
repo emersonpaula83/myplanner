@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,8 @@ import (
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
+
+var ErrSyncAlreadyRunning = errors.New("projeto já em sincronização")
 
 type ClientFactory func(baseURL, email, apiToken string, rateLimit int, logger *zap.Logger) jira.Client
 type OAuthClientFactory func(baseURL, accessToken string, rateLimit int, logger *zap.Logger) jira.Client
@@ -117,6 +120,14 @@ func (s *SyncService) ListJiraProjects(ctx context.Context, fonteDadosID uuid.UU
 }
 
 func (s *SyncService) SyncProject(ctx context.Context, fonteDadosID uuid.UUID, projectKey string) (*domain.SyncLog, error) {
+	running, err := s.repo.HasRunningSync(ctx, fonteDadosID)
+	if err != nil {
+		return nil, err
+	}
+	if running {
+		return nil, ErrSyncAlreadyRunning
+	}
+
 	fonte, err := s.getFonte(ctx, fonteDadosID)
 	if err != nil {
 		return nil, err
@@ -220,6 +231,14 @@ func (s *SyncService) ListLogs(ctx context.Context, fonteDadosID uuid.UUID, limi
 }
 
 func (s *SyncService) syncOne(ctx context.Context, fonte *domain.FonteDados) (*domain.SyncLog, error) {
+	running, err := s.repo.HasRunningSync(ctx, fonte.ID)
+	if err != nil {
+		return nil, err
+	}
+	if running {
+		return nil, ErrSyncAlreadyRunning
+	}
+
 	client, err := s.buildClient(ctx, fonte)
 	if err != nil {
 		return nil, err

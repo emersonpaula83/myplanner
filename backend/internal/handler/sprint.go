@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -18,6 +20,7 @@ type SprintStore interface {
 	GetCapacity(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.SprintCapacityResult, error)
 	GetUnplannedAnalysis(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.UnplannedAnalysisResult, error)
 	GetBurndown(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.BurndownResult, error)
+	GetSprintsTimeline(ctx context.Context, equipeID uuid.UUID, ano int) ([]service.SprintTimelineItem, error)
 }
 
 type SprintHandler struct {
@@ -161,6 +164,36 @@ func (h *SprintHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Error("getting burndown", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to get burndown")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *SprintHandler) GetSprintsTimeline(w http.ResponseWriter, r *http.Request) {
+	equipeStr := r.URL.Query().Get("equipe")
+	if equipeStr == "" {
+		respondError(w, http.StatusBadRequest, "equipe is required")
+		return
+	}
+
+	equipeID, err := uuid.Parse(equipeStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid equipe id")
+		return
+	}
+
+	ano := time.Now().Year()
+	if a := r.URL.Query().Get("ano"); a != "" {
+		if parsed, err := strconv.Atoi(a); err == nil && parsed >= 2000 && parsed <= 2100 {
+			ano = parsed
+		}
+	}
+
+	result, err := h.store.GetSprintsTimeline(r.Context(), equipeID, ano)
+	if err != nil {
+		h.logger.Error("getting sprints timeline", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "failed to get sprints timeline")
 		return
 	}
 

@@ -116,8 +116,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .sidebar-spacer { flex: 1; }
 @media (max-width: 700px) { .sidebar { display: none; } }
 
-.main { flex: 1; min-width: 0; padding: 28px 36px 48px; max-width: 1100px; overflow-y: auto; height: 100vh; }
-.main:has(#page-timeline.active), .main:has(#page-sprints-timeline.active) { max-width: none; }
+.main { flex: 1; min-width: 0; padding: 28px 36px 48px; overflow-y: auto; height: 100vh; }
 @media (max-width: 700px) { .main { padding: 20px 16px 40px; } }
 
 .page { display: none; }
@@ -373,6 +372,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .capacity-badge.overcapacity { background: var(--red-soft); color: var(--red); text-transform: uppercase; letter-spacing: .3px; }
 .capacity-card:hover { border-color: var(--accent); }
 .capacity-card.absent-full { opacity: 0.45; pointer-events: none; }
+.unplanned-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.unplanned-row > .unplanned-disclaimer { flex: 1; margin-bottom: 0; }
 .unplanned-disclaimer { background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 6px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: #1565c0; line-height: 1.5; display: flex; gap: 10px; align-items: flex-start; }
 .unplanned-disclaimer-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
 .unplanned-disclaimer.warn { background: #fff8e1; border-left-color: #ffa000; color: #e65100; }
@@ -580,7 +581,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     </div>
 
     <!-- TIMELINE -->
-    <div class="page" id="page-timeline" style="max-width:none">
+    <div class="page" id="page-timeline">
       <div class="page-header-row"><h1 class="page-title">Timeline de Capacidade</h1></div>
       <div class="timeline-filters">
         <div class="multi-select-wrap" id="timeline-equipe-wrap">
@@ -621,7 +622,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     </div>
 
     <!-- SPRINTS TIMELINE -->
-    <div class="page" id="page-sprints-timeline" style="max-width:none">
+    <div class="page" id="page-sprints-timeline">
       <div class="page-header-row"><h1 class="page-title">Sprints Timeline</h1></div>
       <div class="timeline-filters" style="display:flex;align-items:center;gap:8px">
         <select class="filter-select" id="stl-equipe" onchange="loadSprintsTimeline()"><option value="">Selecione uma equipe</option></select>
@@ -1471,10 +1472,12 @@ async function openSprintCapacity(sprintID) {
   try {
     const equipe = document.getElementById('sprints-equipe').value;
     const qs = equipe ? '?equipe=' + equipe : '';
-    const [data, unplanned, burndown] = await Promise.all([
+    const sprintAno = new Date().getFullYear();
+    const [data, unplanned, burndown, allCheckpoints] = await Promise.all([
       api('/sprints/' + sprintID + '/capacity' + qs),
       api('/sprints/' + sprintID + '/unplanned' + qs).catch(() => null),
-      api('/sprints/' + sprintID + '/burndown' + qs).catch(() => null)
+      api('/sprints/' + sprintID + '/burndown' + qs).catch(() => null),
+      equipe ? api('/checkpoints?equipe_id=' + equipe + '&ano=' + sprintAno).catch(() => []) : Promise.resolve([])
     ]);
     const fonteDadosId = data.fonte_dados_id || '';
     const projetoChave = data.projeto_chave || '';
@@ -1499,6 +1502,30 @@ async function openSprintCapacity(sprintID) {
     html += '<div class="capacity-panel-sub">' + formatSprintDates(data.sprint.data_inicio, data.sprint.data_fim) + ' • ' + data.dias_uteis + ' dias úteis</div></div>';
     const estado = data.sprint.estado || 'future';
     html += '<span class="sprint-state-badge ' + estado + '">' + formatEstado(estado) + '</span></div>';
+
+    if (allCheckpoints && allCheckpoints.length > 0 && data.sprint.data_inicio && data.sprint.data_fim) {
+      const sStart = new Date(data.sprint.data_inicio);
+      const sEnd = new Date(data.sprint.data_fim);
+      const matched = allCheckpoints.filter(cp => {
+        const cpStart = new Date(cp.data_inicio + 'T00:00:00');
+        const cpEnd = cp.data_fim ? new Date(cp.data_fim + 'T23:59:59') : cpStart;
+        return cpStart <= sEnd && cpEnd >= sStart;
+      });
+      if (matched.length > 0) {
+        const corBox = matched[0].cor || '#2196F3';
+        html += '<div style="background:' + corBox + '18;border-left:4px solid ' + corBox + ';border-radius:6px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:' + corBox + ';line-height:1.5">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:help;position:relative" onmouseenter="this.querySelector(\'.legend-tip\').style.display=\'block\'" onmouseleave="this.querySelector(\'.legend-tip\').style.display=\'none\'"><span style="font-size:18px">📌</span><span style="font-size:14px;font-weight:700;letter-spacing:.3px">Lembretes da Sprint</span><div class="legend-tip" style="display:none;position:absolute;top:100%;left:0;background:var(--tooltip-bg);color:var(--tooltip-text);padding:10px 14px;border-radius:8px;font-size:12px;z-index:60;width:300px;box-shadow:0 4px 12px rgba(0,0,0,.2);line-height:1.5;margin-top:6px">Lembretes são os checkpoints gerados no relatório de Timeline de Sprints cuja as datas cruzam com a sprint ativa atual.</div></div>';
+        matched.forEach(cp => {
+          const opts = { day: '2-digit', month: '2-digit' };
+          const cpStartFmt = new Date(cp.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR', opts);
+          const cpDates = cp.data_fim && cp.data_fim !== cp.data_inicio
+            ? cpStartFmt + ' — ' + new Date(cp.data_fim + 'T12:00:00').toLocaleDateString('pt-BR', opts)
+            : cpStartFmt;
+          html += '<div style="margin-left:24px"><b>' + esc(cp.nome) + '</b> (' + cpDates + ')' + (cp.resumo ? ' — ' + esc(cp.resumo) : '') + '</div>';
+        });
+        html += '</div>';
+      }
+    }
 
     // Sprint summary
     const pctGeral = data.horas_total_sprint > 0 ? (data.horas_alocadas / data.horas_total_sprint * 100) : 0;
@@ -1567,29 +1594,36 @@ async function openSprintCapacity(sprintID) {
       const pctMel = (horasMelhorias / horasBreakdownTotal * 100);
       const pctSup = (horasSuporte / horasBreakdownTotal * 100);
       html += '<div class="breakdown-section fade-in" style="margin-top:16px"><div class="breakdown-header"><span class="breakdown-title">Distribuição por Tipo</span><span class="breakdown-total">' + horasBreakdownTotal.toFixed(1) + 'h</span></div>';
+      const tipStyle = 'display:none;position:absolute;bottom:100%;left:0;background:var(--tooltip-bg);color:var(--tooltip-text);padding:10px 14px;border-radius:8px;font-size:12px;z-index:60;width:220px;box-shadow:0 4px 12px rgba(0,0,0,.2);line-height:1.5;margin-bottom:6px';
+      const tipEnter = "this.querySelector('.legend-tip').style.display='block'";
+      const tipLeave = "this.querySelector('.legend-tip').style.display='none'";
       html += '<div class="breakdown-legend" style="margin-bottom:12px">';
-      html += '<div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div><span class="legend-label">Manutenção</span><span class="legend-value">' + pctMan.toFixed(1) + '% (' + horasManutencao.toFixed(1) + 'h)</span></div>';
-      html += '<div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div><span class="legend-label">Melhorias e Inovação</span><span class="legend-value">' + pctMel.toFixed(1) + '% (' + horasMelhorias.toFixed(1) + 'h)</span></div>';
-      html += '<div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div><span class="legend-label">Suporte</span><span class="legend-value">' + pctSup.toFixed(1) + '% (' + horasSuporte.toFixed(1) + 'h)</span></div>';
+      html += '<div class="legend-item" style="cursor:help;position:relative" onmouseenter="' + tipEnter + '" onmouseleave="' + tipLeave + '"><div class="legend-dot" style="background:var(--red)"></div><span class="legend-label">Manutenção</span><span class="legend-value">' + pctMan.toFixed(1) + '% (' + horasManutencao.toFixed(1) + 'h)</span><div class="legend-tip" style="' + tipStyle + '">Incidentes e Bugs<br><span style="opacity:.6">Cards do tipo: Bug, Incidente</span></div></div>';
+      html += '<div class="legend-item" style="cursor:help;position:relative" onmouseenter="' + tipEnter + '" onmouseleave="' + tipLeave + '"><div class="legend-dot" style="background:var(--accent)"></div><span class="legend-label">Melhorias e Inovação</span><span class="legend-value">' + pctMel.toFixed(1) + '% (' + horasMelhorias.toFixed(1) + 'h)</span><div class="legend-tip" style="' + tipStyle + '">Melhorias e Histórias<br><span style="opacity:.6">Cards do tipo: Melhoria, História</span></div></div>';
+      html += '<div class="legend-item" style="cursor:help;position:relative" onmouseenter="' + tipEnter + '" onmouseleave="' + tipLeave + '"><div class="legend-dot" style="background:var(--blue)"></div><span class="legend-label">Suporte</span><span class="legend-value">' + pctSup.toFixed(1) + '% (' + horasSuporte.toFixed(1) + 'h)</span><div class="legend-tip" style="' + tipStyle + '">Tarefas e Suporte<br><span style="opacity:.6">Cards do tipo: Tarefa, Subtarefa</span></div></div>';
       html += '</div>';
       html += '<div class="stacked-bar"><div class="stacked-segment" style="width:' + pctMan.toFixed(1) + '%;background:var(--red)"></div><div class="stacked-segment" style="width:' + pctMel.toFixed(1) + '%;background:var(--accent)"></div><div class="stacked-segment" style="width:' + pctSup.toFixed(1) + '%;background:var(--blue)"></div></div>';
       html += '</div>';
     }
 
-    if (unplanned && unplanned.sprint_atual && unplanned.sprint_atual.tarefas_nao_planejadas > 0) {
+    if (unplanned && unplanned.sprint_atual && unplanned.sprint_atual.manutencao_count > 0) {
       const sa = unplanned.sprint_atual;
-      html += '<div class="unplanned-disclaimer warn"><span class="unplanned-disclaimer-icon">⚡</span><div>';
-      html += 'Nesta sprint: <b>' + sa.tarefas_nao_planejadas + '</b> tarefa(s) não planejada(s) (' + sa.horas_nao_planejadas.toFixed(1) + 'h — ' + sa.percentual_nao_planejadas.toFixed(1) + '% do total)';
-      html += '</div></div>';
+      const pctInc = sa.horas_total_sprint > 0 ? (sa.manutencao_horas / sa.horas_total_sprint * 100).toFixed(1) : '0.0';
+      html += '<div class="unplanned-disclaimer danger"><span class="unplanned-disclaimer-icon">🔥</span><div><b>' + pctInc + '%</b> da capacity dedicado em <b>' + sa.manutencao_count + '</b> incidente(s)/bug(s) (' + sa.manutencao_horas.toFixed(1) + 'h)</div></div>';
     }
-
     if (data.membros_ausentes_com_cards && data.membros_ausentes_com_cards.length > 0) {
-      const nomes = data.membros_ausentes_com_cards.map(m => '<b>' + esc(m.nome) + '</b>');
-      const nomesStr = nomes.length === 1 ? nomes[0] : nomes.slice(0, -1).join(', ') + ' e ' + nomes[nomes.length - 1];
-      const verbo = data.membros_ausentes_com_cards.length === 1 ? 'está ausente durante toda a sprint e possui' : 'estão ausentes durante toda a sprint e possuem';
-      html += '<div class="unplanned-disclaimer danger"><span class="unplanned-disclaimer-icon">⚠</span><div>';
-      html += nomesStr + ' ' + verbo + ' cards atribuídos.';
-      html += '</div></div>';
+      const descricoes = data.membros_ausentes_com_cards.map(m => {
+        const nome = '<b>' + esc(m.nome) + '</b>';
+        if (m.sprint_inteira) return nome + ' de ' + esc(m.motivo);
+        return nome + ' ' + m.dias_ausente + 'd ' + esc(m.motivo);
+      });
+      const txt = descricoes.length === 1 ? descricoes[0] : descricoes.slice(0, -1).join(', ') + ' e ' + descricoes[descricoes.length - 1];
+      html += '<div class="unplanned-disclaimer warn"><span class="unplanned-disclaimer-icon">⚠</span><div>' + txt + ' — possuem cards atribuídos.</div></div>';
+    }
+    if (unplanned && unplanned.sprint_atual && unplanned.sprint_atual.outras_count > 0) {
+      const sa = unplanned.sprint_atual;
+      const pctOutras = sa.horas_total_sprint > 0 ? (sa.outras_horas / sa.horas_total_sprint * 100).toFixed(1) : '0.0';
+      html += '<div class="unplanned-disclaimer warn"><span class="unplanned-disclaimer-icon">⚡</span><div><b>' + pctOutras + '%</b> da capacity dedicado em <b>' + sa.outras_count + '</b> tarefa(s) não planejada(s) (' + sa.outras_horas.toFixed(1) + 'h)</div></div>';
     }
 
     if (!data.membros || data.membros.length === 0) {

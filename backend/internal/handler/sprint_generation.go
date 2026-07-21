@@ -35,7 +35,7 @@ func (h *SprintGenerationHandler) GetBoards(w http.ResponseWriter, r *http.Reque
 	boards, err := h.svc.GetBoardsForEquipe(r.Context(), equipeID)
 	if err != nil {
 		h.logger.Error("getting boards for equipe", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "failed to get boards")
+		respondError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get boards: %v", err))
 		return
 	}
 	respondJSON(w, http.StatusOK, boards)
@@ -62,7 +62,7 @@ func (h *SprintGenerationHandler) Preview(w http.ResponseWriter, r *http.Request
 	result, err := h.svc.PreviewSprints(r.Context(), req.EquipeID, req.BoardID, startDate)
 	if err != nil {
 		h.logger.Error("previewing sprints", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "Erro ao comunicar com JIRA")
+		respondError(w, http.StatusInternalServerError, fmt.Sprintf("Erro ao comunicar com JIRA: %v", err))
 		return
 	}
 	respondJSON(w, http.StatusOK, result)
@@ -83,7 +83,7 @@ func (h *SprintGenerationHandler) Generate(w http.ResponseWriter, r *http.Reques
 	result, err := h.svc.GenerateSprints(r.Context(), req.EquipeID, req.BoardID, startDate)
 	if err != nil {
 		h.logger.Error("generating sprints", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "Erro ao comunicar com JIRA")
+		respondError(w, http.StatusInternalServerError, fmt.Sprintf("Erro ao comunicar com JIRA: %v", err))
 		return
 	}
 	respondJSON(w, http.StatusOK, result)

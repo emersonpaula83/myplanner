@@ -2,11 +2,13 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"go.uber.org/zap"
 )
 
@@ -57,6 +59,10 @@ func (h *SyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 	if projectKey != "" {
 		log, err := h.store.SyncProject(r.Context(), fdID, projectKey)
 		if err != nil {
+			if errors.Is(err, service.ErrSyncAlreadyRunning) {
+				respondError(w, http.StatusConflict, "Projeto já em sincronização.")
+				return
+			}
 			h.logger.Error("failed to sync project", zap.String("project", projectKey), zap.Error(err))
 			respondError(w, http.StatusInternalServerError, "falha ao sincronizar projeto: "+err.Error())
 			return
@@ -67,6 +73,10 @@ func (h *SyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 
 	log, err := h.store.SyncFonteDados(r.Context(), fdID)
 	if err != nil {
+		if errors.Is(err, service.ErrSyncAlreadyRunning) {
+			respondError(w, http.StatusConflict, "Projeto já em sincronização.")
+			return
+		}
 		h.logger.Error("failed to sync fonte dados", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao sincronizar: "+err.Error())
 		return

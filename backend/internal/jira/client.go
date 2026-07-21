@@ -22,6 +22,7 @@ type Client interface {
 	GetBoardSprints(ctx context.Context, boardID int) ([]JiraSprint, error)
 	GetSprintFieldID(ctx context.Context) (string, error)
 	SetSprintFieldID(id string)
+	CreateSprint(ctx context.Context, boardID int, name string, startDate, endDate time.Time) (*JiraSprint, error)
 }
 
 type HTTPClient struct {
@@ -471,4 +472,23 @@ func (c *HTTPClient) GetBoardSprints(ctx context.Context, boardID int) ([]JiraSp
 		startAt += len(result.Values)
 	}
 	return all, nil
+}
+
+func (c *HTTPClient) CreateSprint(ctx context.Context, boardID int, name string, startDate, endDate time.Time) (*JiraSprint, error) {
+	payload := map[string]any{
+		"name":          name,
+		"originBoardId": boardID,
+		"startDate":     startDate.Format(time.RFC3339),
+		"endDate":       endDate.Format(time.RFC3339),
+	}
+	body, err := c.doPost(ctx, "/rest/agile/1.0/sprint", payload)
+	if err != nil {
+		return nil, fmt.Errorf("creating sprint %q: %w", name, err)
+	}
+	var sprint JiraSprint
+	if err := json.Unmarshal(body, &sprint); err != nil {
+		return nil, fmt.Errorf("decoding created sprint: %w", err)
+	}
+	c.logger.Info("created sprint in jira", zap.String("name", name), zap.Int("id", sprint.ID))
+	return &sprint, nil
 }

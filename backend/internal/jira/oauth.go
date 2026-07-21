@@ -17,7 +17,7 @@ const (
 	atlassianTokenURL    = "https://auth.atlassian.com/oauth/token"
 	atlassianResourceURL = "https://api.atlassian.com/oauth/token/accessible-resources"
 
-	oauthScopes = "read:jira-work read:jira-user read:jira-software offline_access"
+	oauthScopes = "read:jira-work read:jira-user read:board-scope:jira-software read:sprint:jira-software read:project:jira write:sprint:jira-software offline_access"
 )
 
 type OAuthConfig struct {

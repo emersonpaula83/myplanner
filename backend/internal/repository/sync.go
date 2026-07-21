@@ -203,6 +203,20 @@ func (r *SyncRepository) LinkTarefaProduto(ctx context.Context, tarefaID, produt
 	return nil
 }
 
+func (r *SyncRepository) HasRunningSync(ctx context.Context, fonteDadosID uuid.UUID) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM sync_logs
+			WHERE fonte_dados_id = $1 AND status = 'running'
+		)
+	`, fonteDadosID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("checking running sync: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *SyncRepository) CreateSyncLog(ctx context.Context, log *domain.SyncLog) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO sync_logs (id, fonte_dados_id, tipo, status, iniciado_em, mensagem)

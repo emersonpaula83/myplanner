@@ -87,6 +87,8 @@ func (h *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.Info("oauth token scopes received", zap.String("scope", tokens.Scope))
+
 	resources, err := h.oauthSvc.GetAccessibleResources(ctx, tokens.AccessToken)
 	if err != nil {
 		h.logger.Error("failed to get accessible resources", zap.Error(err))
@@ -110,6 +112,14 @@ func (h *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/?oauth_error=save_failed", http.StatusFound)
 			return
 		}
+	} else if existing, _ := h.fdRepo.GetByBaseURL(ctx, baseURL); existing != nil {
+		err = h.fdRepo.SaveOAuthTokens(ctx, existing.ID, baseURL, tokens.AccessToken, tokens.RefreshToken, expiry)
+		if err != nil {
+			h.logger.Error("failed to update oauth tokens", zap.Error(err))
+			http.Redirect(w, r, "/?oauth_error=save_failed", http.StatusFound)
+			return
+		}
+		h.logger.Info("oauth tokens updated for existing fonte", zap.String("id", existing.ID.String()))
 	} else {
 		cfm := json.RawMessage(`{}`)
 		_, err = h.fdRepo.Create(ctx, &repository.CreateFonteDadosRequest{
