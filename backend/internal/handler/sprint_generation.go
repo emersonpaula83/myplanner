@@ -62,7 +62,7 @@ func (h *SprintGenerationHandler) Preview(w http.ResponseWriter, r *http.Request
 	result, err := h.svc.PreviewSprints(r.Context(), req.EquipeID, req.BoardID, startDate)
 	if err != nil {
 		h.logger.Error("previewing sprints", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, "Erro ao comunicar com JIRA")
 		return
 	}
 	respondJSON(w, http.StatusOK, result)
@@ -83,7 +83,7 @@ func (h *SprintGenerationHandler) Generate(w http.ResponseWriter, r *http.Reques
 	result, err := h.svc.GenerateSprints(r.Context(), req.EquipeID, req.BoardID, startDate)
 	if err != nil {
 		h.logger.Error("generating sprints", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, err.Error())
+		respondError(w, http.StatusInternalServerError, "Erro ao comunicar com JIRA")
 		return
 	}
 	respondJSON(w, http.StatusOK, result)

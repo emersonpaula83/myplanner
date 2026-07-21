@@ -116,7 +116,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .sidebar-spacer { flex: 1; }
 @media (max-width: 700px) { .sidebar { display: none; } }
 
-.main { flex: 1; min-width: 0; padding: 28px 36px 48px; overflow-y: auto; height: 100vh; }
+.main { flex: 1; min-width: 0; padding: 28px 36px 48px; max-width: 1100px; overflow-y: auto; height: 100vh; }
+.main:has(#page-timeline.active), .main:has(#page-sprints-timeline.active) { max-width: none; }
 @media (max-width: 700px) { .main { padding: 20px 16px 40px; } }
 
 .page { display: none; }
@@ -579,7 +580,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     </div>
 
     <!-- TIMELINE -->
-    <div class="page" id="page-timeline">
+    <div class="page" id="page-timeline" style="max-width:none">
       <div class="page-header-row"><h1 class="page-title">Timeline de Capacidade</h1></div>
       <div class="timeline-filters">
         <div class="multi-select-wrap" id="timeline-equipe-wrap">
@@ -620,7 +621,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     </div>
 
     <!-- SPRINTS TIMELINE -->
-    <div class="page" id="page-sprints-timeline">
+    <div class="page" id="page-sprints-timeline" style="max-width:none">
       <div class="page-header-row"><h1 class="page-title">Sprints Timeline</h1></div>
       <div class="timeline-filters" style="display:flex;align-items:center;gap:8px">
         <select class="filter-select" id="stl-equipe" onchange="loadSprintsTimeline()"><option value="">Selecione uma equipe</option></select>
@@ -2900,7 +2901,7 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
     if (!found) { if (tip) tip.style.display = 'none'; return; }
     if (tip) {
       tip.innerHTML = '<b>' + esc(found.d.sprint_nome) + '</b><br>'
-        + found.d.data_inicio + ' — ' + found.d.data_fim + '<br>'
+        + fmtDateBR(found.d.data_inicio) + ' — ' + fmtDateBR(found.d.data_fim) + '<br>'
         + 'Capacidade: ' + found.d.horas_capacidade.toFixed(1) + 'h (' + found.pctCap.toFixed(1) + '%)<br>'
         + 'Alocadas: ' + found.d.horas_alocadas.toFixed(1) + 'h (' + found.pctAloc.toFixed(1) + '%)<br>'
         + 'Máx teórico: ' + found.d.horas_maximo_teorico.toFixed(1) + 'h<br>'
@@ -2916,7 +2917,6 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
   };
 
   canvas.oncontextmenu = function(e) {
-    e.preventDefault();
     var r = canvas.getBoundingClientRect();
     var mx = e.clientX - r.left;
 
@@ -2928,6 +2928,8 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
       }
     }
     if (!cpHit) return;
+
+    e.preventDefault();
 
     // Remove existing context menu if any
     var old = document.getElementById('cp-ctx-menu');
