@@ -2725,6 +2725,77 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
     ctx.fillText('HOJE', tx, pad.top - 6);
   }
 
+  // Checkpoint lines and bands
+  var cpHitAreas = [];
+  checkpoints.forEach(function(cp) {
+    var x1 = dateToX(cp.data_inicio);
+    ctx.save();
+
+    if (cp.data_fim) {
+      // Period: striped band
+      var x2 = dateToX(cp.data_fim);
+      var bandW = x2 - x1;
+      if (bandW < 2) bandW = 2;
+
+      // Create diagonal stripe pattern
+      var patCanvas = document.createElement('canvas');
+      patCanvas.width = 10;
+      patCanvas.height = 10;
+      var patCtx = patCanvas.getContext('2d');
+      patCtx.strokeStyle = cp.cor;
+      patCtx.lineWidth = 3;
+      patCtx.beginPath();
+      patCtx.moveTo(0, 10);
+      patCtx.lineTo(10, 0);
+      patCtx.stroke();
+      var pattern = ctx.createPattern(patCanvas, 'repeat');
+
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = pattern;
+      ctx.fillRect(x1, pad.top, bandW, ch);
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = cp.cor;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x1, pad.top, bandW, ch);
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+
+      // Label centered at top
+      ctx.fillStyle = cp.cor;
+      ctx.globalAlpha = 0.7;
+      ctx.font = 'bold 9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(cp.nome, x1 + bandW / 2, pad.top - 6);
+      ctx.globalAlpha = 1;
+
+      cpHitAreas.push({ x1: x1, x2: x1 + bandW, cp: cp });
+    } else {
+      // Single point: dashed vertical line
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = cp.cor;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x1, pad.top);
+      ctx.lineTo(x1, pad.top + ch);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label above
+      ctx.fillStyle = cp.cor;
+      ctx.globalAlpha = 0.7;
+      ctx.font = 'bold 9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(cp.nome, x1, pad.top - 6);
+      ctx.globalAlpha = 1;
+
+      cpHitAreas.push({ x1: x1 - 6, x2: x1 + 6, cp: cp });
+    }
+
+    ctx.restore();
+  });
+
   // Sprint name labels (rotated, under each bar)
   ctx.fillStyle = colText;
   ctx.font = '9px system-ui';
@@ -2799,6 +2870,27 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
       }
       return;
     }
+    // Check checkpoint areas
+    var cpHit = null;
+    for (var ci = 0; ci < cpHitAreas.length; ci++) {
+      if (mx >= cpHitAreas[ci].x1 && mx <= cpHitAreas[ci].x2) {
+        cpHit = cpHitAreas[ci].cp;
+        break;
+      }
+    }
+    if (cpHit) {
+      if (tip) {
+        var cpDates = fmtDateBR(cpHit.data_inicio);
+        if (cpHit.data_fim) cpDates += ' — ' + fmtDateBR(cpHit.data_fim);
+        tip.innerHTML = '<span style="color:' + esc(cpHit.cor) + '">●</span> <b>' + esc(cpHit.nome) + '</b><br>'
+          + esc(cpHit.resumo) + '<br>'
+          + '<span style="font-size:11px;color:var(--text-secondary)">' + cpDates + '</span>';
+        tip.style.display = 'block';
+        tip.style.left = (e.clientX + 12) + 'px';
+        tip.style.top = (e.clientY - 10) + 'px';
+      }
+      return;
+    }
     // Check sprint bars
     var found = null;
     for (var i = 0; i < sprintRects.length; i++) {
@@ -2821,6 +2913,46 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
   canvas.onmouseleave = function() {
     var tip = document.getElementById('gantt-tooltip');
     if (tip) tip.style.display = 'none';
+  };
+
+  canvas.oncontextmenu = function(e) {
+    e.preventDefault();
+    var r = canvas.getBoundingClientRect();
+    var mx = e.clientX - r.left;
+
+    var cpHit = null;
+    for (var ci = 0; ci < cpHitAreas.length; ci++) {
+      if (mx >= cpHitAreas[ci].x1 && mx <= cpHitAreas[ci].x2) {
+        cpHit = cpHitAreas[ci].cp;
+        break;
+      }
+    }
+    if (!cpHit) return;
+
+    // Remove existing context menu if any
+    var old = document.getElementById('cp-ctx-menu');
+    if (old) old.remove();
+
+    var menu = document.createElement('div');
+    menu.id = 'cp-ctx-menu';
+    menu.style.cssText = 'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY + 'px;background:var(--card-bg);border:1px solid var(--border-subtle);border-radius:6px;padding:4px 0;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:13px';
+    var item = document.createElement('div');
+    item.style.cssText = 'padding:6px 16px;cursor:pointer;color:var(--red)';
+    item.textContent = 'Excluir "' + cpHit.nome + '"';
+    item.onmouseenter = function() { this.style.background = 'var(--border-subtle)'; };
+    item.onmouseleave = function() { this.style.background = 'none'; };
+    item.onclick = function() {
+      menu.remove();
+      if (!confirm('Excluir checkpoint "' + cpHit.nome + '"?')) return;
+      api('/checkpoints/' + cpHit.id, { method: 'DELETE' })
+        .then(function() { loadSprintsTimeline(); })
+        .catch(function(err) { alert('Erro: ' + err.message); });
+    };
+    menu.appendChild(item);
+    document.body.appendChild(menu);
+
+    var closeMenu = function() { menu.remove(); document.removeEventListener('click', closeMenu); };
+    setTimeout(function() { document.addEventListener('click', closeMenu); }, 10);
   };
 }
 
