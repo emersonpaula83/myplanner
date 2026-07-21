@@ -180,7 +180,7 @@ func (s *SprintGenerationService) PreviewSprints(ctx context.Context, equipeID u
 
 	now := time.Now()
 	ano := now.Year()
-	slots := generateSprintSlots(now, 11, ano)
+	slots := generateSprintSlots(now, 12, ano)
 	missing, ignored := filterExistingSlots(slots, existing)
 
 	result := &PreviewResult{
@@ -228,7 +228,7 @@ func (s *SprintGenerationService) GenerateSprints(ctx context.Context, equipeID 
 
 	now := time.Now()
 	ano := now.Year()
-	slots := generateSprintSlots(now, 11, ano)
+	slots := generateSprintSlots(now, 12, ano)
 	missing, _ := filterExistingSlots(slots, existing)
 
 	result := &GenerateResult{Erros: make([]string, 0)}
@@ -352,7 +352,7 @@ func detectSprintPattern(sprints []jira.JiraSprint) (string, int, error) {
 		start := parseJiraDate(s.StartDate)
 		end := parseJiraDate(s.EndDate)
 		if start != nil && end != nil {
-			days := int(end.Sub(*start).Hours() / 24)
+			days := int(end.Sub(*start).Hours()/24) + 1
 			if days > 0 {
 				durationCounts[days]++
 			}
@@ -364,7 +364,7 @@ func detectSprintPattern(sprints []jira.JiraSprint) (string, int, error) {
 	}
 
 	prefix := modeString(prefixCounts)
-	duration := 11
+	duration := 12
 	if len(durationCounts) > 0 {
 		duration = modeInt(durationCounts)
 	}

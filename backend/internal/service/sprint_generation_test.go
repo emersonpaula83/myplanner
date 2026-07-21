@@ -23,8 +23,8 @@ func TestDetectSprintPattern_PrefixAndDuration(t *testing.T) {
 	if prefix != "RM Dev" {
 		t.Errorf("prefix = %q, want %q", prefix, "RM Dev")
 	}
-	if days != 11 {
-		t.Errorf("days = %d, want %d", days, 11)
+	if days != 12 {
+		t.Errorf("days = %d, want %d", days, 12)
 	}
 }
 
@@ -58,8 +58,8 @@ func TestDetectSprintPattern_FallbackDuration(t *testing.T) {
 	if prefix != "RM Dev" {
 		t.Errorf("prefix = %q, want %q", prefix, "RM Dev")
 	}
-	if days != 11 {
-		t.Errorf("days = %d, want 11 (fallback)", days)
+	if days != 12 {
+		t.Errorf("days = %d, want 12 (fallback)", days)
 	}
 }
 
