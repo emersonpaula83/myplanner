@@ -2,6 +2,7 @@ package service
 
 import (
 	"testing"
+	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/jira"
 )
@@ -80,5 +81,75 @@ func TestDetectSprintPattern_MostFrequentPrefix(t *testing.T) {
 	}
 	if prefix != "RM Dev" {
 		t.Errorf("prefix = %q, want %q (most frequent)", prefix, "RM Dev")
+	}
+}
+
+func TestGenerateSprintSlots_DynamicDuration(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	start := time.Date(2026, 8, 3, 0, 0, 0, 0, loc)
+	// durationDays represents an inclusive calendar-day count (end = start + durationDays - 1),
+	// so a Monday-to-Friday-of-next-week sprint (12 calendar days: Mon wk1 .. Fri wk2) needs 12,
+	// not 11 (11 lands on Thursday). See task-2-report.md concerns for details.
+	slots := generateSprintSlots(start, 12, 2026)
+
+	if len(slots) == 0 {
+		t.Fatal("expected at least one slot")
+	}
+
+	first := slots[0]
+	if first.start.Weekday() != time.Monday {
+		t.Errorf("first slot start = %v, want Monday", first.start.Weekday())
+	}
+	if first.start.Hour() != 8 || first.start.Minute() != 30 {
+		t.Errorf("first slot start time = %02d:%02d, want 08:30", first.start.Hour(), first.start.Minute())
+	}
+	if first.end.Weekday() != time.Friday {
+		t.Errorf("first slot end = %v, want Friday", first.end.Weekday())
+	}
+	if first.end.Hour() != 18 || first.end.Minute() != 30 {
+		t.Errorf("first slot end time = %02d:%02d, want 18:30", first.end.Hour(), first.end.Minute())
+	}
+	if first.end.Location().String() != "America/Sao_Paulo" {
+		t.Errorf("timezone = %s, want America/Sao_Paulo", first.end.Location())
+	}
+}
+
+func TestGenerateSprintSlots_AdjustsToMonday(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	// Wednesday August 5
+	start := time.Date(2026, 8, 5, 0, 0, 0, 0, loc)
+	slots := generateSprintSlots(start, 11, 2026)
+
+	if len(slots) == 0 {
+		t.Fatal("expected at least one slot")
+	}
+	// Should adjust to next Monday (August 10)
+	if slots[0].start.Day() != 10 {
+		t.Errorf("first slot start day = %d, want 10 (next Monday)", slots[0].start.Day())
+	}
+}
+
+func TestGenerateSprintSlots_StopsAtYearEnd(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	start := time.Date(2026, 12, 20, 0, 0, 0, 0, loc)
+	slots := generateSprintSlots(start, 11, 2026)
+
+	if len(slots) != 1 {
+		t.Errorf("expected 1 slot (Dec 21 is Monday, end Dec 31), got %d", len(slots))
+	}
+}
+
+func TestGenerateSprintSlots_7DaySprints(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	start := time.Date(2026, 8, 3, 0, 0, 0, 0, loc)
+	slots := generateSprintSlots(start, 5, 2026)
+
+	if len(slots) == 0 {
+		t.Fatal("expected at least one slot")
+	}
+	first := slots[0]
+	diff := int(first.end.Sub(first.start).Hours()/24) + 1
+	if diff != 5 {
+		t.Errorf("duration = %d days, want 5", diff)
 	}
 }

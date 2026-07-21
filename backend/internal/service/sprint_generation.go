@@ -180,7 +180,7 @@ func (s *SprintGenerationService) PreviewSprints(ctx context.Context, equipeID u
 
 	now := time.Now()
 	ano := now.Year()
-	slots := generateSprintSlots(ano, now)
+	slots := generateSprintSlots(now, 11, ano)
 	missing, ignored := filterExistingSlots(slots, existing)
 
 	result := &PreviewResult{
@@ -228,7 +228,7 @@ func (s *SprintGenerationService) GenerateSprints(ctx context.Context, equipeID 
 
 	now := time.Now()
 	ano := now.Year()
-	slots := generateSprintSlots(ano, now)
+	slots := generateSprintSlots(now, 11, ano)
 	missing, _ := filterExistingSlots(slots, existing)
 
 	result := &GenerateResult{Erros: make([]string, 0)}
@@ -258,24 +258,36 @@ type sprintSlot struct {
 	end   time.Time
 }
 
-func generateSprintSlots(ano int, after time.Time) []sprintSlot {
-	start := nextMonday(after)
-	yearEnd := time.Date(ano, 12, 31, 0, 0, 0, 0, time.UTC)
+var saoPaulo *time.Location
+
+func init() {
+	var err error
+	saoPaulo, err = time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		panic("failed to load America/Sao_Paulo timezone: " + err.Error())
+	}
+}
+
+func generateSprintSlots(startDate time.Time, durationDays int, year int) []sprintSlot {
+	start := nextMonday(startDate)
+	yearEnd := time.Date(year, 12, 31, 23, 59, 59, 0, saoPaulo)
 
 	var slots []sprintSlot
-	for start.Before(yearEnd) || start.Equal(yearEnd) {
-		end := start.AddDate(0, 0, 11) // Friday of 2nd week
-		if end.Weekday() != time.Friday {
-			end = start.AddDate(0, 0, 11)
+	for !start.After(yearEnd) {
+		end := start.AddDate(0, 0, durationDays-1)
+		if end.After(yearEnd) {
+			break
 		}
-		slots = append(slots, sprintSlot{start: start, end: end})
-		start = end.AddDate(0, 0, 3) // next Monday
+		slotStart := time.Date(start.Year(), start.Month(), start.Day(), 8, 30, 0, 0, saoPaulo)
+		slotEnd := time.Date(end.Year(), end.Month(), end.Day(), 18, 30, 0, 0, saoPaulo)
+		slots = append(slots, sprintSlot{start: slotStart, end: slotEnd})
+		start = end.AddDate(0, 0, 3)
 	}
 	return slots
 }
 
 func nextMonday(t time.Time) time.Time {
-	d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, saoPaulo)
 	wd := d.Weekday()
 	if wd == time.Monday {
 		return d
