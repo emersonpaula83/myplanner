@@ -116,7 +116,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .sidebar-spacer { flex: 1; }
 @media (max-width: 700px) { .sidebar { display: none; } }
 
-.main { flex: 1; min-width: 0; padding: 28px 36px 48px; max-width: 1100px; overflow-y: auto; height: 100vh; }
+.main { flex: 1; min-width: 0; padding: 28px 36px 48px; overflow-y: auto; height: 100vh; }
 @media (max-width: 700px) { .main { padding: 20px 16px 40px; } }
 
 .page { display: none; }
@@ -525,9 +525,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
       <span class="sidebar-item-label">Equipes</span>
     </button>
-    <button class="sidebar-item" data-page="timeline" title="Timeline" onclick="navigate('timeline')">
+    <button class="sidebar-item" data-page="timeline" title="Timeline de Capacidade" onclick="navigate('timeline')">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
-      <span class="sidebar-item-label">Timeline</span>
+      <span class="sidebar-item-label">Timeline de Capacidade</span>
     </button>
     <button class="sidebar-item" data-page="projetos" title="Projetos" onclick="navigate('projetos')">
       <svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
@@ -536,6 +536,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <button class="sidebar-item" data-page="sprints" title="Sprints" onclick="navigate('sprints')">
       <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
       <span class="sidebar-item-label">Sprints</span>
+    </button>
+    <button class="sidebar-item" data-page="sprints-timeline" title="Sprints Timeline" onclick="navigate('sprints-timeline')">
+      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="12" width="3" height="6"/></svg>
+      <span class="sidebar-item-label">Sprints Timeline</span>
     </button>
     <button class="sidebar-item" data-page="usuarios" title="Usuários" onclick="navigate('usuarios')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg>
@@ -613,6 +617,18 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <button class="period-chip" onclick="filterSprints('closed')">Concluídas</button>
       </div>
       <div id="sprints-content"></div>
+    </div>
+
+    <!-- SPRINTS TIMELINE -->
+    <div class="page" id="page-sprints-timeline">
+      <div class="page-header-row"><h1 class="page-title">Sprints Timeline</h1></div>
+      <div class="timeline-filters" style="display:flex;align-items:center;gap:8px">
+        <select class="filter-select" id="stl-equipe" onchange="loadSprintsTimeline()"><option value="">Selecione uma equipe</option></select>
+        <button class="btn-sm" id="stl-sync-btn" style="display:none;font-size:12px;padding:4px 12px" onclick="syncSprintsTimeline()">⟳ Sincronizar</button>
+        <button class="btn-sm" id="stl-gen-btn" style="display:none;font-size:12px;padding:4px 12px;background:var(--blue);color:#fff" onclick="openGerarSprintsForm()">+ Gerar Sprints</button>
+        <span id="stl-sync-ts" style="font-size:11px;color:var(--text-muted);opacity:0.7"></span>
+      </div>
+      <div id="stl-content" style="margin-top:12px"></div>
     </div>
 
     <!-- USUARIOS -->
@@ -799,6 +815,19 @@ function api(path, opts = {}) {
 
 function formatDate(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function fmtDateBR(s) { if (!s) return ''; var p = s.split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : s; }
+function fmtDateTimeBR(s) {
+  if (!s) return '';
+  var d = new Date(s);
+  if (isNaN(d)) return s;
+  var dd = String(d.getDate()).padStart(2, '0');
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var yyyy = d.getFullYear();
+  var hh = String(d.getHours()).padStart(2, '0');
+  var mi = String(d.getMinutes()).padStart(2, '0');
+  var ss = String(d.getSeconds()).padStart(2, '0');
+  return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + mi + ':' + ss;
+}
 
 // === AUTH ===
 async function handleLogin(e) {
@@ -856,6 +885,7 @@ function navigate(page) {
   if (page === 'fontes') loadFontes();
   if (page === 'projetos') loadProjetos();
   if (page === 'sprints') loadSprints();
+  if (page === 'sprints-timeline') loadSprintsTimeline();
 }
 
 // === EQUIPES ===
@@ -869,7 +899,8 @@ async function loadEquipes() {
     const fills = [
       {sel: document.getElementById('equipe-select'), def: 'Todos os membros'},
       {sel: document.getElementById('projetos-equipe'), def: 'Todas as equipes'},
-      {sel: document.getElementById('sprints-equipe'), def: 'Todas as equipes'}
+      {sel: document.getElementById('sprints-equipe'), def: 'Todas as equipes'},
+      {sel: document.getElementById('stl-equipe'), def: 'Selecione uma equipe'}
     ];
     fills.forEach(({sel, def}) => {
       sel.innerHTML = '<option value="">' + def + '</option>';
@@ -1443,7 +1474,23 @@ async function openSprintCapacity(sprintID) {
       api('/sprints/' + sprintID + '/unplanned' + qs).catch(() => null),
       api('/sprints/' + sprintID + '/burndown' + qs).catch(() => null)
     ]);
-    let html = '<button class="capacity-back-btn" onclick="loadSprints()">← Voltar</button>';
+    const fonteDadosId = data.fonte_dados_id || '';
+    const projetoChave = data.projeto_chave || '';
+    let syncStatus = null;
+    if (fonteDadosId) {
+      syncStatus = await api('/sync/status?fonte_dados_id=' + fonteDadosId).catch(() => null);
+    }
+    let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+    html += '<button class="capacity-back-btn" style="margin-bottom:0" onclick="loadSprints()">← Voltar</button>';
+    if (fonteDadosId && projetoChave) {
+      html += '<button class="btn-sm" id="sync-sprint-btn" onclick="syncSprint(\'' + sprintID + '\',\'' + fonteDadosId + '\',\'' + esc(projetoChave) + '\')" style="font-size:12px;padding:4px 12px">⟳ Sincronizar</button>';
+      if (syncStatus && syncStatus.finalizado_em) {
+        const dt = new Date(syncStatus.finalizado_em);
+        const fmt = dt.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+        html += '<span style="font-size:11px;color:var(--text-muted);opacity:0.7">Última sync: ' + fmt + '</span>';
+      }
+    }
+    html += '</div>';
     html += '<div class="sprint-detail-layout">';
     html += '<div class="capacity-panel">';
     html += '<div class="capacity-panel-header"><div><div class="capacity-panel-title">' + esc(data.sprint.nome) + '</div>';
@@ -1466,7 +1513,7 @@ async function openSprintCapacity(sprintID) {
     const pctDispClass = pctDisponivel < 10 ? 'red' : pctDisponivel < 30 ? 'amber' : 'green';
     const horasLivres = Math.max(0, data.horas_total_sprint - data.horas_alocadas);
     html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Disponível</div><div class="capacity-summary-value ' + pctDispClass + '">' + pctDisponivel.toFixed(1) + '%</div><div class="capacity-summary-detail">' + horasLivres.toFixed(1) + 'h livres</div></div>';
-    const horasPendentes = Math.max(0, data.horas_alocadas - horasExec);
+    const horasPendentes = data.horas_pendentes_execucao || 0;
     const pctPendente = data.horas_total_sprint > 0 ? (horasPendentes / data.horas_total_sprint * 100) : 0;
     const pctPendenteClass = pctPendente > 60 ? 'red' : pctPendente > 30 ? 'amber' : 'green';
     html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Pendente de Execução</div><div class="capacity-summary-value ' + pctPendenteClass + '">' + pctPendente.toFixed(1) + '%</div><div class="capacity-summary-detail">' + horasPendentes.toFixed(1) + 'h pendentes</div></div>';
@@ -1567,7 +1614,12 @@ async function openSprintCapacity(sprintID) {
     if (burndown && burndown.linha_ideal && burndown.linha_ideal.length > 0) {
       html += '<div class="sprint-chart-card"><div class="sprint-chart-title">Burndown</div>';
       html += '<div class="unplanned-disclaimer" style="margin-bottom:12px;font-size:12px"><span class="unplanned-disclaimer-icon">ℹ</span><div>Tarefas em Deploy, Teste ou Validação do Solicitante são consideradas 80% concluídas.</div></div>';
-      html += '<canvas id="burndown-canvas" width="600" height="300" style="width:100%;height:300px"></canvas></div>';
+      html += '<canvas id="burndown-canvas" width="600" height="300" style="width:100%;height:300px"></canvas>';
+      html += '<div class="gantt-legend" style="margin-top:8px">';
+      html += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--text-tertiary);opacity:.5"></div>Ideal</div>';
+      html += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--accent)"></div>Real</div>';
+      html += '<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--amber)"></div>Não Planejadas</div>';
+      html += '</div></div>';
     }
     html += '</div>';
 
@@ -1594,8 +1646,9 @@ function drawBurndown(canvas, bd) {
 
   const ideal = bd.linha_ideal || [];
   const real = bd.linha_real || [];
+  const unplanned = bd.linha_nao_planejadas || [];
   if (ideal.length === 0) return;
-  const maxH = Math.max(bd.horas_total, ...(real.length ? real.map(p => p.horas) : [0])) * 1.1;
+  const maxH = Math.max(bd.horas_total, ...(real.length ? real.map(p => p.horas) : [0]), ...(unplanned.length ? unplanned.map(p => p.horas) : [0])) * 1.1;
   const labels = ideal.map(p => { const d = new Date(p.data + 'T12:00:00'); return (d.getDate() + '').padStart(2, '0') + '/' + (d.getMonth() + 1 + '').padStart(2, '0'); });
 
   const style = getComputedStyle(document.documentElement);
@@ -1670,12 +1723,26 @@ function drawBurndown(canvas, bd) {
     }
   }
 
+  const colAmber = style.getPropertyValue('--amber').trim() || '#f59e0b';
+  if (unplanned.length > 0) {
+    const unpPts = toXY(unplanned);
+    ctx.strokeStyle = colAmber; ctx.lineWidth = 2;
+    ctx.beginPath();
+    unpPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+    unpPts.forEach(p => {
+      ctx.fillStyle = colAmber;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
   const tip = document.getElementById('gantt-tooltip');
   canvas.onmousemove = function(e) {
-    if (!real.length || !tip) return;
+    if ((!real.length && !unplanned.length) || !tip) return;
     const r = canvas.getBoundingClientRect();
     const mx = e.clientX - r.left;
     const realPts = toXY(real);
+    const unpPts = toXY(unplanned);
     let closest = null, minD = 20;
     realPts.forEach((p, i) => { const d = Math.abs(p.x - mx); if (d < minD) { minD = d; closest = i; } });
     if (closest !== null) {
@@ -1684,7 +1751,11 @@ function drawBurndown(canvas, bd) {
       tip.style.top = (e.clientY - 30) + 'px';
       const p = real[closest];
       const d = new Date(p.data + 'T12:00:00');
-      tip.textContent = (d.getDate() + '').padStart(2, '0') + '/' + (d.getMonth() + 1 + '').padStart(2, '0') + ' — ' + p.horas.toFixed(1) + 'h restantes';
+      const dateStr = (d.getDate() + '').padStart(2, '0') + '/' + (d.getMonth() + 1 + '').padStart(2, '0');
+      let txt = dateStr + ' — ' + p.horas.toFixed(1) + 'h restantes';
+      const unpMatch = unplanned.find(u => u.data === p.data);
+      if (unpMatch && unpMatch.horas > 0) { txt += ' | ' + unpMatch.horas.toFixed(1) + 'h não planejadas'; }
+      tip.textContent = txt;
     } else { tip.style.display = 'none'; }
   };
   canvas.onmouseleave = function() { if (tip) tip.style.display = 'none'; };
@@ -1715,7 +1786,8 @@ function renderCapacityCard(m, idx) {
   html += '<div class="capacity-card-name">' + esc(m.nome) + desligadoTag + (hasTarefas ? ' <span style="font-weight:400;color:var(--text-tertiary);font-size:11px">(' + m.tarefas.length + ' tarefas)</span>' : '') + '</div>';
   html += '<div class="capacity-card-pct ' + pctClass + '">' + m.percentual_alocacao.toFixed(1) + '%</div></div>';
   html += '<div class="capacity-bar"><div class="capacity-bar-fill ' + pctClass + '" style="width:' + barWidth + '%"></div></div>';
-  html += '<div class="capacity-card-detail">' + m.horas_alocadas.toFixed(1) + 'h alocadas / ' + (m.horas_executadas || 0).toFixed(1) + 'h executadas / ' + m.horas_disponiveis.toFixed(1) + 'h disponíveis</div>';
+  const horasNaoAloc = Math.max(0, m.horas_disponiveis - m.horas_alocadas);
+  html += '<div class="capacity-card-detail">' + m.horas_alocadas.toFixed(1) + 'h alocadas / ' + (m.horas_executadas || 0).toFixed(1) + 'h executadas / ' + m.horas_disponiveis.toFixed(1) + 'h total / ' + horasNaoAloc.toFixed(1) + 'h não alocadas</div>';
   html += '<div class="capacity-badges">';
   if (m.overcapacity) html += '<span class="capacity-badge overcapacity">Overcapacity</span>';
   m.ausencias.forEach(a => {
@@ -2197,6 +2269,480 @@ function startSyncPolling(fonteId, projectKey, btnEl) {
       }
     } catch(e) { /* ignore poll errors */ }
   }, 2000);
+}
+
+async function syncSprint(sprintID, fonteId, projectKey) {
+  const btn = document.getElementById('sync-sprint-btn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1s infinite;vertical-align:middle;margin-right:6px"></span>Sincronizando...';
+  btn.style.opacity = '0.7';
+  try {
+    await api('/sync/trigger?fonte_dados_id=' + fonteId + '&project_key=' + encodeURIComponent(projectKey), { method: 'POST' });
+    const poll = setInterval(async () => {
+      try {
+        const st = await api('/sync/status?fonte_dados_id=' + fonteId);
+        if (st && st.status !== 'running') {
+          clearInterval(poll);
+          openSprintCapacity(sprintID);
+        }
+      } catch(e) {}
+    }, 2000);
+    setTimeout(() => { clearInterval(poll); btn.disabled = false; btn.innerHTML = '⟳ Sincronizar'; btn.style.opacity = '1'; }, 120000);
+  } catch (err) {
+    alert('Erro ao sincronizar: ' + err.message);
+    btn.disabled = false;
+    btn.innerHTML = '⟳ Sincronizar';
+    btn.style.opacity = '1';
+  }
+}
+
+// === SPRINTS TIMELINE ===
+let stlData = null;
+let stlAno = new Date().getFullYear();
+let stlResizeTimer = null;
+window.addEventListener('resize', function() {
+  clearTimeout(stlResizeTimer);
+  stlResizeTimer = setTimeout(function() {
+    var c = document.getElementById('stl-canvas');
+    if (c && stlData !== null) drawSprintsTimeline(c, stlData, stlAno);
+  }, 150);
+});
+
+async function loadSprintsTimeline() {
+  const equipe = document.getElementById('stl-equipe').value;
+  const el = document.getElementById('stl-content');
+  const syncBtn = document.getElementById('stl-sync-btn');
+  const genBtn = document.getElementById('stl-gen-btn');
+  const syncTs = document.getElementById('stl-sync-ts');
+  syncBtn.style.display = 'none';
+  genBtn.style.display = 'none';
+  syncTs.textContent = '';
+
+  if (!equipe) {
+    el.innerHTML = '<div class="empty-state"><p>Selecione uma equipe para visualizar a timeline.</p></div>';
+    return;
+  }
+  genBtn.style.display = '';
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    stlAno = new Date().getFullYear();
+    const data = await api('/sprints/timeline?equipe=' + equipe + '&ano=' + stlAno);
+    stlData = data;
+    if (data && data.length > 0) {
+      const first = data[0];
+      if (first.fonte_dados_id) {
+        syncBtn.style.display = '';
+        syncBtn.dataset.fonteId = first.fonte_dados_id;
+        syncBtn.dataset.projectKey = first.projeto_chave || '';
+        try {
+          const st = await api('/sync/status?fonte_dados_id=' + first.fonte_dados_id);
+          if (st && st.finalizado_em) {
+            const dt = new Date(st.finalizado_em);
+            syncTs.textContent = 'Última sync: ' + dt.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+          }
+        } catch(e) {}
+      }
+    }
+    el.innerHTML = '<canvas id="stl-canvas" style="width:100%;"></canvas>';
+    drawSprintsTimeline(document.getElementById('stl-canvas'), data || [], stlAno);
+  } catch (err) {
+    el.innerHTML = '<div class="empty-state"><p>Erro: ' + esc(err.message) + '</p></div>';
+  }
+}
+
+async function syncSprintsTimeline() {
+  const btn = document.getElementById('stl-sync-btn');
+  if (!btn) return;
+  const fonteId = btn.dataset.fonteId;
+  const projectKey = btn.dataset.projectKey;
+  if (!fonteId) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1s infinite;vertical-align:middle;margin-right:6px"></span>Sincronizando...';
+  btn.style.opacity = '0.7';
+  try {
+    await api('/sync/trigger?fonte_dados_id=' + fonteId + (projectKey ? '&project_key=' + encodeURIComponent(projectKey) : ''), { method: 'POST' });
+    const poll = setInterval(async () => {
+      try {
+        const st = await api('/sync/status?fonte_dados_id=' + fonteId);
+        if (st && st.status !== 'running') {
+          clearInterval(poll);
+          btn.disabled = false;
+          btn.innerHTML = '⟳ Sincronizar';
+          btn.style.opacity = '1';
+          loadSprintsTimeline();
+        }
+      } catch(e) {}
+    }, 2000);
+    setTimeout(() => { clearInterval(poll); btn.disabled = false; btn.innerHTML = '⟳ Sincronizar'; btn.style.opacity = '1'; }, 120000);
+  } catch (err) {
+    alert('Erro ao sincronizar: ' + err.message);
+    btn.disabled = false;
+    btn.innerHTML = '⟳ Sincronizar';
+    btn.style.opacity = '1';
+  }
+}
+
+async function openGerarSprintsForm() {
+  var equipe = document.getElementById('stl-equipe').value;
+  if (!equipe) { alert('Selecione uma equipe primeiro.'); return; }
+  var el = document.getElementById('stl-content');
+  var prevHTML = el.innerHTML;
+  var today = new Date().toISOString().split('T')[0];
+  el.innerHTML = '<div style="background:var(--card-bg);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;max-width:700px">'
+    + '<h3 style="margin:0 0 16px">Gerar Sprints</h3>'
+    + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'
+    + '<div><label style="font-size:12px;color:var(--text-secondary)">Board ID</label><br>'
+    + '<input id="gen-board" type="number" placeholder="Ex: 42" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:100px">'
+    + '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">Da URL do board JIRA: /boards/<b>ID</b></div></div>'
+    + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Inicial</label><br>'
+    + '<input id="gen-start-date" type="date" min="' + today + '" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:160px"></div>'
+    + '<button class="btn-sm" style="padding:6px 16px;font-size:13px" onclick="previewGerarSprints()">Calcular</button>'
+    + '<button class="btn-sm" style="padding:6px 16px;font-size:13px;background:var(--border-subtle)" onclick="cancelGerarSprints()">Cancelar</button>'
+    + '</div>'
+    + '<div id="gen-preview" style="margin-top:16px"></div>'
+    + '</div>';
+  el.dataset.prevHtml = prevHTML;
+}
+
+function cancelGerarSprints() {
+  var el = document.getElementById('stl-content');
+  if (el.dataset.prevHtml) {
+    el.innerHTML = el.dataset.prevHtml;
+    if (stlData !== null) {
+      var c = document.getElementById('stl-canvas');
+      if (c) drawSprintsTimeline(c, stlData, stlAno);
+    }
+  } else {
+    loadSprintsTimeline();
+  }
+}
+
+async function previewGerarSprints() {
+  var equipe = document.getElementById('stl-equipe').value;
+  var boardId = document.getElementById('gen-board').value.trim();
+  var startDate = document.getElementById('gen-start-date').value;
+  if (!boardId || isNaN(parseInt(boardId))) { alert('Informe o Board ID (número).'); return; }
+  if (!startDate) { alert('Informe a Data Inicial.'); return; }
+  var previewEl = document.getElementById('gen-preview');
+  previewEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    var result = await api('/sprints/generate/preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ equipe_id: equipe, board_id: parseInt(boardId), start_date: startDate })
+    });
+    if (!result.sprints || result.sprints.length === 0) {
+      previewEl.innerHTML = '<p style="color:var(--text-secondary);font-size:13px">Todas as sprints até o final do ano já existem neste board.'
+        + (result.existentes_ignoradas > 0 ? ' (' + result.existentes_ignoradas + ' existentes ignoradas)' : '') + '</p>';
+      return;
+    }
+    var html = '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">'
+      + '<div>Prefixo detectado: <strong>' + esc(result.prefixo_detectado) + '</strong></div>'
+      + '<div>Duração detectada: <strong>' + result.duracao_detectada_dias + ' dias</strong></div>'
+      + '<div style="margin-top:4px">' + result.sprints.length + ' sprints a criar'
+      + (result.existentes_ignoradas > 0 ? ' (' + result.existentes_ignoradas + ' existentes ignoradas)' : '') + '</div></div>';
+    html += '<div style="max-height:300px;overflow-y:auto"><table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<tr style="text-align:left;border-bottom:1px solid var(--border-subtle)"><th style="padding:4px 8px">Nome</th><th style="padding:4px 8px">Início</th><th style="padding:4px 8px">Fim</th></tr>';
+    result.sprints.forEach(function(s) {
+      html += '<tr style="border-bottom:1px solid var(--border-subtle)">'
+        + '<td style="padding:4px 8px">' + esc(s.nome) + '</td>'
+        + '<td style="padding:4px 8px">' + fmtDateTimeBR(s.data_inicio) + '</td>'
+        + '<td style="padding:4px 8px">' + fmtDateTimeBR(s.data_fim) + '</td></tr>';
+    });
+    html += '</table></div>';
+    html += '<button class="btn-sm" style="margin-top:12px;padding:6px 20px;font-size:13px;background:var(--blue);color:#fff" onclick="executarGerarSprints()">Criar ' + result.sprints.length + ' Sprints no JIRA</button>';
+    previewEl.innerHTML = html;
+  } catch(err) {
+    previewEl.innerHTML = '<p style="color:var(--red)">Erro: ' + esc(err.message) + '</p>';
+  }
+}
+
+async function executarGerarSprints() {
+  var equipe = document.getElementById('stl-equipe').value;
+  var boardId = document.getElementById('gen-board').value.trim();
+  var startDate = document.getElementById('gen-start-date').value;
+  var previewEl = document.getElementById('gen-preview');
+  previewEl.innerHTML = '<div class="loading"><div class="spinner"></div></div><p style="font-size:13px;color:var(--text-secondary)">Criando sprints no JIRA...</p>';
+  try {
+    var result = await api('/sprints/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ equipe_id: equipe, board_id: parseInt(boardId), start_date: startDate })
+    });
+    var msg = result.criadas + ' sprints criadas com sucesso.';
+    if (result.erros && result.erros.length > 0) {
+      msg += '\n\nErros:\n' + result.erros.join('\n');
+    }
+    alert(msg);
+    loadSprintsTimeline();
+  } catch(err) {
+    previewEl.innerHTML = '<p style="color:var(--red)">Erro: ' + esc(err.message) + '</p>';
+  }
+}
+
+function drawSprintsTimeline(canvas, data, ano) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width;
+  const H = Math.max(350, window.innerHeight - rect.top - 16);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 30, right: 60, bottom: 50, left: 55 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  const cs = getComputedStyle(document.documentElement);
+  const colGrid = cs.getPropertyValue('--border-subtle').trim() || '#333';
+  const colText = cs.getPropertyValue('--text-tertiary').trim() || '#888';
+  const colCapacity = cs.getPropertyValue('--blue').trim() || '#3b82f6';
+  const colAllocated = cs.getPropertyValue('--accent').trim() || '#10b981';
+  const colOver = cs.getPropertyValue('--red').trim() || '#ef4444';
+  const colAmber = cs.getPropertyValue('--amber').trim() || '#f59e0b';
+  const colHeadcount = '#a78bfa';
+
+  const yearStart = new Date(ano, 0, 1);
+  const yearEnd = new Date(ano, 11, 31);
+  const yearMs = yearEnd.getTime() - yearStart.getTime();
+
+  function dateToX(d) {
+    var t = (typeof d === 'string') ? new Date(d + 'T12:00:00') : d;
+    var frac = (t.getTime() - yearStart.getTime()) / yearMs;
+    frac = Math.max(0, Math.min(1, frac));
+    return pad.left + frac * cw;
+  }
+
+  // Y axis left: percentage
+  var yMax = 100;
+  if (data.length > 0) {
+    const maxPct = Math.max(100, ...data.map(function(d) {
+      var pctCap = d.horas_maximo_teorico > 0 ? (d.horas_capacidade / d.horas_maximo_teorico * 100) : 0;
+      var pctAloc = d.horas_maximo_teorico > 0 ? (d.horas_alocadas / d.horas_maximo_teorico * 100) : 0;
+      return Math.max(pctCap, pctAloc);
+    }));
+    yMax = Math.ceil(maxPct / 20) * 20;
+  }
+
+  // Y axis right: headcount
+  var hcMax = 4;
+  if (data.length > 0) {
+    const maxHC = Math.max(1, ...data.map(function(d) { return d.headcount; }));
+    hcMax = Math.ceil(maxHC / 2) * 2 + 2;
+  }
+
+  // Grid
+  ctx.strokeStyle = colGrid;
+  ctx.lineWidth = 0.5;
+  ctx.fillStyle = colText;
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'right';
+  for (var i = 0; i <= 5; i++) {
+    var y = pad.top + ch - (i / 5) * ch;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + cw, y);
+    ctx.stroke();
+    ctx.fillText(Math.round(yMax * i / 5) + '%', pad.left - 6, y + 4);
+  }
+
+  // Right axis labels
+  ctx.textAlign = 'left';
+  for (var i = 0; i <= 4; i++) {
+    var y = pad.top + ch - (i / 4) * ch;
+    ctx.fillText(Math.round(hcMax * i / 4), pad.left + cw + 8, y + 4);
+  }
+
+  // Month separators and labels (always 12 months)
+  var months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  for (var m = 0; m < 12; m++) {
+    var mStart = new Date(ano, m, 1);
+    var mEnd = new Date(ano, m + 1, 0);
+    var x1 = dateToX(mStart);
+    var x2 = dateToX(mEnd);
+    // separator line at month start (skip Jan)
+    if (m > 0) {
+      ctx.strokeStyle = colText;
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x1, pad.top);
+      ctx.lineTo(x1, pad.top + ch);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // month label centered
+    ctx.fillStyle = colText;
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(months[m], (x1 + x2) / 2, H - 8);
+  }
+
+  // Bars — positioned by calendar date, uniform width
+  var barW = Math.min(cw / (data.length > 0 ? data.length : 1) * 0.6, 28);
+  var sprintRects = [];
+  data.forEach(function(d) {
+    var mid = (dateToX(d.data_inicio) + dateToX(d.data_fim)) / 2;
+    var bw = barW;
+    var bx = mid - bw / 2;
+
+    var pctCap = d.horas_maximo_teorico > 0 ? (d.horas_capacidade / d.horas_maximo_teorico * 100) : 0;
+    var pctAloc = d.horas_maximo_teorico > 0 ? (d.horas_alocadas / d.horas_maximo_teorico * 100) : 0;
+    var hCap = (pctCap / yMax) * ch;
+    var hAloc = (pctAloc / yMax) * ch;
+
+    ctx.fillStyle = colCapacity;
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(bx, pad.top + ch - hCap, bw, hCap);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = pctAloc > pctCap ? colOver : colAllocated;
+    ctx.fillRect(bx, pad.top + ch - hAloc, bw, hAloc);
+
+    sprintRects.push({ x: bx, w: bw, d: d, pctCap: pctCap, pctAloc: pctAloc });
+  });
+
+  // Headcount line
+  if (data.length > 0) {
+    ctx.strokeStyle = colHeadcount;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    data.forEach(function(d, i) {
+      var mid = (dateToX(d.data_inicio) + dateToX(d.data_fim)) / 2;
+      var y = pad.top + ch - (d.headcount / hcMax) * ch;
+      if (i === 0) ctx.moveTo(mid, y); else ctx.lineTo(mid, y);
+    });
+    ctx.stroke();
+
+    data.forEach(function(d) {
+      var mid = (dateToX(d.data_inicio) + dateToX(d.data_fim)) / 2;
+      var y = pad.top + ch - (d.headcount / hcMax) * ch;
+      ctx.fillStyle = colHeadcount;
+      ctx.beginPath();
+      ctx.arc(mid, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // Today line
+  var today = new Date();
+  today.setHours(12, 0, 0, 0);
+  if (today.getFullYear() === ano) {
+    var tx = dateToX(today);
+    ctx.strokeStyle = colAmber;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(tx, pad.top);
+    ctx.lineTo(tx, pad.top + ch);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = colAmber;
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('HOJE', tx, pad.top - 6);
+  }
+
+  // Sprint name labels (rotated, under each bar)
+  ctx.fillStyle = colText;
+  ctx.font = '9px system-ui';
+  data.forEach(function(d) {
+    var mid = (dateToX(d.data_inicio) + dateToX(d.data_fim)) / 2;
+    var label = d.sprint_nome.length > 14 ? d.sprint_nome.substring(0, 14) + '…' : d.sprint_nome;
+    ctx.save();
+    ctx.translate(mid, pad.top + ch + 6);
+    ctx.rotate(Math.PI / 6);
+    ctx.textAlign = 'left';
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+  });
+
+  // Legend
+  var legendY = pad.top + 2;
+  var legendX = pad.left + 8;
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = colCapacity;
+  ctx.fillRect(legendX, legendY, 12, 12);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = colText;
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText('% Capacidade', legendX + 16, legendY + 10);
+
+  ctx.fillStyle = colAllocated;
+  ctx.fillRect(legendX + 120, legendY, 12, 12);
+  ctx.fillStyle = colText;
+  ctx.fillText('% Alocadas', legendX + 136, legendY + 10);
+
+  ctx.fillStyle = colOver;
+  ctx.fillRect(legendX + 230, legendY, 12, 12);
+  ctx.fillStyle = colText;
+  ctx.fillText('Overcapacity', legendX + 246, legendY + 10);
+
+  ctx.fillStyle = colHeadcount;
+  ctx.fillRect(legendX + 350, legendY, 12, 12);
+  ctx.fillStyle = colText;
+  ctx.fillText('Headcount', legendX + 366, legendY + 10);
+
+  // Build headcount dot positions for tooltip detection
+  var hcDots = [];
+  data.forEach(function(d) {
+    var mid = (dateToX(d.data_inicio) + dateToX(d.data_fim)) / 2;
+    var y = pad.top + ch - (d.headcount / hcMax) * ch;
+    hcDots.push({ x: mid, y: y, hc: d.headcount });
+  });
+
+  // Tooltip
+  canvas.onmousemove = function(e) {
+    var r = canvas.getBoundingClientRect();
+    var mx = e.clientX - r.left;
+    var my = e.clientY - r.top;
+    var tip = document.getElementById('gantt-tooltip');
+    if (mx < pad.left || mx > pad.left + cw || my < pad.top || my > pad.top + ch) {
+      if (tip) tip.style.display = 'none';
+      return;
+    }
+    // Check headcount dots first (within 12px radius)
+    var hcHit = null;
+    for (var h = 0; h < hcDots.length; h++) {
+      var dx = mx - hcDots[h].x, dy = my - hcDots[h].y;
+      if (dx * dx + dy * dy < 144) { hcHit = hcDots[h]; break; }
+    }
+    if (hcHit) {
+      if (tip) {
+        tip.innerHTML = 'Headcount: ' + hcHit.hc;
+        tip.style.display = 'block';
+        tip.style.left = (e.clientX + 12) + 'px';
+        tip.style.top = (e.clientY - 10) + 'px';
+      }
+      return;
+    }
+    // Check sprint bars
+    var found = null;
+    for (var i = 0; i < sprintRects.length; i++) {
+      var sr = sprintRects[i];
+      if (mx >= sr.x && mx <= sr.x + sr.w) { found = sr; break; }
+    }
+    if (!found) { if (tip) tip.style.display = 'none'; return; }
+    if (tip) {
+      tip.innerHTML = '<b>' + esc(found.d.sprint_nome) + '</b><br>'
+        + found.d.data_inicio + ' — ' + found.d.data_fim + '<br>'
+        + 'Capacidade: ' + found.d.horas_capacidade.toFixed(1) + 'h (' + found.pctCap.toFixed(1) + '%)<br>'
+        + 'Alocadas: ' + found.d.horas_alocadas.toFixed(1) + 'h (' + found.pctAloc.toFixed(1) + '%)<br>'
+        + 'Máx teórico: ' + found.d.horas_maximo_teorico.toFixed(1) + 'h<br>'
+        + 'Headcount: ' + found.d.headcount;
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 12) + 'px';
+      tip.style.top = (e.clientY - 10) + 'px';
+    }
+  };
+  canvas.onmouseleave = function() {
+    var tip = document.getElementById('gantt-tooltip');
+    if (tip) tip.style.display = 'none';
+  };
 }
 
 async function deleteFonte(fonteId, nome) {
