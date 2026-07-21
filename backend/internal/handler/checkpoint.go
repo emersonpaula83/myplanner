@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
@@ -125,8 +127,12 @@ func (h *CheckpointHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.Delete(r.Context(), id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondError(w, http.StatusNotFound, "checkpoint não encontrado")
+			return
+		}
 		h.logger.Error("deleting checkpoint", zap.Error(err))
-		respondError(w, http.StatusNotFound, "checkpoint não encontrado")
+		respondError(w, http.StatusInternalServerError, "falha ao excluir checkpoint")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
