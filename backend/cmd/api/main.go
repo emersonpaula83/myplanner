@@ -6,15 +6,11 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"path/filepath"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/emersonpaula83/myplanner/backend/internal/auth"
 	"github.com/emersonpaula83/myplanner/backend/internal/config"
 	"github.com/emersonpaula83/myplanner/backend/internal/handler"
@@ -22,6 +18,10 @@ import (
 	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
@@ -133,6 +133,9 @@ func main() {
 	sprintGenService := service.NewSprintGenerationService(fonteDadosRepo, equipeRepo, syncRepo, sprintRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	sprintGenHandler := handler.NewSprintGenerationHandler(sprintGenService, logger)
 
+	equalizerSvc := service.NewEqualizerService(sprintService, sprintRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
+	equalizerHandler := handler.NewEqualizerHandler(equalizerSvc, logger)
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -219,6 +222,8 @@ func main() {
 			r.Get("/sprints/{id}/capacity", sprintHandler.GetCapacity)
 			r.Get("/sprints/{id}/unplanned", sprintHandler.GetUnplanned)
 			r.Get("/sprints/{id}/burndown", sprintHandler.GetBurndown)
+			r.Get("/sprints/{id}/equalizer", equalizerHandler.GetSuggestions)
+			r.Post("/sprints/{id}/equalizer/apply", equalizerHandler.ApplyTransfers)
 
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)
