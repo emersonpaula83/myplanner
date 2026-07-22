@@ -147,14 +147,11 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 					INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id
 					WHERE t2.sprint_id = s.id AND em.equipe_id = $%d
 				)
-				OR (
-					NOT EXISTS (SELECT 1 FROM tarefas t3 WHERE t3.sprint_id = s.id)
-					AND EXISTS (
-						SELECT 1 FROM sprints s2
-						INNER JOIN tarefas t4 ON t4.sprint_id = s2.id
-						INNER JOIN equipe_membros em2 ON em2.membro_id = t4.responsavel_id
-						WHERE s2.projeto_id = s.projeto_id AND em2.equipe_id = $%d
-					)
+				OR EXISTS (
+					SELECT 1 FROM sprints s2
+					INNER JOIN tarefas t4 ON t4.sprint_id = s2.id
+					INNER JOIN equipe_membros em2 ON em2.membro_id = t4.responsavel_id
+					WHERE s2.projeto_id = s.projeto_id AND em2.equipe_id = $%d
 				)
 			)`, argN, argN)
 		} else {
