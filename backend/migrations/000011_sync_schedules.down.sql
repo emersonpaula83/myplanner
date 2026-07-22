@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS sync_schedules;
+ALTER TABLE sync_logs DROP COLUMN IF EXISTS origem;

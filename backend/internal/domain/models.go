@@ -173,4 +173,5 @@ type SyncLog struct {
 	Erros          json.RawMessage `json:"erros" db:"erros"`
 	Mensagem       *string         `json:"mensagem" db:"mensagem"`
 	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
+	Origem         string          `json:"origem" db:"origem"`
 }

@@ -143,6 +143,42 @@ func (s *SyncService) SyncProject(ctx context.Context, fonteDadosID uuid.UUID, p
 		Tipo:         "project",
 		Status:       "running",
 		IniciadoEm:   time.Now(),
+		Origem:       "manual",
+	}
+	if err := s.repo.CreateSyncLog(ctx, syncLog); err != nil {
+		return nil, fmt.Errorf("creating sync log: %w", err)
+	}
+
+	go s.runProjectSync(client, fonte, projectKey, syncLog.ID)
+
+	return syncLog, nil
+}
+
+func (s *SyncService) SyncProjectScheduled(ctx context.Context, fonteDadosID uuid.UUID, projectKey string) (*domain.SyncLog, error) {
+	running, err := s.repo.HasRunningSync(ctx, fonteDadosID)
+	if err != nil {
+		return nil, err
+	}
+	if running {
+		return nil, ErrSyncAlreadyRunning
+	}
+
+	fonte, err := s.getFonte(ctx, fonteDadosID)
+	if err != nil {
+		return nil, err
+	}
+	client, err := s.buildClient(ctx, fonte)
+	if err != nil {
+		return nil, err
+	}
+
+	syncLog := &domain.SyncLog{
+		ID:           uuid.New(),
+		FonteDadosID: fonte.ID,
+		Tipo:         "project",
+		Status:       "running",
+		IniciadoEm:   time.Now(),
+		Origem:       "scheduled",
 	}
 	if err := s.repo.CreateSyncLog(ctx, syncLog); err != nil {
 		return nil, fmt.Errorf("creating sync log: %w", err)
@@ -250,6 +286,7 @@ func (s *SyncService) syncOne(ctx context.Context, fonte *domain.FonteDados) (*d
 		Tipo:         "full",
 		Status:       "running",
 		IniciadoEm:   time.Now(),
+		Origem:       "manual",
 	}
 	if err := s.repo.CreateSyncLog(ctx, syncLog); err != nil {
 		return nil, fmt.Errorf("creating sync log: %w", err)

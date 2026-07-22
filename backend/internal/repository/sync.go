@@ -218,10 +218,14 @@ func (r *SyncRepository) HasRunningSync(ctx context.Context, fonteDadosID uuid.U
 }
 
 func (r *SyncRepository) CreateSyncLog(ctx context.Context, log *domain.SyncLog) error {
+	origem := log.Origem
+	if origem == "" {
+		origem = "manual"
+	}
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO sync_logs (id, fonte_dados_id, tipo, status, iniciado_em, mensagem)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, log.ID, log.FonteDadosID, log.Tipo, log.Status, log.IniciadoEm, log.Mensagem)
+		INSERT INTO sync_logs (id, fonte_dados_id, tipo, status, iniciado_em, mensagem, origem)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, log.ID, log.FonteDadosID, log.Tipo, log.Status, log.IniciadoEm, log.Mensagem, origem)
 	if err != nil {
 		return fmt.Errorf("creating sync log: %w", err)
 	}
@@ -261,7 +265,7 @@ func (r *SyncRepository) GetLatestSyncLog(ctx context.Context, fonteDadosID uuid
 	err := r.pool.QueryRow(ctx, `
 		SELECT id, fonte_dados_id, tipo, status, iniciado_em, finalizado_em,
 		       total_projetos, total_tarefas, total_membros, total_sprints,
-		       erros, mensagem, created_at
+		       erros, mensagem, created_at, origem
 		FROM sync_logs
 		WHERE fonte_dados_id = $1
 		ORDER BY iniciado_em DESC
@@ -269,7 +273,7 @@ func (r *SyncRepository) GetLatestSyncLog(ctx context.Context, fonteDadosID uuid
 	`, fonteDadosID).Scan(
 		&log.ID, &log.FonteDadosID, &log.Tipo, &log.Status, &log.IniciadoEm, &log.FinalizadoEm,
 		&log.TotalProjetos, &log.TotalTarefas, &log.TotalMembros, &log.TotalSprints,
-		&log.Erros, &log.Mensagem, &log.CreatedAt,
+		&log.Erros, &log.Mensagem, &log.CreatedAt, &log.Origem,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -287,7 +291,7 @@ func (r *SyncRepository) ListSyncLogs(ctx context.Context, fonteDadosID uuid.UUI
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, fonte_dados_id, tipo, status, iniciado_em, finalizado_em,
 		       total_projetos, total_tarefas, total_membros, total_sprints,
-		       erros, mensagem, created_at
+		       erros, mensagem, created_at, origem
 		FROM sync_logs
 		WHERE fonte_dados_id = $1
 		ORDER BY iniciado_em DESC
@@ -304,7 +308,7 @@ func (r *SyncRepository) ListSyncLogs(ctx context.Context, fonteDadosID uuid.UUI
 		if err := rows.Scan(
 			&log.ID, &log.FonteDadosID, &log.Tipo, &log.Status, &log.IniciadoEm, &log.FinalizadoEm,
 			&log.TotalProjetos, &log.TotalTarefas, &log.TotalMembros, &log.TotalSprints,
-			&log.Erros, &log.Mensagem, &log.CreatedAt,
+			&log.Erros, &log.Mensagem, &log.CreatedAt, &log.Origem,
 		); err != nil {
 			return nil, fmt.Errorf("scanning sync log: %w", err)
 		}

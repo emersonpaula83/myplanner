@@ -113,6 +113,23 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .sidebar-item.active svg { stroke: var(--sidebar-active); }
 .sidebar-item.active .sidebar-item-label { color: var(--sidebar-active); }
 .sidebar-item.active::before { content: ''; position: absolute; left: -12px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 2px 2px 0; background: var(--sidebar-active); }
+.sidebar-group { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-group-header { height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; position: relative; border: none; background: none; padding: 0; flex-shrink: 0; gap: 10px; }
+.sidebar.expanded .sidebar-group-header { justify-content: flex-start; padding: 0 10px; width: auto; }
+.sidebar:not(.expanded) .sidebar-group-header { width: 36px; }
+.sidebar-group-header svg { width: 20px; height: 20px; stroke: var(--sidebar-icon); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.sidebar-group-header:hover { background: rgba(255,255,255,.08); }
+.sidebar-group-header .sidebar-item-label { font-size: 13px; color: var(--sidebar-icon); white-space: nowrap; opacity: 0; width: 0; overflow: hidden; transition: opacity .15s, width .2s; }
+.sidebar.expanded .sidebar-group-header .sidebar-item-label { opacity: 1; width: auto; }
+.sidebar-group-header .sidebar-arrow { font-size: 10px; color: var(--sidebar-icon); margin-left: auto; opacity: 0; transition: opacity .15s, transform .2s; }
+.sidebar.expanded .sidebar-group-header .sidebar-arrow { opacity: 1; }
+.sidebar-group.open .sidebar-group-header .sidebar-arrow { transform: rotate(90deg); }
+.sidebar-group.open .sidebar-group-header svg { stroke: var(--sidebar-active); }
+.sidebar-group.open .sidebar-group-header .sidebar-item-label { color: var(--sidebar-active); }
+.sidebar-group-items { display: none; flex-direction: column; gap: 2px; }
+.sidebar-group.open .sidebar-group-items { display: flex; }
+.sidebar.expanded .sidebar-group-items .sidebar-item { padding-left: 30px; }
+.sidebar-group-items .sidebar-item { height: 32px; }
 .sidebar-spacer { flex: 1; }
 @media (max-width: 700px) { .sidebar { display: none; } }
 
@@ -277,7 +294,23 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .counter-bump { animation: counter-bump .3s ease-out; display: inline-block; }
 .fonte-card-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px; font-variant-numeric: tabular-nums; }
 .fonte-card-stat b { color: var(--text-primary); font-weight: 600; }
-.fonte-card-actions { display: flex; gap: 8px; }
+.fonte-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.schedule-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.schedule-toggle-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--text-primary); display: inline-flex; align-items: center; gap: 6px; font-family: inherit; }
+.schedule-toggle-btn:hover { background: var(--surface-raised); border-color: var(--accent); }
+.schedule-panel { margin-top: 10px; }
+.schedule-project-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.schedule-project-row .project-key { font-weight: 600; min-width: 80px; font-size: 13px; }
+.schedule-times { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding-left: 28px; padding-bottom: 6px; }
+.schedule-times input[type="time"] { padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; background: var(--surface); color: var(--text-primary); font-family: inherit; }
+.schedule-add-time { background: none; border: 1px dashed var(--border); border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 12px; color: var(--text-secondary); font-family: inherit; }
+.schedule-add-time:hover { border-color: var(--accent); color: var(--accent); }
+.schedule-remove-time { background: none; border: none; cursor: pointer; color: var(--red); font-size: 14px; padding: 0 2px; }
+.schedule-actions { margin-top: 10px; display: flex; gap: 8px; }
+.schedule-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft, rgba(59,130,246,.1)); color: var(--accent); font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+.schedule-next { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.schedule-summary { margin-top: 8px; padding: 8px 10px; background: var(--surface-raised, rgba(59,130,246,.05)); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.schedule-summary b { color: var(--accent); }
 .btn-sm { padding: 7px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); transition: all .15s; font-family: inherit; }
 .btn-sm:hover { background: var(--surface-raised); border-color: var(--accent); color: var(--accent); }
 .btn-sm:disabled { opacity: .5; cursor: not-allowed; }
@@ -527,10 +560,6 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
       <span class="sidebar-item-label">Equipes</span>
     </button>
-    <button class="sidebar-item" data-page="timeline" title="Timeline de Capacidade" onclick="navigate('timeline')">
-      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
-      <span class="sidebar-item-label">Timeline de Capacidade</span>
-    </button>
     <button class="sidebar-item" data-page="projetos" title="Projetos" onclick="navigate('projetos')">
       <svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
       <span class="sidebar-item-label">Projetos</span>
@@ -539,10 +568,23 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
       <span class="sidebar-item-label">Sprints</span>
     </button>
-    <button class="sidebar-item" data-page="sprints-timeline" title="Sprints Timeline" onclick="navigate('sprints-timeline')">
-      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="12" width="3" height="6"/></svg>
-      <span class="sidebar-item-label">Sprints Timeline</span>
-    </button>
+    <div class="sidebar-group" id="sidebar-group-relatorios">
+      <button class="sidebar-group-header" title="Relatórios" onclick="toggleSidebarGroup('relatorios')">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="12" width="3" height="6"/></svg>
+        <span class="sidebar-item-label">Relatórios</span>
+        <span class="sidebar-arrow">▶</span>
+      </button>
+      <div class="sidebar-group-items">
+        <button class="sidebar-item" data-page="timeline" title="Capacity Timeline" onclick="navigate('timeline')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+          <span class="sidebar-item-label">Capacity Timeline</span>
+        </button>
+        <button class="sidebar-item" data-page="sprints-timeline" title="Sprints Timeline" onclick="navigate('sprints-timeline')">
+          <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 5-6"/></svg>
+          <span class="sidebar-item-label">Sprints Timeline</span>
+        </button>
+      </div>
+    </div>
     <button class="sidebar-item" data-page="usuarios" title="Usuários" onclick="navigate('usuarios')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg>
       <span class="sidebar-item-label">Usuários</span>
@@ -884,11 +926,19 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   document.querySelectorAll('.sidebar-item[data-page]').forEach(i => i.classList.toggle('active', i.dataset.page === page));
+  const reportPages = ['timeline', 'sprints-timeline'];
+  const group = document.getElementById('sidebar-group-relatorios');
+  if (group && reportPages.includes(page)) { group.classList.add('open'); }
   if (page === 'usuarios') loadUsuarios();
   if (page === 'fontes') loadFontes();
   if (page === 'projetos') loadProjetos();
   if (page === 'sprints') loadSprints();
   if (page === 'sprints-timeline') loadSprintsTimeline();
+}
+
+function toggleSidebarGroup(name) {
+  const group = document.getElementById('sidebar-group-' + name);
+  if (group) group.classList.toggle('open');
 }
 
 // === EQUIPES ===
@@ -2146,6 +2196,10 @@ async function renderFonteCards(fontes, el) {
   for (const f of fontes) {
     let syncStatus = null;
     try { syncStatus = await api('/sync/status?fonte_dados_id=' + f.id); } catch(e) {}
+    let schedule = null;
+    try { schedule = await api('/sync/schedules?fonte_dados_id=' + f.id); } catch(e) {}
+    const hasSchedule = schedule && schedule.ativo && schedule.project_keys && schedule.project_keys.length > 0;
+    const scheduleBadge = hasSchedule ? '<span class="schedule-badge">🕐 Agendado</span>' : '';
     const hasSync = syncStatus && syncStatus.status && syncStatus.status !== 'never_synced';
     const statusClass = hasSync ? syncStatus.status : 'never';
     const statusLabel = hasSync ? (syncStatus.status === 'success' ? 'Sincronizado' : syncStatus.status === 'running' ? 'Sincronizando...' : syncStatus.status === 'partial' ? 'Parcial' : 'Erro') : 'Nunca sincronizado';
@@ -2157,7 +2211,16 @@ async function renderFonteCards(fontes, el) {
     const statsHtml = '<div class="fonte-card-stats' + syncingClass + '"><span><b>' + (hasSync ? (syncStatus.total_projetos||0) : 0) + '</b> projetos</span><span><b>' + (hasSync ? (syncStatus.total_tarefas||0) : 0) + '</b> tarefas</span><span><b>' + (hasSync ? (syncStatus.total_membros||0) : 0) + '</b> membros</span><span><b>' + (hasSync ? (syncStatus.total_sprints||0) : 0) + '</b> sprints</span></div>';
     const authBadge = f.auth_type === 'oauth2' ? '<span class="auth-badge oauth">OAuth</span>' : '<span class="auth-badge basic">Token</span>';
     const reconnectBtn = f.auth_type === 'oauth2' ? '<button class="btn-sm" onclick="startOAuthConnect(\'' + f.id + '\')">Reconectar</button>' : '';
-    html += '<div class="fonte-card" data-fonte-id="' + f.id + '"><div class="fonte-card-header"><span class="fonte-card-name">' + esc(f.nome) + '</span>' + authBadge + '</div><div class="fonte-card-url">' + esc(f.base_url) + '</div><div class="fonte-card-sync"><span class="fonte-card-sync-dot ' + statusClass + '"></span><span class="fonte-card-sync-label">' + statusLabel + '</span>' + (f.ultimo_sync ? ' — ' + lastSync : '') + '</div>' + progressBarHtml + statsHtml + '<div class="fonte-card-actions"><button class="btn-sm primary" onclick="openProjectsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Sincronizar Projetos</button>' + reconnectBtn + '<button class="btn-sm" onclick="openLogsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Logs</button><button class="btn-sm danger" onclick="deleteFonte(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Excluir</button></div></div>';
+    const nextSync = hasSchedule ? computeNextSync(schedule) : '';
+    let scheduleSummary = '';
+    if (hasSchedule) {
+      const keys = schedule.project_keys.join(', ');
+      const times = schedule.horarios.join(', ');
+      const nextHtml = nextSync ? ' · Próximo: <b>' + nextSync + '</b>' : '';
+      scheduleSummary = '<div class="schedule-summary"><span>📋 ' + keys + '</span><span>🕐 ' + times + '</span>' + nextHtml + '</div>';
+    }
+    const scheduleSection = '<div class="schedule-section"><button class="schedule-toggle-btn" onclick="toggleSchedulePanel(\'' + f.id + '\')">🕐 Agendar Sync</button>' + scheduleSummary + '<div class="schedule-panel" id="schedule-panel-' + f.id + '" style="display:none"></div></div>';
+    html += '<div class="fonte-card" data-fonte-id="' + f.id + '"><div class="fonte-card-header"><span class="fonte-card-name">' + esc(f.nome) + '</span>' + scheduleBadge + authBadge + '</div><div class="fonte-card-url">' + esc(f.base_url) + '</div><div class="fonte-card-sync"><span class="fonte-card-sync-dot ' + statusClass + '"></span><span class="fonte-card-sync-label">' + statusLabel + '</span>' + (f.ultimo_sync ? ' — ' + lastSync : '') + '</div>' + progressBarHtml + statsHtml + '<div class="fonte-card-actions"><button class="btn-sm primary" onclick="openProjectsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Sincronizar Projetos</button>' + reconnectBtn + '<button class="btn-sm" onclick="openLogsModal(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Logs</button><button class="btn-sm danger" onclick="deleteFonte(\'' + f.id + '\',\'' + esc(f.nome) + '\')">Excluir</button></div>' + scheduleSection + '</div>';
   }
   html += '</div>'; el.innerHTML = html;
   for (const f of _runningFontes) {
@@ -3014,10 +3077,173 @@ async function loadSyncLogs(fonteId) {
     logs.forEach(l => {
       const statusCls = l.status || 'running';
       const statusTxt = l.status === 'success' ? 'OK' : l.status === 'partial' ? 'Parcial' : l.status === 'running' ? 'Em andamento' : 'Erro';
-      html += '<div class="sync-log-row"><span class="sync-log-status ' + statusCls + '">' + statusTxt + '</span><span class="sync-log-time">' + formatDate(l.iniciado_em) + '</span><span class="sync-log-totals">' + l.total_projetos + ' proj, ' + l.total_tarefas + ' tarefas, ' + l.total_membros + ' membros' + (l.mensagem ? ' — ' + esc(l.mensagem) : '') + '</span></div>';
+      const origemBadge = l.origem === 'scheduled' ? '<span style="font-size:10px;background:var(--accent-soft,rgba(59,130,246,.1));color:var(--accent);padding:1px 6px;border-radius:8px;margin-left:4px">agendado</span>' : '';
+      html += '<div class="sync-log-row"><span class="sync-log-status ' + statusCls + '">' + statusTxt + '</span>' + origemBadge + '<span class="sync-log-time">' + formatDate(l.iniciado_em) + '</span><span class="sync-log-totals">' + l.total_projetos + ' proj, ' + l.total_tarefas + ' tarefas, ' + l.total_membros + ' membros' + (l.mensagem ? ' — ' + esc(l.mensagem) : '') + '</span></div>';
     });
     el.innerHTML = html + '</div>';
   } catch (err) { el.innerHTML = '<div class="empty-state" style="padding:30px"><div class="empty-state-text">' + esc(err.message) + '</div></div>'; }
+}
+
+// === SYNC AGENDADO ===
+function computeNextSync(schedule) {
+  if (!schedule || !schedule.horarios || !schedule.horarios.length) return '';
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  let closest = null;
+  for (const h of schedule.horarios) {
+    const [hh, mm] = h.split(':').map(Number);
+    const mins = hh * 60 + mm;
+    const diff = mins > nowMins ? mins - nowMins : mins + 1440 - nowMins;
+    if (closest === null || diff < closest.diff) {
+      closest = { time: h, diff: diff };
+    }
+  }
+  return closest ? closest.time : '';
+}
+
+async function toggleSchedulePanel(fonteId) {
+  const panel = document.getElementById('schedule-panel-' + fonteId);
+  if (panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+  panel.innerHTML = '<div style="padding:10px;color:var(--text-secondary)">Carregando...</div>';
+
+  let projects, schedule;
+  try {
+    [projects, schedule] = await Promise.all([
+      api('/sync/projects?fonte_dados_id=' + fonteId),
+      api('/sync/schedules?fonte_dados_id=' + fonteId)
+    ]);
+  } catch(e) {
+    panel.innerHTML = '<div style="padding:10px;color:var(--red)">Erro ao carregar: ' + esc(e.message) + '</div>';
+    return;
+  }
+
+  const selectedKeys = schedule && schedule.project_keys ? schedule.project_keys : [];
+  const horarios = schedule && schedule.horarios ? schedule.horarios : [];
+  const ativo = schedule ? schedule.ativo : true;
+
+  let html = '<div style="font-size:13px;font-weight:600;margin-bottom:8px">Projetos</div>';
+  for (const p of projects) {
+    const checked = selectedKeys.includes(p.key) ? 'checked' : '';
+    html += '<div class="schedule-project-row" data-project-key="' + esc(p.key) + '">';
+    html += '<input type="checkbox" class="schedule-project-check" ' + checked + '>';
+    html += '<span class="project-key">' + esc(p.key) + '</span>';
+    html += '<span style="font-size:12px;color:var(--text-secondary)">' + esc(p.name) + '</span>';
+    html += '</div>';
+  }
+
+  html += '<div style="font-size:13px;font-weight:600;margin:12px 0 8px">Horários</div>';
+  html += '<div class="schedule-times" id="schedule-times-' + fonteId + '">';
+  for (const h of horarios) {
+    html += '<input type="time" value="' + h + '" class="schedule-time-input">';
+    html += '<button class="schedule-remove-time" onclick="removeScheduleTime(this)">×</button>';
+  }
+  if (horarios.length < 4) {
+    html += '<button class="schedule-add-time" onclick="addScheduleTime(this,\'' + fonteId + '\')">+ horário</button>';
+  }
+  html += '</div>';
+
+  if (schedule) {
+    const ativoChecked = ativo ? 'checked' : '';
+    html += '<div style="margin-top:8px"><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" ' + ativoChecked + ' onchange="toggleScheduleAtivo(\'' + schedule.id + '\',this.checked)"> Agendamento ativo</label></div>';
+  }
+
+  html += '<div class="schedule-actions">';
+  html += '<button class="btn-sm primary" onclick="saveSchedule(\'' + fonteId + '\')">Salvar</button>';
+  if (schedule) {
+    html += '<button class="btn-sm danger" onclick="deleteSchedule(\'' + fonteId + '\')">Excluir Agendamento</button>';
+  }
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+function addScheduleTime(btn, fonteId) {
+  const container = document.getElementById('schedule-times-' + fonteId);
+  const inputs = container.querySelectorAll('.schedule-time-input');
+  if (inputs.length >= 4) return;
+
+  const input = document.createElement('input');
+  input.type = 'time';
+  input.className = 'schedule-time-input';
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'schedule-remove-time';
+  removeBtn.textContent = '×';
+  removeBtn.onclick = function() { input.remove(); removeBtn.remove(); checkScheduleAddBtn(container); };
+
+  btn.before(input, removeBtn);
+  if (inputs.length + 1 >= 4) btn.style.display = 'none';
+}
+
+function removeScheduleTime(btn) {
+  const container = btn.parentElement;
+  btn.previousElementSibling.remove();
+  btn.remove();
+  checkScheduleAddBtn(container);
+}
+
+function checkScheduleAddBtn(container) {
+  const inputs = container.querySelectorAll('.schedule-time-input');
+  const addBtn = container.querySelector('.schedule-add-time');
+  if (addBtn) addBtn.style.display = inputs.length < 4 ? '' : 'none';
+}
+
+async function toggleScheduleAtivo(schedId, ativo) {
+  try {
+    await api('/sync/schedules/' + schedId + '/toggle', { method: 'PATCH', body: JSON.stringify({ ativo }) });
+    alert(ativo ? 'Agendamento ativado' : 'Agendamento pausado');
+  } catch (e) {
+    alert('Erro ao alterar agendamento');
+  }
+}
+
+async function saveSchedule(fonteId) {
+  const panel = document.getElementById('schedule-panel-' + fonteId);
+  const rows = panel.querySelectorAll('.schedule-project-row');
+  const project_keys = [];
+  for (const row of rows) {
+    if (row.querySelector('.schedule-project-check').checked) {
+      project_keys.push(row.dataset.projectKey);
+    }
+  }
+
+  if (project_keys.length === 0) {
+    alert('Selecione ao menos um projeto');
+    return;
+  }
+
+  const timesContainer = document.getElementById('schedule-times-' + fonteId);
+  const inputs = timesContainer.querySelectorAll('.schedule-time-input');
+  const horarios = Array.from(inputs).map(i => i.value).filter(v => v);
+
+  if (horarios.length === 0) {
+    alert('Adicione ao menos um horário');
+    return;
+  }
+
+  try {
+    await api('/sync/schedules', {
+      method: 'PUT',
+      body: JSON.stringify({ fonte_dados_id: fonteId, project_keys, horarios })
+    });
+    alert('Agendamento salvo');
+    loadFontes();
+  } catch (e) {
+    alert('Erro ao salvar: ' + e.message);
+  }
+}
+
+async function deleteSchedule(fonteId) {
+  if (!confirm('Excluir agendamento desta fonte?')) return;
+  try {
+    await api('/sync/schedules?fonte_dados_id=' + fonteId, { method: 'DELETE' });
+    alert('Agendamento excluído');
+    loadFontes();
+  } catch (e) {
+    alert('Erro ao excluir: ' + e.message);
+  }
 }
 
 // === DESLIGAMENTO ===

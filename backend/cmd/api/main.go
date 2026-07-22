@@ -125,6 +125,11 @@ func main() {
 	syncService := service.NewSyncService(syncRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	syncHandler := handler.NewSyncHandler(syncService, logger)
 
+	scheduleRepo := repository.NewSyncScheduleRepository(pool)
+	scheduleHandler := handler.NewSyncScheduleHandler(scheduleRepo, logger)
+	schedulerSvc := service.NewSchedulerService(syncService, scheduleRepo, logger)
+	go schedulerSvc.Start(ctx)
+
 	sprintGenService := service.NewSprintGenerationService(fonteDadosRepo, equipeRepo, syncRepo, sprintRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	sprintGenHandler := handler.NewSprintGenerationHandler(sprintGenService, logger)
 
@@ -132,7 +137,7 @@ func main() {
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
@@ -219,6 +224,11 @@ func main() {
 			r.Get("/sync/status", syncHandler.GetSyncStatus)
 			r.Get("/sync/logs", syncHandler.ListSyncLogs)
 			r.Get("/sync/projects", syncHandler.ListJiraProjects)
+
+			r.Get("/sync/schedules", scheduleHandler.Get)
+			r.Put("/sync/schedules", scheduleHandler.Upsert)
+			r.Delete("/sync/schedules", scheduleHandler.Delete)
+			r.Patch("/sync/schedules/{id}/toggle", scheduleHandler.Toggle)
 		})
 	})
 
