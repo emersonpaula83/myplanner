@@ -515,6 +515,20 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .membro-detail-info h2 { font-size: 20px; font-weight: 650; color: var(--text-primary); margin: 0 0 4px; }
 .membro-detail-info p { font-size: 13px; color: var(--text-secondary); margin: 0; }
 .membro-detail-info .team-badge { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+.skill-section { margin-bottom: 16px; }
+.skill-badges { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.skill-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); color: var(--accent); border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+.skill-badge .skill-remove { cursor: pointer; opacity: .6; font-size: 14px; line-height: 1; }
+.skill-badge .skill-remove:hover { opacity: 1; }
+.skill-add-btn { cursor: pointer; width: 22px; height: 22px; border-radius: 50%; border: 1.5px dashed var(--border); background: none; color: var(--text-secondary); font-size: 14px; display: inline-flex; align-items: center; justify-content: center; transition: border-color .15s, color .15s; }
+.skill-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+.skill-input-wrap { position: relative; display: inline-block; margin-top: 6px; }
+.skill-input-wrap input { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); width: 200px; }
+.skill-dropdown { position: absolute; top: 100%; left: 0; width: 200px; max-height: 160px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; z-index: 100; display: none; }
+.skill-dropdown.open { display: block; }
+.skill-dropdown-item { padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--text-primary); }
+.skill-dropdown-item:hover { background: var(--accent-soft); }
+.skill-dropdown-item.create { color: var(--accent); font-style: italic; }
 .membro-detail-period-chips { display: flex; gap: 6px; margin-bottom: 16px; }
 .membro-detail-period-chips .chip { cursor: pointer; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--chip-bg); color: var(--chip-text); border: none; transition: background .15s, color .15s; }
 .membro-detail-period-chips .chip.active { background: var(--chip-active-bg); color: var(--chip-active-text); }
@@ -2119,6 +2133,7 @@ async function loadMembroDetail(membroId, periodo) {
         '<button class="btn-sm" onclick="salvarDesligamento(\'' + membroId + '\')">Salvar</button>' +
         (m.data_desligamento ? '<button class="btn-sm danger" onclick="limparDesligamento(\'' + membroId + '\')">Limpar</button>' : '') +
       '</div>' +
+      '<div class="skill-section" id="membro-skills-section"></div>' +
       '<div class="membro-detail-period-chips" id="membro-period-chips"><span style="font-size:12px;color:var(--text-secondary);margin-right:4px">Período</span>' + periodChips + '</div>' +
       '<div class="membro-stats-grid">' +
         '<div class="membro-stat-card"><div class="membro-stat-label">Total Tarefas</div><div class="membro-stat-value">' + s.total_tarefas + '</div></div>' +
@@ -2140,6 +2155,8 @@ async function loadMembroDetail(membroId, periodo) {
         loadMembroDetail(membroId, chip.dataset.period);
       });
     });
+
+    loadMembroSkills(membroId);
   } catch (err) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(err.message) + '</div></div>';
   }
@@ -3511,6 +3528,121 @@ document.addEventListener('click', e => {
     results.classList.remove('open');
   }
 });
+
+// === SKILLS (membro detail) ===
+let skillSearchTimer = null;
+
+async function loadMembroSkills(membroId) {
+  const section = document.getElementById('membro-skills-section');
+  if (!section) return;
+  try {
+    const skills = await api('/membros/' + membroId + '/skills');
+    renderMembroSkills(skills, membroId, section);
+  } catch (err) {
+    section.innerHTML = '';
+  }
+}
+
+function renderMembroSkills(skills, membroId, container) {
+  let html = '<div class="skill-badges">';
+  skills.forEach(function(s) {
+    html += '<span class="skill-badge">' + esc(s.nome) +
+      '<span class="skill-remove" onclick="removeSkillFromMembro(\'' + membroId + '\',\'' + s.id + '\')">&times;</span></span>';
+  });
+  if (skills.length === 0) {
+    html += '<span style="font-size:12px;color:var(--text-secondary)">Nenhuma skill cadastrada</span>';
+  }
+  html += '<button class="skill-add-btn" onclick="showSkillInput(\'' + membroId + '\')" title="Adicionar skill">+</button>';
+  html += '</div>';
+  html += '<div class="skill-input-wrap" id="skill-input-wrap-' + membroId + '" style="display:none">' +
+    '<input type="text" id="skill-input-' + membroId + '" placeholder="Adicionar skill..." ' +
+    'oninput="searchSkills(\'' + membroId + '\')" onkeydown="skillInputKeydown(event,\'' + membroId + '\')">' +
+    '<div class="skill-dropdown" id="skill-dropdown-' + membroId + '"></div></div>';
+  container.innerHTML = html;
+}
+
+function showSkillInput(membroId) {
+  var wrap = document.getElementById('skill-input-wrap-' + membroId);
+  wrap.style.display = 'inline-block';
+  var inp = document.getElementById('skill-input-' + membroId);
+  inp.value = '';
+  inp.focus();
+}
+
+function searchSkills(membroId) {
+  clearTimeout(skillSearchTimer);
+  var inp = document.getElementById('skill-input-' + membroId);
+  var q = inp.value.trim();
+  var dd = document.getElementById('skill-dropdown-' + membroId);
+  if (q.length === 0) { dd.classList.remove('open'); return; }
+  skillSearchTimer = setTimeout(async function() {
+    try {
+      var skills = await api('/skills?q=' + encodeURIComponent(q));
+      var html = '';
+      skills.forEach(function(s) {
+        html += '<div class="skill-dropdown-item" onclick="addSkillToMembro(\'' + membroId + '\',\'' + s.id + '\')">' + esc(s.nome) + '</div>';
+      });
+      var exactMatch = skills.some(function(s) { return s.nome.toLowerCase() === q.toLowerCase(); });
+      if (!exactMatch && q.length > 0) {
+        html += '<div class="skill-dropdown-item create" onclick="createAndAddSkill(\'' + membroId + '\')">+ Criar "' + esc(q) + '"</div>';
+      }
+      dd.innerHTML = html;
+      dd.classList.add('open');
+    } catch (err) {
+      dd.classList.remove('open');
+    }
+  }, 300);
+}
+
+function skillInputKeydown(e, membroId) {
+  if (e.key === 'Escape') {
+    var wrap = document.getElementById('skill-input-wrap-' + membroId);
+    wrap.style.display = 'none';
+    document.getElementById('skill-dropdown-' + membroId).classList.remove('open');
+  }
+  if (e.key === 'Enter') {
+    var dd = document.getElementById('skill-dropdown-' + membroId);
+    var createItem = dd.querySelector('.skill-dropdown-item.create');
+    if (createItem) createItem.click();
+  }
+}
+
+async function addSkillToMembro(membroId, skillId) {
+  try {
+    await api('/membros/' + membroId + '/skills', { method: 'POST', body: JSON.stringify({ skill_id: skillId }) });
+    var wrap = document.getElementById('skill-input-wrap-' + membroId);
+    wrap.style.display = 'none';
+    document.getElementById('skill-dropdown-' + membroId).classList.remove('open');
+    loadMembroSkills(membroId);
+  } catch (err) {
+    alert('Falha ao associar skill');
+  }
+}
+
+async function createAndAddSkill(membroId) {
+  var inp = document.getElementById('skill-input-' + membroId);
+  var nome = inp ? inp.value.trim() : '';
+  if (!nome) return;
+  try {
+    var skill = await api('/skills', { method: 'POST', body: JSON.stringify({ nome: nome }) });
+    await api('/membros/' + membroId + '/skills', { method: 'POST', body: JSON.stringify({ skill_id: skill.id }) });
+    var wrap = document.getElementById('skill-input-wrap-' + membroId);
+    wrap.style.display = 'none';
+    document.getElementById('skill-dropdown-' + membroId).classList.remove('open');
+    loadMembroSkills(membroId);
+  } catch (err) {
+    alert('Falha ao criar skill');
+  }
+}
+
+async function removeSkillFromMembro(membroId, skillId) {
+  try {
+    await api('/membros/' + membroId + '/skills/' + skillId, { method: 'DELETE' });
+    loadMembroSkills(membroId);
+  } catch (err) {
+    alert('Falha ao remover skill');
+  }
+}
 
 // === INIT ===
 if (token) { api('/usuarios').then(() => showApp()).catch(() => logout()); }
