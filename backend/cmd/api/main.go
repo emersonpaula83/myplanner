@@ -136,6 +136,9 @@ func main() {
 	equalizerSvc := service.NewEqualizerService(sprintService, sprintRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	equalizerHandler := handler.NewEqualizerHandler(equalizerSvc, logger)
 
+	skillRepo := repository.NewSkillRepository(pool)
+	skillHandler := handler.NewSkillHandler(skillRepo, logger)
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -203,6 +206,14 @@ func main() {
 			r.Put("/membros/{id}/disponibilidade/{dispId}", membroHandler.UpdateDisponibilidade)
 			r.Delete("/membros/{id}/disponibilidade/{dispId}", membroHandler.DeleteDisponibilidade)
 			r.Put("/membros/{id}/desligamento", membroHandler.UpdateDataDesligamento)
+
+			r.Get("/skills", skillHandler.List)
+			r.Post("/skills", skillHandler.Create)
+			r.Delete("/skills/{id}", skillHandler.Delete)
+
+			r.Get("/membros/{id}/skills", skillHandler.GetMembroSkills)
+			r.Post("/membros/{id}/skills", skillHandler.AddMembroSkill)
+			r.Delete("/membros/{id}/skills/{skillId}", skillHandler.RemoveMembroSkill)
 
 			r.Get("/feriados", feriadoHandler.List)
 			r.Post("/feriados", feriadoHandler.Create)
