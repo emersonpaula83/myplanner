@@ -18,6 +18,10 @@ func NewSprintRepository(pool *pgxpool.Pool) *SprintRepository {
 	return &SprintRepository{pool: pool}
 }
 
+func (r *SprintRepository) Pool() *pgxpool.Pool {
+	return r.pool
+}
+
 type SprintListItem struct {
 	ID           uuid.UUID  `json:"id"`
 	Nome         string     `json:"nome"`
@@ -273,6 +277,76 @@ func (r *SprintRepository) GetTarefasDetailBySprint(ctx context.Context, sprintI
 		result = append(result, td)
 	}
 	return result, nil
+}
+
+type EqualizerTarefa struct {
+	ID            uuid.UUID `json:"id"`
+	NumeroTicket  string    `json:"numero_ticket"`
+	Resumo        string    `json:"resumo"`
+	Tipo          string    `json:"tipo"`
+	Status        string    `json:"status"`
+	Prioridade    *string   `json:"prioridade"`
+	Horas         float64   `json:"horas"`
+	ResponsavelID uuid.UUID `json:"-"`
+}
+
+// GetEqualizerTarefas returns tasks for a member in a sprint that have not
+// yet started (i.e. not in an executed or in-progress status), ordered by
+// hours descending so the equalizer's greedy algorithm can move the biggest
+// tasks first. Status exclusion list mirrors GetCapacity's statusExecutado
+// map plus the in-progress statuses.
+func (r *SprintRepository) GetEqualizerTarefas(ctx context.Context, sprintID, membroID uuid.UUID) ([]EqualizerTarefa, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.status, t.prioridade,
+		       COALESCE(t.estimativa_tempo, 0) / 3600.0
+		FROM tarefas t
+		WHERE t.sprint_id = $1
+		  AND t.responsavel_id = $2
+		  AND t.status NOT IN (
+			'Code Review', 'Teste', 'Validação do Solicitante', 'Deploy', 'Concluído',
+			'Em Desenvolvimento', 'Desenvolvimento', 'Cancelado'
+		  )
+		  AND COALESCE(t.estimativa_tempo, 0) > 0
+		ORDER BY t.estimativa_tempo DESC
+	`, sprintID, membroID)
+	if err != nil {
+		return nil, fmt.Errorf("getting equalizer tarefas: %w", err)
+	}
+	defer rows.Close()
+
+	var result []EqualizerTarefa
+	for rows.Next() {
+		var t EqualizerTarefa
+		if err := rows.Scan(&t.ID, &t.NumeroTicket, &t.Resumo, &t.Tipo, &t.Status, &t.Prioridade, &t.Horas); err != nil {
+			return nil, fmt.Errorf("scanning equalizer tarefa: %w", err)
+		}
+		t.ResponsavelID = membroID
+		result = append(result, t)
+	}
+	return result, nil
+}
+
+// UpdateTarefaResponsavel updates the local DB's assigned member for a task
+// after the corresponding JIRA reassignment has been made.
+func (r *SprintRepository) UpdateTarefaResponsavel(ctx context.Context, tarefaID, novoResponsavelID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE tarefas SET responsavel_id = $2, updated_at = NOW() WHERE id = $1
+	`, tarefaID, novoResponsavelID)
+	if err != nil {
+		return fmt.Errorf("updating tarefa responsavel: %w", err)
+	}
+	return nil
+}
+
+// GetMembroJiraAccountID resolves the local membro UUID to its JIRA account
+// ID, needed to call JIRA APIs such as AssignIssue.
+func (r *SprintRepository) GetMembroJiraAccountID(ctx context.Context, membroID uuid.UUID) (string, error) {
+	var accountID string
+	err := r.pool.QueryRow(ctx, `SELECT jira_account_id FROM membros WHERE id = $1`, membroID).Scan(&accountID)
+	if err != nil {
+		return "", fmt.Errorf("getting membro jira account id: %w", err)
+	}
+	return accountID, nil
 }
 
 type MembroInfo struct {
