@@ -23,6 +23,8 @@ type Client interface {
 	GetSprintFieldID(ctx context.Context) (string, error)
 	SetSprintFieldID(id string)
 	CreateSprint(ctx context.Context, boardID int, name string, startDate, endDate time.Time) (*JiraSprint, error)
+	AssignIssue(ctx context.Context, issueKey, accountID string) error
+	AddComment(ctx context.Context, issueKey, body string) error
 }
 
 type HTTPClient struct {
@@ -76,6 +78,14 @@ func (c *HTTPClient) doPost(ctx context.Context, path string, payload any) ([]by
 		return nil, fmt.Errorf("marshalling payload: %w", err)
 	}
 	return c.doRequest(ctx, http.MethodPost, path, data)
+}
+
+func (c *HTTPClient) doPut(ctx context.Context, path string, payload any) ([]byte, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling payload: %w", err)
+	}
+	return c.doRequest(ctx, http.MethodPut, path, data)
 }
 
 func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body []byte) ([]byte, error) {
@@ -491,4 +501,35 @@ func (c *HTTPClient) CreateSprint(ctx context.Context, boardID int, name string,
 	}
 	c.logger.Info("created sprint in jira", zap.String("name", name), zap.Int("id", sprint.ID))
 	return &sprint, nil
+}
+
+func (c *HTTPClient) AssignIssue(ctx context.Context, issueKey, accountID string) error {
+	payload := map[string]string{"accountId": accountID}
+	_, err := c.doPut(ctx, "/rest/api/3/issue/"+issueKey+"/assignee", payload)
+	if err != nil {
+		return fmt.Errorf("assigning issue %q: %w", issueKey, err)
+	}
+	return nil
+}
+
+func (c *HTTPClient) AddComment(ctx context.Context, issueKey, body string) error {
+	payload := map[string]any{
+		"body": map[string]any{
+			"type":    "doc",
+			"version": 1,
+			"content": []any{
+				map[string]any{
+					"type": "paragraph",
+					"content": []any{
+						map[string]any{"type": "text", "text": body},
+					},
+				},
+			},
+		},
+	}
+	_, err := c.doPost(ctx, "/rest/api/3/issue/"+issueKey+"/comment", payload)
+	if err != nil {
+		return fmt.Errorf("adding comment to issue %q: %w", issueKey, err)
+	}
+	return nil
 }

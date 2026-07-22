@@ -46,6 +46,12 @@ func (m *mockJiraClient) SetSprintFieldID(id string) {}
 func (m *mockJiraClient) CreateSprint(ctx context.Context, boardID int, name string, startDate, endDate time.Time) (*jira.JiraSprint, error) {
 	return &jira.JiraSprint{ID: 999, Name: name}, nil
 }
+func (m *mockJiraClient) AssignIssue(ctx context.Context, issueKey, accountID string) error {
+	return nil
+}
+func (m *mockJiraClient) AddComment(ctx context.Context, issueKey, body string) error {
+	return nil
+}
 
 func TestParseJiraTime(t *testing.T) {
 	tests := []struct {
