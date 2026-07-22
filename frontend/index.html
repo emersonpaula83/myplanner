@@ -365,7 +365,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .eq-task-horas { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 35px; text-align: right; }
 .eq-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface-secondary); color: var(--text-primary); position: relative; }
 .eq-btn:hover { background: var(--border); }
-.eq-badge { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; display: none; }
+.eq-badge { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; display: none; }
 .eq-badge.visible { display: flex; }
 
 .sync-logs { margin-top: 16px; }
@@ -3490,8 +3490,8 @@ async function applyEqualizer() {
       alert(errMsg);
     } else {
       alert(resp.aplicadas + ' tarefas transferidas com sucesso!');
-      closeEqualizerModal();
     }
+    closeEqualizerModal();
     openSprintCapacity(equalizerSprintID);
   } catch (e) {
     alert('Erro ao aplicar: ' + e.message);
