@@ -329,6 +329,45 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .btn-cancel { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; transition: all .15s; }
 .btn-cancel:hover { background: var(--surface-raised); }
 
+.eq-modal { max-width: 720px; }
+.eq-loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+.eq-nada { text-align: center; padding: 40px; }
+.eq-nada-icon { font-size: 48px; margin-bottom: 12px; }
+.eq-nada-text { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.eq-nada-motivo { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+.eq-section-title { font-size: 14px; font-weight: 650; color: var(--text-primary); margin: 20px 0 10px; letter-spacing: -.2px; }
+.eq-antes-depois { display: flex; flex-direction: column; gap: 6px; }
+.eq-ad-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; background: var(--surface-secondary); }
+.eq-ad-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.eq-ad-avatar-fallback { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.eq-ad-nome { flex: 1; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.eq-ad-pct { font-size: 13px; font-weight: 600; min-width: 55px; text-align: right; }
+.eq-ad-arrow { color: var(--text-secondary); font-size: 14px; }
+.eq-ad-bar { flex: 0 0 80px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.eq-ad-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.eq-sug-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; background: var(--surface-secondary); }
+.eq-sug-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.eq-sug-member { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 100px; }
+.eq-sug-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.eq-sug-avatar-fallback { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+.eq-sug-nome { font-size: 12px; font-weight: 600; text-align: center; color: var(--text-primary); }
+.eq-sug-pct { font-size: 11px; }
+.eq-sug-arrow { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--text-secondary); }
+.eq-sug-arrow-icon { font-size: 24px; }
+.eq-sug-arrow-label { font-size: 11px; font-weight: 600; }
+.eq-task-list { display: flex; flex-direction: column; gap: 4px; }
+.eq-task-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; background: var(--surface-primary); cursor: pointer; }
+.eq-task-row:hover { background: var(--border); }
+.eq-task-check { width: 16px; height: 16px; accent-color: var(--primary); }
+.eq-task-key { font-size: 12px; font-weight: 600; color: var(--primary); min-width: 80px; }
+.eq-task-resumo { font-size: 12px; color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-task-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--border); color: var(--text-secondary); }
+.eq-task-horas { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 35px; text-align: right; }
+.eq-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface-secondary); color: var(--text-primary); position: relative; }
+.eq-btn:hover { background: var(--border); }
+.eq-badge { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; display: none; }
+.eq-badge.visible { display: flex; }
+
 .sync-logs { margin-top: 16px; }
 .sync-log-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 12px; }
 .sync-log-row:last-child { border-bottom: none; }
@@ -353,7 +392,6 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .gantt-bar:hover { opacity: 1; }
 .gantt-bar-text { font-size: 10px; color: #fff; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gantt-tooltip { position: fixed; background: var(--tooltip-bg); color: var(--tooltip-text); padding: 10px 14px; border-radius: 8px; font-size: 12px; z-index: 200; pointer-events: none; max-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,.2); line-height: 1.6; }
-.gantt-star { color: var(--amber); font-size: 14px; flex-shrink: 0; }
 
 /* Analysis popup */
 .analysis-popup { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 16px; box-shadow: var(--shadow-card); white-space: pre-wrap; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
@@ -624,7 +662,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 
     <!-- TIMELINE -->
     <div class="page" id="page-timeline">
-      <div class="page-header-row"><h1 class="page-title">Timeline de Capacidade</h1></div>
+      <div class="page-header-row"><h1 class="page-title">Capacity Timeline</h1></div>
       <div class="timeline-filters">
         <div class="multi-select-wrap" id="timeline-equipe-wrap">
           <button class="filter-select multi-select-btn" id="timeline-equipe-btn" onclick="toggleMultiSelect('timeline-equipe-dropdown')">Selecionar equipes...</button>
@@ -835,6 +873,17 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       </div>
     </form>
     <div id="feriados-list" style="margin-top:20px"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="equalizer-modal" onclick="if(event.target===this)closeEqualizerModal()">
+  <div class="modal eq-modal">
+    <div class="modal-title">⚖️ Equalizador de Capacidade</div>
+    <div id="equalizer-content"></div>
+    <div class="modal-actions" id="equalizer-actions" style="display:none">
+      <button class="btn-cancel" onclick="closeEqualizerModal()">Cancelar</button>
+      <button class="btn-primary" id="equalizer-apply-btn" onclick="applyEqualizer()" disabled>Aplicar Selecionadas (0)</button>
+    </div>
   </div>
 </div>
 
@@ -1312,49 +1361,12 @@ function renderTimeline(data) {
     ganttHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Ausências — Membros</div><div class="empty-state" style="padding:30px"><div class="empty-state-text">Nenhum membro encontrado</div></div></div>';
   }
 
-  // Gantt — Épicos
-  const projetos = (data.projetos || []).filter(p => p.data_inicio_execucao || p.data_limite);
-  let epicosHtml = '';
-  if (projetos.length > 0) {
-    let epicoHeader = '<div class="gantt-header"><div style="width:140px;flex-shrink:0"></div>';
-    meses.forEach(m => { epicoHeader += '<div class="gantt-header-cell">' + m + '</div>'; });
-    epicoHeader += '</div>';
-    let epicoRows = '';
-    projetos.forEach(p => {
-      const label = esc(p.apelido || p.numero_ticket || '—');
-      const star = p.projeto_ci ? '<span class="gantt-star" title="Projeto CI — ' + esc(p.projeto_ci_ticket || '') + '">★</span>' : '';
-      const startDate = p.data_inicio_execucao ? new Date(p.data_inicio_execucao).getTime() : null;
-      const endDate = p.data_limite ? new Date(p.data_limite).getTime() : null;
-      let barHtml = '';
-      if (startDate && endDate && endDate > startDate) {
-        const left = Math.max(0, (startDate - anoStart) / totalMs * 100);
-        const width = Math.min(100 - left, (endDate - startDate) / totalMs * 100);
-        const tipoDemanda = p.tipo_demanda || '—';
-        const dias = (p.total_dias_estimados || 0).toFixed(0);
-        const dlStr = p.data_limite || '—';
-        barHtml = '<div class="gantt-bar" style="left:' + left + '%;width:' + Math.max(1, width) + '%" ' +
-          'onmouseenter="showGanttTip(event,\'' + esc(label) + '\',\'' + dias + 'd\',\'' + esc(dlStr) + '\',\'' + esc(tipoDemanda) + '\')" onmouseleave="hideGanttTip()">' +
-          '<span class="gantt-bar-text">' + esc(p.resumo || '') + '</span></div>';
-      }
-      epicoRows += '<div class="gantt-row"><div class="gantt-label">' + star + label + '</div><div class="gantt-bar-area">' + barHtml + '</div></div>';
-    });
-    epicosHtml = '<div class="timeline-card fade-in"><div class="timeline-card-title">Gantt — Épicos</div><div class="gantt-wrap"><div class="gantt">' + epicoHeader + '<div class="gantt-rows">' + epicoRows + '</div></div></div></div>';
-  }
-
   document.getElementById('timeline-content').innerHTML =
     '<div class="timeline-card fade-in"><div class="timeline-card-title">Capacidade Mensal</div><div class="capacity-grid">' + capacityHtml + '</div></div>' +
     ganttHtml +
-    epicosHtml +
     '';
 }
 
-function showGanttTip(e, label, dias, dataLimite, tipo) {
-  const tip = document.getElementById('gantt-tooltip');
-  tip.innerHTML = '<b>' + label + '</b><br>Dias estimados: ' + dias + '<br>Data limite: ' + dataLimite + (tipo ? '<br>Tipo: ' + tipo : '');
-  tip.style.display = 'block';
-  tip.style.left = Math.min(e.clientX + 12, window.innerWidth - 300) + 'px';
-  tip.style.top = (e.clientY + 12) + 'px';
-}
 function showAusenciaTip(e, nome, tipo, dataInicio, dataFim, dias) {
   const tip = document.getElementById('gantt-tooltip');
   const di = new Date(dataInicio + 'T12:00:00').toLocaleDateString('pt-BR');
@@ -1529,6 +1541,7 @@ async function openSprintCapacity(sprintID) {
       api('/sprints/' + sprintID + '/burndown' + qs).catch(() => null),
       equipe ? api('/checkpoints?equipe_id=' + equipe + '&ano=' + sprintAno).catch(() => []) : Promise.resolve([])
     ]);
+    window._currentSprintCapacity = data;
     const fonteDadosId = data.fonte_dados_id || '';
     const projetoChave = data.projeto_chave || '';
     let syncStatus = null;
@@ -1584,10 +1597,6 @@ async function openSprintCapacity(sprintID) {
     html += '<div class="capacity-summary-item"><div class="capacity-summary-label">Membros da equipe</div><div class="capacity-summary-value">' + data.total_membros_equipe + '</div></div>';
     html += '<div class="capacity-summary-item"><div class="capacity-summary-label">Capacidade da Sprint</div><div class="capacity-summary-value">' + data.horas_total_sprint.toFixed(1) + 'h</div><div class="capacity-summary-detail">' + data.dias_uteis + ' dias úteis — capacidade disponível</div></div>';
     html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Horas Alocadas</div><div class="capacity-summary-value ' + pctGeralClass + '">' + pctGeral.toFixed(1) + '%</div><div class="capacity-summary-detail">' + data.horas_alocadas.toFixed(1) + 'h alocadas</div></div>';
-    const horasExec = data.horas_executadas || 0;
-    const pctExec = data.horas_total_sprint > 0 ? (horasExec / data.horas_total_sprint * 100) : 0;
-    const pctExecClass = pctExec > 70 ? 'green' : pctExec > 40 ? 'amber' : 'red';
-    html += '<div class="capacity-summary-item"><div class="capacity-summary-label">% Horas Já Executadas</div><div class="capacity-summary-value ' + pctExecClass + '">' + pctExec.toFixed(1) + '%</div><div class="capacity-summary-detail">' + horasExec.toFixed(1) + 'h executadas</div></div>';
     const pctDisponivel = data.horas_total_sprint > 0 ? Math.max(0, (data.horas_total_sprint - data.horas_alocadas) / data.horas_total_sprint * 100) : 0;
     const pctDispClass = pctDisponivel < 10 ? 'red' : pctDisponivel < 30 ? 'amber' : 'green';
     const horasLivres = Math.max(0, data.horas_total_sprint - data.horas_alocadas);
@@ -1627,6 +1636,7 @@ async function openSprintCapacity(sprintID) {
       html += '</div>';
     }
     html += '</div>';
+    html += '<div style="margin:12px 0"><button class="eq-btn" id="eq-btn-' + sprintID + '" onclick="openEqualizer(\'' + sprintID + '\')">⚖️ Equalizador<span class="eq-badge" id="eq-badge-' + sprintID + '">!</span></button></div>';
 
     // Breakdown por tipo (stacked bar)
     let horasManutencao = 0, horasMelhorias = 0, horasSuporte = 0;
@@ -1714,6 +1724,19 @@ async function openSprintCapacity(sprintID) {
     if (burndown && burndown.linha_ideal && burndown.linha_ideal.length > 0) {
       drawBurndown(document.getElementById('burndown-canvas'), burndown);
     }
+
+    // Background check for equalizer badge
+    (async function() {
+      const eqQs = equipe ? '?equipe=' + equipe : '';
+      try {
+        const eqData = await api('/sprints/' + sprintID + '/equalizer' + eqQs);
+        const badge = document.getElementById('eq-badge-' + sprintID);
+        if (badge && !eqData.nada_a_sugerir) {
+          badge.classList.add('visible');
+        }
+        window._cachedEqualizerData = eqData;
+      } catch(e) {}
+    })();
   } catch(e) { el.innerHTML = '<button class="capacity-back-btn" onclick="loadSprints()">← Voltar</button><div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
 }
 
@@ -3312,6 +3335,169 @@ async function deleteFeriado(id) {
     await api('/feriados/' + id, { method: 'DELETE' });
     loadFeriados();
   } catch(err) { alert('Erro: ' + err.message); }
+}
+
+// === EQUALIZER ===
+let equalizerData = null;
+let equalizerSprintID = null;
+
+async function openEqualizer(sprintID) {
+  equalizerSprintID = sprintID;
+  const modal = document.getElementById('equalizer-modal');
+  const content = document.getElementById('equalizer-content');
+  const actions = document.getElementById('equalizer-actions');
+  content.innerHTML = '<div class="eq-loading">Calculando equalização...</div>';
+  actions.style.display = 'none';
+  modal.classList.add('open');
+
+  if (window._cachedEqualizerData) {
+    equalizerData = window._cachedEqualizerData;
+    window._cachedEqualizerData = null;
+    renderEqualizerModal();
+    return;
+  }
+
+  const equipeVal = document.getElementById('sprints-equipe') ? document.getElementById('sprints-equipe').value : '';
+  const qs = equipeVal ? '?equipe=' + equipeVal : '';
+  try {
+    equalizerData = await api('/sprints/' + sprintID + '/equalizer' + qs);
+    renderEqualizerModal();
+  } catch (e) {
+    content.innerHTML = '<div class="eq-nada"><div class="eq-nada-icon">❌</div><div class="eq-nada-text">Erro ao calcular</div><div class="eq-nada-motivo">' + esc(e.message) + '</div></div>';
+  }
+}
+
+function closeEqualizerModal() {
+  document.getElementById('equalizer-modal').classList.remove('open');
+  equalizerData = null;
+}
+
+function renderEqualizerModal() {
+  const content = document.getElementById('equalizer-content');
+  const actions = document.getElementById('equalizer-actions');
+  const data = equalizerData;
+
+  if (data.nada_a_sugerir) {
+    content.innerHTML = '<div class="eq-nada"><div class="eq-nada-icon">✅</div><div class="eq-nada-text">Nada a sugerir de transferência de tarefas</div>' +
+      (data.motivo ? '<div class="eq-nada-motivo">' + esc(data.motivo) + '</div>' : '') + '</div>';
+    actions.style.display = 'none';
+    return;
+  }
+
+  let html = '';
+
+  // Antes/Depois section
+  html += '<div class="eq-section-title">Antes / Depois da Equalização</div>';
+  html += '<div class="eq-antes-depois">';
+  (data.membros_antes_depois || []).forEach(function(m) {
+    const avatar = m.avatar_url
+      ? '<img class="eq-ad-avatar" src="' + esc(m.avatar_url) + '">'
+      : '<div class="eq-ad-avatar-fallback">' + esc(m.nome.split(' ').map(function(p){return p[0]}).join('').substring(0,2)) + '</div>';
+    const antesColor = m.pct_antes > 100 ? 'var(--red)' : m.pct_antes > 80 ? 'var(--amber)' : 'var(--green)';
+    const depoisColor = m.pct_depois > 100 ? 'var(--red)' : m.pct_depois > 80 ? 'var(--amber)' : 'var(--green)';
+    html += '<div class="eq-ad-row">' + avatar +
+      '<div class="eq-ad-nome">' + esc(m.nome) + '</div>' +
+      '<div class="eq-ad-bar"><div class="eq-ad-bar-fill" style="width:' + Math.min(100, m.pct_antes) + '%;background:' + antesColor + '"></div></div>' +
+      '<div class="eq-ad-pct" style="color:' + antesColor + '">' + m.pct_antes.toFixed(0) + '%</div>' +
+      '<div class="eq-ad-arrow">→</div>' +
+      '<div class="eq-ad-bar"><div class="eq-ad-bar-fill" style="width:' + Math.min(100, m.pct_depois) + '%;background:' + depoisColor + '"></div></div>' +
+      '<div class="eq-ad-pct" style="color:' + depoisColor + '">' + m.pct_depois.toFixed(0) + '%</div>' +
+      '</div>';
+  });
+  html += '</div>';
+
+  // Sugestões
+  html += '<div class="eq-section-title">Sugestões de Transferência</div>';
+  (data.sugestoes || []).forEach(function(sug, si) {
+    const deAvatar = sug.de.avatar_url
+      ? '<img class="eq-sug-avatar" src="' + esc(sug.de.avatar_url) + '">'
+      : '<div class="eq-sug-avatar-fallback">' + esc(sug.de.nome.split(' ').map(function(p){return p[0]}).join('').substring(0,2)) + '</div>';
+    const paraAvatar = sug.para.avatar_url
+      ? '<img class="eq-sug-avatar" src="' + esc(sug.para.avatar_url) + '">'
+      : '<div class="eq-sug-avatar-fallback">' + esc(sug.para.nome.split(' ').map(function(p){return p[0]}).join('').substring(0,2)) + '</div>';
+    const deAntesColor = sug.de.pct_antes > 100 ? 'var(--red)' : 'var(--amber)';
+    const deDepoisColor = sug.de.pct_depois > 100 ? 'var(--red)' : sug.de.pct_depois > 80 ? 'var(--amber)' : 'var(--green)';
+    const paraAntesColor = sug.para.pct_antes < 70 ? 'var(--green)' : 'var(--amber)';
+    const paraDepoisColor = sug.para.pct_depois > 100 ? 'var(--red)' : sug.para.pct_depois > 80 ? 'var(--amber)' : 'var(--green)';
+
+    html += '<div class="eq-sug-card">';
+    html += '<div class="eq-sug-header">';
+    html += '<div class="eq-sug-member">' + deAvatar + '<div class="eq-sug-nome">' + esc(sug.de.nome) + '</div>' +
+      '<div class="eq-sug-pct"><span style="color:' + deAntesColor + '">' + sug.de.pct_antes.toFixed(0) + '%</span> → <span style="color:' + deDepoisColor + '">' + sug.de.pct_depois.toFixed(0) + '%</span></div></div>';
+    html += '<div class="eq-sug-arrow"><div class="eq-sug-arrow-icon">→</div><div class="eq-sug-arrow-label">' + sug.horas_transferidas.toFixed(1) + 'h</div></div>';
+    html += '<div class="eq-sug-member">' + paraAvatar + '<div class="eq-sug-nome">' + esc(sug.para.nome) + '</div>' +
+      '<div class="eq-sug-pct"><span style="color:' + paraAntesColor + '">' + sug.para.pct_antes.toFixed(0) + '%</span> → <span style="color:' + paraDepoisColor + '">' + sug.para.pct_depois.toFixed(0) + '%</span></div></div>';
+    html += '</div>';
+
+    html += '<div class="eq-task-list">';
+    sug.tarefas.forEach(function(t, ti) {
+      html += '<label class="eq-task-row">' +
+        '<input type="checkbox" class="eq-task-check" data-sug="' + si + '" data-task="' + ti + '" checked onchange="updateEqualizerCount()">' +
+        '<span class="eq-task-key">' + esc(t.numero_ticket) + '</span>' +
+        '<span class="eq-task-resumo">' + esc(t.resumo) + '</span>' +
+        '<span class="eq-task-badge">' + esc(t.tipo) + '</span>' +
+        '<span class="eq-task-horas">' + t.horas.toFixed(1) + 'h</span>' +
+        '</label>';
+    });
+    html += '</div></div>';
+  });
+
+  content.innerHTML = html;
+  actions.style.display = 'flex';
+  updateEqualizerCount();
+}
+
+function updateEqualizerCount() {
+  const checks = document.querySelectorAll('.eq-task-check:checked');
+  const btn = document.getElementById('equalizer-apply-btn');
+  btn.textContent = 'Aplicar Selecionadas (' + checks.length + ')';
+  btn.disabled = checks.length === 0;
+}
+
+async function applyEqualizer() {
+  const checks = document.querySelectorAll('.eq-task-check:checked');
+  if (checks.length === 0) return;
+
+  const btn = document.getElementById('equalizer-apply-btn');
+  btn.disabled = true;
+  btn.textContent = 'Aplicando...';
+
+  const transferencias = [];
+  checks.forEach(function(ch) {
+    const si = parseInt(ch.dataset.sug);
+    const ti = parseInt(ch.dataset.task);
+    const sug = equalizerData.sugestoes[si];
+    const t = sug.tarefas[ti];
+    transferencias.push({
+      tarefa_id: t.id,
+      tarefa_key: t.numero_ticket,
+      novo_responsavel_id: sug.para.membro_id
+    });
+  });
+
+  try {
+    const resp = await api('/sprints/' + equalizerSprintID + '/equalizer/apply', {
+      method: 'POST',
+      body: JSON.stringify({
+        fonte_dados_id: window._currentSprintCapacity ? window._currentSprintCapacity.fonte_dados_id : '',
+        transferencias: transferencias
+      })
+    });
+
+    if (resp.erros && resp.erros.length > 0) {
+      let errMsg = resp.aplicadas + ' transferidas com sucesso.\nErros:\n';
+      resp.erros.forEach(function(e) { errMsg += e.tarefa_key + ': ' + e.erro + '\n'; });
+      alert(errMsg);
+    } else {
+      alert(resp.aplicadas + ' tarefas transferidas com sucesso!');
+      closeEqualizerModal();
+    }
+    openSprintCapacity(equalizerSprintID);
+  } catch (e) {
+    alert('Erro ao aplicar: ' + e.message);
+    btn.disabled = false;
+    updateEqualizerCount();
+  }
 }
 
 // === MODAL UTILS ===
