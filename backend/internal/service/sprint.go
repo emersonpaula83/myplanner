@@ -771,6 +771,9 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 		if sp.DataFim.Before(anoInicio) || sp.DataInicio.After(anoFim) {
 			continue
 		}
+		if sp.Estado != nil && *sp.Estado == "closed" {
+			continue
+		}
 		sprints = append(sprints, sp)
 	}
 
