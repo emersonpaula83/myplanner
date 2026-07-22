@@ -3,12 +3,20 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 )
+
+func escapeILIKE(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
 
 type SkillRepository struct {
 	pool *pgxpool.Pool
@@ -23,13 +31,14 @@ func (r *SkillRepository) List(ctx context.Context, query string) ([]domain.Skil
 	var err error
 	if query == "" {
 		rows, err = r.pool.Query(ctx, `
-			SELECT id, nome, created_at, updated_at FROM skills ORDER BY nome
+			SELECT id, nome, created_at, updated_at FROM skills ORDER BY nome LIMIT 50
 		`)
 	} else {
+		query = escapeILIKE(query)
 		rows, err = r.pool.Query(ctx, `
 			SELECT id, nome, created_at, updated_at FROM skills
 			WHERE nome ILIKE '%' || $1 || '%'
-			ORDER BY nome
+			ORDER BY nome LIMIT 50
 		`, query)
 	}
 	if err != nil {
