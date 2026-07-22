@@ -69,7 +69,7 @@ myplanner/
       jira/          # Cliente Jira (token + OAuth)
       middleware/    # Auth, filtro de projetos
       repository/    # Acesso a dados (pgx)
-      service/       # Logica de negocio
+      service/       # Logica de negocio (equalizer, sync)
     migrations/      # SQL migrations (golang-migrate)
   frontend/
     index.html       # SPA completo (HTML + CSS + JS)
@@ -84,6 +84,8 @@ myplanner/
 - **Sprints** — visualizacao de capacidade por membro, tarefas nao planejadas, burndown chart
 - **Timeline** — Gantt de projetos (epicos) e ausencias de membros, capacidade mensal
 - **Equipes** — gestao de membros, resumo de equipe
+- **Skills** — catalogo global de skills (tags tecnicas) com associacao N:N a membros, autocomplete e criacao inline
+- **Equalizer** — redistribuicao automatica de tarefas entre membros da sprint, algoritmo greedy com visualizacao before/after e apply via Jira
 - **Ausencias** — ferias, licencas, dayoffs com impacto automatico na capacidade
 - **Feriados** — CRUD de feriados nacionais, descontados dos dias uteis
 - **Desligamento** — membros desligados sao excluidos automaticamente dos calculos

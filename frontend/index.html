@@ -363,8 +363,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .eq-task-resumo { font-size: 12px; color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eq-task-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--border); color: var(--text-secondary); }
 .eq-task-horas { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 35px; text-align: right; }
-.eq-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface-secondary); color: var(--text-primary); position: relative; }
-.eq-btn:hover { background: var(--border); }
+.eq-btn { position: relative; }
 .eq-badge { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; display: none; }
 .eq-badge.visible { display: flex; }
 
@@ -1650,7 +1649,6 @@ async function openSprintCapacity(sprintID) {
       html += '</div>';
     }
     html += '</div>';
-    html += '<div style="margin:12px 0"><button class="eq-btn" id="eq-btn-' + sprintID + '" onclick="openEqualizer(\'' + sprintID + '\')">⚖️ Equalizador<span class="eq-badge" id="eq-badge-' + sprintID + '">!</span></button></div>';
 
     // Breakdown por tipo (stacked bar)
     let horasManutencao = 0, horasMelhorias = 0, horasSuporte = 0;
@@ -1699,6 +1697,8 @@ async function openSprintCapacity(sprintID) {
       const pctOutras = sa.horas_total_sprint > 0 ? (sa.outras_horas / sa.horas_total_sprint * 100).toFixed(1) : '0.0';
       html += '<div class="unplanned-disclaimer warn"><span class="unplanned-disclaimer-icon">⚡</span><div><b>' + pctOutras + '%</b> da capacity dedicado em <b>' + sa.outras_count + '</b> tarefa(s) não planejada(s) (' + sa.outras_horas.toFixed(1) + 'h)</div></div>';
     }
+
+    html += '<div style="margin:12px 0"><button class="btn-sm eq-btn" id="eq-btn-' + sprintID + '" style="font-size:12px;padding:4px 12px;background:var(--accent);color:#fff" onclick="openEqualizer(\'' + sprintID + '\')">⚖️ Equalizador<span class="eq-badge" id="eq-badge-' + sprintID + '">!</span></button></div>';
 
     if (!data.membros || data.membros.length === 0) {
       html += '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Nenhum membro com tarefas nesta sprint</div></div>';
