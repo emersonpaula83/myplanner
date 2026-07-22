@@ -328,10 +328,10 @@ func (r *SprintRepository) GetEqualizerTarefas(ctx context.Context, sprintID, me
 
 // UpdateTarefaResponsavel updates the local DB's assigned member for a task
 // after the corresponding JIRA reassignment has been made.
-func (r *SprintRepository) UpdateTarefaResponsavel(ctx context.Context, tarefaID, novoResponsavelID uuid.UUID) error {
+func (r *SprintRepository) UpdateTarefaResponsavel(ctx context.Context, sprintID, tarefaID, novoResponsavelID uuid.UUID) error {
 	_, err := r.pool.Exec(ctx, `
-		UPDATE tarefas SET responsavel_id = $2, updated_at = NOW() WHERE id = $1
-	`, tarefaID, novoResponsavelID)
+		UPDATE tarefas SET responsavel_id = $3, updated_at = NOW() WHERE id = $2 AND sprint_id = $1
+	`, sprintID, tarefaID, novoResponsavelID)
 	if err != nil {
 		return fmt.Errorf("updating tarefa responsavel: %w", err)
 	}

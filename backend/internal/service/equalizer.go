@@ -65,6 +65,7 @@ type TransferRequest struct {
 }
 
 type ApplyRequest struct {
+	SprintID       uuid.UUID         `json:"-"`
 	FonteDadosID   uuid.UUID         `json:"fonte_dados_id"`
 	Transferencias []TransferRequest `json:"transferencias"`
 }
@@ -230,7 +231,7 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 			break
 		}
 		d := states[dID]
-		if d.mc.HorasEstimadas <= 0 {
+		if d.mc.HorasDisponiveis <= 0 {
 			continue
 		}
 
@@ -247,7 +248,7 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 			if len(sugestoes) >= 10 {
 				break
 			}
-			pctShift := t.Horas / d.mc.HorasEstimadas * 100
+			pctShift := t.Horas / d.mc.HorasDisponiveis * 100
 			if pctShift < 10 {
 				continue
 			}
@@ -258,11 +259,11 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 			bestDisp := -1.0
 			for _, rID := range receptores {
 				r := states[rID]
-				if r.mc.HorasEstimadas <= 0 {
+				if r.mc.HorasDisponiveis <= 0 {
 					continue
 				}
 				disp := r.mc.HorasDisponiveis - r.horasMov
-				newPct := (r.mc.HorasAlocadas + r.horasMov + t.Horas) / r.mc.HorasEstimadas * 100
+				newPct := (r.mc.HorasAlocadas + r.horasMov + t.Horas) / r.mc.HorasDisponiveis * 100
 				if disp > bestDisp && newPct <= 100 {
 					bestDisp = disp
 					bestR = rID
@@ -309,10 +310,10 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 		d := states[sug.De.MembroID]
 		r := states[sug.Para.MembroID]
 		sug.De.PctAntes = d.mc.PercentualAlocacao
-		sug.De.PctDepois = (d.mc.HorasAlocadas - d.horasMov) / d.mc.HorasEstimadas * 100
+		sug.De.PctDepois = (d.mc.HorasAlocadas - d.horasMov) / d.mc.HorasDisponiveis * 100
 		sug.Para.PctAntes = r.mc.PercentualAlocacao
-		sug.Para.PctDepois = (r.mc.HorasAlocadas + r.horasMov) / r.mc.HorasEstimadas * 100
-		sug.PctTransferido = sug.HorasTransferidas / d.mc.HorasEstimadas * 100
+		sug.Para.PctDepois = (r.mc.HorasAlocadas + r.horasMov) / r.mc.HorasDisponiveis * 100
+		sug.PctTransferido = sug.HorasTransferidas / d.mc.HorasDisponiveis * 100
 	}
 
 	// Dereference pointers into value slice for the result.
@@ -365,8 +366,8 @@ func (s *EqualizerService) buildMembrosAntesDepois(cap *SprintCapacityResult, st
 		}
 
 		pctDepois := m.PercentualAlocacao
-		if m.HorasEstimadas > 0 {
-			pctDepois = horasDepois / m.HorasEstimadas * 100
+		if m.HorasDisponiveis > 0 {
+			pctDepois = horasDepois / m.HorasDisponiveis * 100
 		}
 
 		result = append(result, MembroAntesDepois{
@@ -402,7 +403,8 @@ func (s *EqualizerService) Apply(ctx context.Context, req ApplyRequest) (*ApplyR
 		}
 
 		if err := client.AssignIssue(ctx, tr.TarefaKey, jiraAccountID); err != nil {
-			result.Erros = append(result.Erros, ApplyError{TarefaKey: tr.TarefaKey, Erro: err.Error()})
+			s.logger.Warn("JIRA assign failed", zap.String("key", tr.TarefaKey), zap.Error(err))
+			result.Erros = append(result.Erros, ApplyError{TarefaKey: tr.TarefaKey, Erro: fmt.Sprintf("falha ao reatribuir %s no JIRA", tr.TarefaKey)})
 			continue
 		}
 
@@ -410,12 +412,15 @@ func (s *EqualizerService) Apply(ctx context.Context, req ApplyRequest) (*ApplyR
 		if n, err := s.getMembroNome(ctx, tr.NovoResponsavelID); err == nil {
 			novoNome = n
 		}
+		if novoNome == "" {
+			novoNome = "outro membro"
+		}
 		comment := fmt.Sprintf("Tarefa transferida para %s via Equalizador de Capacidade", novoNome)
 		if err := client.AddComment(ctx, tr.TarefaKey, comment); err != nil {
 			s.logger.Warn("failed to add comment", zap.String("key", tr.TarefaKey), zap.Error(err))
 		}
 
-		if err := s.sprintRepo.UpdateTarefaResponsavel(ctx, tr.TarefaID, tr.NovoResponsavelID); err != nil {
+		if err := s.sprintRepo.UpdateTarefaResponsavel(ctx, req.SprintID, tr.TarefaID, tr.NovoResponsavelID); err != nil {
 			s.logger.Error("failed to update local responsavel", zap.String("key", tr.TarefaKey), zap.Error(err))
 		}
 

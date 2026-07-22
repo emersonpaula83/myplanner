@@ -42,11 +42,17 @@ func (h *EqualizerHandler) GetSuggestions(w http.ResponseWriter, r *http.Request
 }
 
 func (h *EqualizerHandler) ApplyTransfers(w http.ResponseWriter, r *http.Request) {
+	sprintID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid sprint id")
+		return
+	}
 	var req service.ApplyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
+	req.SprintID = sprintID
 	if len(req.Transferencias) == 0 {
 		respondError(w, http.StatusBadRequest, "nenhuma transferência selecionada")
 		return
