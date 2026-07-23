@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS membro_produtos;
+ALTER TABLE membros DROP COLUMN IF EXISTS cargo;

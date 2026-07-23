@@ -37,6 +37,7 @@ type MembroResumo struct {
 	Nome             string    `json:"nome"`
 	Email            *string   `json:"email"`
 	AvatarURL        *string   `json:"avatar_url"`
+	Cargo            *string   `json:"cargo"`
 	AtuacaoRastreada float64   `json:"atuacao_rastreada"`
 }
 

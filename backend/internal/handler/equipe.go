@@ -106,6 +106,7 @@ func CalcularResumoEquipe(
 			Nome:             m.Nome,
 			Email:            m.Email,
 			AvatarURL:        m.AvatarURL,
+			Cargo:            m.Cargo,
 			AtuacaoRastreada: pctAtuacao,
 		}
 

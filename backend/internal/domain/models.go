@@ -38,6 +38,7 @@ type Membro struct {
 	Team             *string    `json:"team" db:"team"`
 	Ativo            bool       `json:"ativo" db:"ativo"`
 	DataDesligamento *time.Time `json:"data_desligamento" db:"data_desligamento"`
+	Cargo            *string    `json:"cargo" db:"cargo"`
 	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
 }
