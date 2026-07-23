@@ -522,15 +522,23 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .skill-add-btn { cursor: pointer; width: 22px; height: 22px; border-radius: 50%; border: 1.5px dashed var(--border); background: none; color: var(--text-secondary); font-size: 14px; display: inline-flex; align-items: center; justify-content: center; transition: border-color .15s, color .15s; }
 .skill-add-btn:hover { border-color: var(--accent); color: var(--accent); }
 .skill-input-wrap { position: relative; display: inline-block; margin-top: 6px; }
-.skill-input-wrap input { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); width: 200px; }
-.skill-dropdown { position: absolute; top: 100%; left: 0; width: 200px; max-height: 160px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; z-index: 100; display: none; }
+.skill-input-wrap input { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-primary); width: 200px; }
+.skill-dropdown { position: absolute; top: 100%; left: 0; width: 200px; max-height: 160px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; z-index: 100; display: none; }
 .skill-dropdown.open { display: block; }
 .skill-dropdown-item { padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--text-primary); }
 .skill-dropdown-item:hover { background: var(--accent-soft); }
 .skill-dropdown-item.create { color: var(--accent); font-style: italic; }
 .cargo-section { margin-bottom: 16px; }
 .cargo-section .form-label { font-size: 12px; margin-bottom: 4px; display: block; color: var(--text-secondary); }
-.cargo-select { padding: 5px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); min-width: 220px; }
+.cargo-select-wrap { position: relative; display: inline-block; min-width: 220px; }
+.cargo-select-btn { padding: 5px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-primary); min-width: 220px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.cargo-select-btn:hover { border-color: var(--accent); }
+.cargo-select-btn::after { content: '\25BC'; font-size: 8px; margin-left: 8px; opacity: .5; }
+.cargo-dropdown { position: absolute; top: 100%; left: 0; width: 100%; max-height: 200px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; z-index: 100; display: none; }
+.cargo-dropdown.open { display: block; }
+.cargo-dropdown-item { padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--text-primary); }
+.cargo-dropdown-item:hover { background: var(--accent-soft); }
+.cargo-dropdown-item.selected { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .produto-section { margin-top: 10px; }
 .produto-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
 .produto-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); color: var(--accent); border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
@@ -538,8 +546,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .produto-chip .produto-remove:hover { opacity: 1; }
 .produto-chip .produto-remove.disabled { pointer-events: none; opacity: .2; }
 .produto-input-wrap { position: relative; display: inline-block; margin-top: 6px; }
-.produto-input-wrap input { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); width: 220px; }
-.produto-dropdown { position: absolute; top: 100%; left: 0; width: 220px; max-height: 160px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; z-index: 100; display: none; }
+.produto-input-wrap input { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-primary); width: 220px; }
+.produto-dropdown { position: absolute; top: 100%; left: 0; width: 220px; max-height: 160px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; z-index: 100; display: none; }
 .produto-dropdown.open { display: block; }
 .produto-dropdown-item { padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--text-primary); }
 .produto-dropdown-item:hover { background: var(--accent-soft); }
@@ -2579,14 +2587,14 @@ async function openGerarSprintsForm() {
   var el = document.getElementById('stl-content');
   var prevHTML = el.innerHTML;
   var today = new Date().toISOString().split('T')[0];
-  el.innerHTML = '<div style="background:var(--card-bg);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;max-width:700px">'
+  el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;max-width:700px">'
     + '<h3 style="margin:0 0 16px">Gerar Sprints</h3>'
     + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Board ID</label><br>'
-    + '<input id="gen-board" type="number" placeholder="Ex: 42" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:100px">'
+    + '<input id="gen-board" type="number" placeholder="Ex: 42" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:100px">'
     + '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">Da URL do board JIRA: /boards/<b>ID</b></div></div>'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Inicial</label><br>'
-    + '<input id="gen-start-date" type="date" min="' + today + '" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:160px"></div>'
+    + '<input id="gen-start-date" type="date" min="' + today + '" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:160px"></div>'
     + '<button class="btn-sm" style="padding:6px 16px;font-size:13px" onclick="previewGerarSprints()">Calcular</button>'
     + '<button class="btn-sm" style="padding:6px 16px;font-size:13px;background:var(--border-subtle)" onclick="cancelGerarSprints()">Cancelar</button>'
     + '</div>'
@@ -2613,19 +2621,19 @@ function openCheckpointForm() {
   if (!equipe) { alert('Selecione uma equipe primeiro.'); return; }
   var el = document.getElementById('stl-content');
   var prevHTML = el.innerHTML;
-  el.innerHTML = '<div style="background:var(--card-bg);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;max-width:700px">'
+  el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;max-width:700px">'
     + '<h3 style="margin:0 0 16px">Criar Checkpoint</h3>'
     + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Nome (máx 15)</label><br>'
-    + '<input id="cp-nome" type="text" maxlength="15" placeholder="Ex: Deploy v2" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:140px"></div>'
+    + '<input id="cp-nome" type="text" maxlength="15" placeholder="Ex: Deploy v2" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:140px"></div>'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Resumo (máx 50)</label><br>'
-    + '<input id="cp-resumo" type="text" maxlength="50" placeholder="Descrição breve" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:220px"></div>'
+    + '<input id="cp-resumo" type="text" maxlength="50" placeholder="Descrição breve" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:220px"></div>'
     + '</div>'
     + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Início</label><br>'
-    + '<input id="cp-inicio" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:150px"></div>'
+    + '<input id="cp-inicio" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:150px"></div>'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Fim (opcional)</label><br>'
-    + '<input id="cp-fim" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px;width:150px"></div>'
+    + '<input id="cp-fim" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:150px"></div>'
     + '<label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input id="cp-global" type="checkbox"> Global (todas equipes)</label>'
     + '</div>'
     + '<div style="margin-top:16px;display:flex;gap:8px">'
@@ -3118,7 +3126,7 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
 
     var menu = document.createElement('div');
     menu.id = 'cp-ctx-menu';
-    menu.style.cssText = 'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY + 'px;background:var(--card-bg);border:1px solid var(--border-subtle);border-radius:6px;padding:4px 0;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:13px';
+    menu.style.cssText = 'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY + 'px;background:var(--surface);border:1px solid var(--border-subtle);border-radius:6px;padding:4px 0;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:13px';
     var item = document.createElement('div');
     item.style.cssText = 'padding:6px 16px;cursor:pointer;color:var(--red)';
     item.textContent = 'Excluir "' + cpHit.nome + '"';
@@ -3589,12 +3597,17 @@ async function loadMembroCargo(membroId, cargo) {
 }
 
 function renderMembroCargo(cargo, membroId, container) {
-  var options = '<option value="">Sem cargo</option>';
-  (allCargos || []).forEach(function(c) {
-    options += '<option value="' + c.value + '"' + (cargo === c.value ? ' selected' : '') + '>' + esc(c.label) + '</option>';
-  });
+  var items = [{value: '', label: 'Sem cargo'}];
+  (allCargos || []).forEach(function(c) { items.push({value: c.value, label: c.label}); });
+  var current = items.find(function(i) { return i.value === (cargo || ''); });
+  var dropdownItems = items.map(function(i) {
+    return '<div class="cargo-dropdown-item' + (i.value === (cargo || '') ? ' selected' : '') + '" data-value="' + i.value + '" onclick="selectCargo(\'' + membroId + '\',\'' + i.value + '\')">' + esc(i.label) + '</div>';
+  }).join('');
   var html = '<label class="form-label">Cargo</label>' +
-    '<select class="cargo-select" id="cargo-select-' + membroId + '" onchange="updateMembroCargo(\'' + membroId + '\')">' + options + '</select>' +
+    '<div class="cargo-select-wrap" id="cargo-wrap-' + membroId + '">' +
+    '<div class="cargo-select-btn" id="cargo-btn-' + membroId + '" onclick="toggleCargoDropdown(\'' + membroId + '\')">' + esc(current ? current.label : 'Sem cargo') + '</div>' +
+    '<div class="cargo-dropdown" id="cargo-dd-' + membroId + '">' + dropdownItems + '</div>' +
+    '</div>' +
     '<div id="produto-section-' + membroId + '"></div>';
   container.innerHTML = html;
   if (cargo === 'po_produto') {
@@ -3602,9 +3615,29 @@ function renderMembroCargo(cargo, membroId, container) {
   }
 }
 
-async function updateMembroCargo(membroId) {
-  var sel = document.getElementById('cargo-select-' + membroId);
-  var cargo = sel.value || null;
+function toggleCargoDropdown(membroId) {
+  var dd = document.getElementById('cargo-dd-' + membroId);
+  var isOpen = dd.classList.contains('open');
+  document.querySelectorAll('.cargo-dropdown.open').forEach(function(el) { el.classList.remove('open'); });
+  if (!isOpen) dd.classList.add('open');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.cargo-select-wrap')) {
+    document.querySelectorAll('.cargo-dropdown.open').forEach(function(el) { el.classList.remove('open'); });
+  }
+});
+
+async function selectCargo(membroId, value) {
+  var dd = document.getElementById('cargo-dd-' + membroId);
+  dd.classList.remove('open');
+  var btn = document.getElementById('cargo-btn-' + membroId);
+  var label = value ? cargoLabelMap(value) : 'Sem cargo';
+  btn.textContent = label;
+  dd.querySelectorAll('.cargo-dropdown-item').forEach(function(el) {
+    el.classList.toggle('selected', el.getAttribute('data-value') === value);
+  });
+  var cargo = value || null;
   try {
     await api('/membros/' + membroId + '/cargo', { method: 'PUT', body: JSON.stringify({ cargo: cargo }) });
     var prodSection = document.getElementById('produto-section-' + membroId);
