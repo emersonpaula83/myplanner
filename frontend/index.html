@@ -459,6 +459,25 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 :root[data-theme="dark"] .unplanned-disclaimer.warn { background: #ff6f0018; border-left-color: #ffb74d; color: #ffcc80; }
 :root[data-theme="dark"] .unplanned-disclaimer.danger { background: #d32f2f18; border-left-color: #ef5350; color: #ef9a9a; }
 :root[data-theme="dark"] .unplanned-badge { background: #e6510020; color: #ffab40; }
+.pie-modal { max-width: 780px; }
+.pie-modal-content { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+.pie-modal-content.single { justify-content: center; }
+.pie-chart-wrap { display: flex; flex-direction: column; align-items: center; min-width: 300px; flex: 1; }
+.pie-chart-wrap h4 { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px 0; font-weight: 600; }
+.pie-chart-svg { cursor: default; }
+.pie-chart-svg path { transition: opacity .15s; }
+.pie-chart-svg path:hover { opacity: .85; }
+.pie-legend { margin-top: 12px; width: 100%; }
+.pie-legend-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--text-primary); }
+.pie-legend-color { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.pie-legend-label { flex: 1; }
+.pie-legend-value { font-weight: 600; white-space: nowrap; }
+.pie-tooltip-card { position: fixed; z-index: 1000; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 16px rgba(0,0,0,.15); pointer-events: none; max-width: 420px; max-height: 300px; overflow-y: auto; }
+.pie-tooltip-card table { border-collapse: collapse; font-size: 11px; width: 100%; }
+.pie-tooltip-card th { text-align: left; padding: 2px 8px 4px 0; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border); }
+.pie-tooltip-card td { padding: 3px 8px 3px 0; color: var(--text-primary); white-space: nowrap; }
+.pie-tooltip-card td.resumo-col { white-space: normal; max-width: 200px; word-break: break-word; }
+.pie-no-data { text-align: center; color: var(--text-secondary); padding: 40px 0; font-size: 13px; }
 .sprint-detail-layout { display: flex; flex-direction: column; gap: 20px; }
 .sprint-charts-panel { display: flex; flex-direction: column; gap: 16px; }
 .sprint-chart-card { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; }
@@ -928,6 +947,15 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     </div>
   </div>
 </div>
+
+<div class="modal-overlay" id="disclaimer-modal" onclick="if(event.target===this)closeDisclaimerModal()">
+  <div class="modal pie-modal">
+    <div class="modal-title" id="disclaimer-modal-title"></div>
+    <div id="disclaimer-modal-content"></div>
+    <div class="modal-actions"><button class="btn-cancel" onclick="closeDisclaimerModal()">Fechar</button></div>
+  </div>
+</div>
+<div class="pie-tooltip-card" id="pie-tooltip" style="display:none"></div>
 
 <div class="gantt-tooltip" id="gantt-tooltip" style="display:none"></div>
 
@@ -1731,7 +1759,7 @@ async function openSprintCapacity(sprintID) {
     if (unplanned && unplanned.sprint_atual && unplanned.sprint_atual.manutencao_count > 0) {
       const sa = unplanned.sprint_atual;
       const pctInc = sa.horas_total_sprint > 0 ? (sa.manutencao_horas / sa.horas_total_sprint * 100).toFixed(1) : '0.0';
-      html += '<div class="unplanned-disclaimer danger"><span class="unplanned-disclaimer-icon">🔥</span><div><b>' + pctInc + '%</b> da capacity dedicado em <b>' + sa.manutencao_count + '</b> incidente(s)/bug(s) (' + sa.manutencao_horas.toFixed(1) + 'h)</div></div>';
+      html += '<div class="unplanned-disclaimer danger" style="cursor:pointer" onclick="openDisclaimerModal(\'' + sprintID + '\',\'manutencao\')"><span class="unplanned-disclaimer-icon">🔥</span><div><b>' + pctInc + '%</b> da capacity dedicado em <b>' + sa.manutencao_count + '</b> incidente(s)/bug(s) (' + sa.manutencao_horas.toFixed(1) + 'h)</div></div>';
     }
     if (data.membros_ausentes_com_cards && data.membros_ausentes_com_cards.length > 0) {
       const descricoes = data.membros_ausentes_com_cards.map(m => {
@@ -1745,7 +1773,7 @@ async function openSprintCapacity(sprintID) {
     if (unplanned && unplanned.sprint_atual && unplanned.sprint_atual.outras_count > 0) {
       const sa = unplanned.sprint_atual;
       const pctOutras = sa.horas_total_sprint > 0 ? (sa.outras_horas / sa.horas_total_sprint * 100).toFixed(1) : '0.0';
-      html += '<div class="unplanned-disclaimer warn"><span class="unplanned-disclaimer-icon">⚡</span><div><b>' + pctOutras + '%</b> da capacity dedicado em <b>' + sa.outras_count + '</b> tarefa(s) não planejada(s) (' + sa.outras_horas.toFixed(1) + 'h)</div></div>';
+      html += '<div class="unplanned-disclaimer warn" style="cursor:pointer" onclick="openDisclaimerModal(\'' + sprintID + '\',\'outras\')"><span class="unplanned-disclaimer-icon">⚡</span><div><b>' + pctOutras + '%</b> da capacity dedicado em <b>' + sa.outras_count + '</b> tarefa(s) não planejada(s) (' + sa.outras_horas.toFixed(1) + 'h)</div></div>';
     }
 
     html += '<div style="margin:12px 0"><button class="btn-sm eq-btn" id="eq-btn-' + sprintID + '" style="font-size:12px;padding:4px 12px;background:var(--accent);color:#fff" onclick="openEqualizer(\'' + sprintID + '\')">⚖️ Equalizador<span class="eq-badge" id="eq-badge-' + sprintID + '">!</span></button></div>';
@@ -3439,6 +3467,38 @@ async function openEqualizer(sprintID) {
 function closeEqualizerModal() {
   document.getElementById('equalizer-modal').classList.remove('open');
   equalizerData = null;
+}
+
+async function openDisclaimerModal(sprintID, taskType) {
+  var modal = document.getElementById('disclaimer-modal');
+  var titleEl = document.getElementById('disclaimer-modal-title');
+  var content = document.getElementById('disclaimer-modal-content');
+
+  titleEl.textContent = taskType === 'manutencao' ? '🔥 Bugs e Incidentes por Produto' : '⚡ Tarefas Não Planejadas';
+  content.innerHTML = '<div class="pie-no-data">Carregando...</div>';
+  modal.classList.add('open');
+
+  var equipeVal = document.getElementById('sprints-equipe') ? document.getElementById('sprints-equipe').value : '';
+  var qs = equipeVal ? '&equipe=' + equipeVal : '';
+  try {
+    var data = await api('/sprints/' + sprintID + '/disclaimer-tasks?type=' + taskType + qs);
+    renderDisclaimerPies(content, data.tarefas, taskType);
+  } catch (e) {
+    content.innerHTML = '<div class="pie-no-data">Erro ao carregar dados</div>';
+  }
+}
+
+function closeDisclaimerModal() {
+  document.getElementById('disclaimer-modal').classList.remove('open');
+  document.getElementById('pie-tooltip').style.display = 'none';
+}
+
+function renderDisclaimerPies(container, tarefas, taskType) {
+  if (!tarefas || tarefas.length === 0) {
+    container.innerHTML = '<div class="pie-no-data">Nenhuma tarefa encontrada</div>';
+    return;
+  }
+  container.innerHTML = '<div class="pie-no-data">Gráfico será implementado na próxima etapa (' + tarefas.length + ' tarefas carregadas)</div>';
 }
 
 function renderEqualizerModal() {
