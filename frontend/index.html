@@ -3663,10 +3663,26 @@ function renderDisclaimerPies(container, tarefas, taskType) {
 
 function showPieTooltip(event, tarefas, label, horas) {
   var tip = document.getElementById('pie-tooltip');
-  tip.textContent = label + ': ' + horas.toFixed(1) + 'h (' + tarefas.length + ' tarefas)';
+
+  var html = '<table><thead><tr><th>Ticket</th><th>Descrição</th><th>Relator</th></tr></thead><tbody>';
+  tarefas.forEach(function(t) {
+    var resumo = t.resumo || '';
+    if (resumo.length > 60) resumo = resumo.substring(0, 57) + '...';
+    var relator = t.relator_nome || '—';
+    html += '<tr><td>' + esc(t.numero_ticket) + '</td><td class="resumo-col">' + esc(resumo) + '</td><td>' + esc(relator) + '</td></tr>';
+  });
+  html += '</tbody></table>';
+
+  tip.innerHTML = html;
   tip.style.display = 'block';
-  tip.style.left = (event.clientX + 12) + 'px';
-  tip.style.top = (event.clientY + 12) + 'px';
+
+  var x = event.clientX + 16;
+  var y = event.clientY + 16;
+  var rect = tip.getBoundingClientRect();
+  if (x + rect.width > window.innerWidth - 8) x = event.clientX - rect.width - 16;
+  if (y + rect.height > window.innerHeight - 8) y = event.clientY - rect.height - 16;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
 }
 
 function renderEqualizerModal() {
