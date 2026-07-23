@@ -23,6 +23,10 @@ type EquipeStore interface {
 	RemoveMembroEquipe(ctx context.Context, equipeID uuid.UUID, membroID uuid.UUID) error
 	GetDiasAusencia(ctx context.Context, membroIDs []uuid.UUID, inicio, fim time.Time) (map[uuid.UUID]int, error)
 	GetHorasTarefasEquipe(ctx context.Context, membroIDs []uuid.UUID, inicio, fim time.Time) ([]domain.HorasTarefasMembro, error)
+	UpdateMembroCargo(ctx context.Context, membroID uuid.UUID, cargo *string) error
+	ListProdutos(ctx context.Context) ([]domain.Produto, error)
+	GetMembroProdutos(ctx context.Context, membroID uuid.UUID) ([]domain.Produto, error)
+	SetMembroProdutos(ctx context.Context, membroID uuid.UUID, produtoIDs []uuid.UUID) error
 }
 
 type EquipeHandler struct {
@@ -350,4 +354,99 @@ func (h *EquipeHandler) RemoveMembro(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]string{"message": "membro removido"})
+}
+
+func (h *EquipeHandler) UpdateCargo(w http.ResponseWriter, r *http.Request) {
+	membroID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	var req struct {
+		Cargo *string `json:"cargo"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	if req.Cargo != nil && *req.Cargo != "" && !domain.IsCargoValido(*req.Cargo) {
+		respondError(w, http.StatusBadRequest, "cargo inválido")
+		return
+	}
+	if req.Cargo != nil && *req.Cargo == "" {
+		req.Cargo = nil
+	}
+	if err := h.store.UpdateMembroCargo(r.Context(), membroID, req.Cargo); err != nil {
+		h.logger.Error("failed to update membro cargo", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao atualizar cargo")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"message": "cargo atualizado"})
+}
+
+func (h *EquipeHandler) ListCargos(w http.ResponseWriter, r *http.Request) {
+	type cargoItem struct {
+		Value string `json:"value"`
+		Label string `json:"label"`
+	}
+	result := make([]cargoItem, len(domain.CargosValidos))
+	for i, c := range domain.CargosValidos {
+		result[i] = cargoItem{Value: c, Label: domain.CargoLabels[c]}
+	}
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *EquipeHandler) ListProdutos(w http.ResponseWriter, r *http.Request) {
+	produtos, err := h.store.ListProdutos(r.Context())
+	if err != nil {
+		h.logger.Error("failed to list produtos", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao listar produtos")
+		return
+	}
+	respondJSON(w, http.StatusOK, produtos)
+}
+
+func (h *EquipeHandler) GetMembroProdutos(w http.ResponseWriter, r *http.Request) {
+	membroID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	produtos, err := h.store.GetMembroProdutos(r.Context(), membroID)
+	if err != nil {
+		h.logger.Error("failed to get membro produtos", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao listar produtos do membro")
+		return
+	}
+	respondJSON(w, http.StatusOK, produtos)
+}
+
+func (h *EquipeHandler) SetMembroProdutos(w http.ResponseWriter, r *http.Request) {
+	membroID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	var req struct {
+		ProdutoIDs []string `json:"produto_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(req.ProdutoIDs))
+	for _, s := range req.ProdutoIDs {
+		id, err := uuid.Parse(s)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "produto_id inválido: "+s)
+			return
+		}
+		ids = append(ids, id)
+	}
+	if err := h.store.SetMembroProdutos(r.Context(), membroID, ids); err != nil {
+		h.logger.Error("failed to set membro produtos", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao atualizar produtos do membro")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"message": "produtos atualizados"})
 }

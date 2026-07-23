@@ -215,6 +215,13 @@ func main() {
 			r.Post("/membros/{id}/skills", skillHandler.AddMembroSkill)
 			r.Delete("/membros/{id}/skills/{skillId}", skillHandler.RemoveMembroSkill)
 
+			r.Put("/membros/{id}/cargo", equipeHandler.UpdateCargo)
+			r.Get("/membros/{id}/produtos", equipeHandler.GetMembroProdutos)
+			r.Put("/membros/{id}/produtos", equipeHandler.SetMembroProdutos)
+
+			r.Get("/produtos", equipeHandler.ListProdutos)
+			r.Get("/cargos", equipeHandler.ListCargos)
+
 			r.Get("/feriados", feriadoHandler.List)
 			r.Post("/feriados", feriadoHandler.Create)
 			r.Delete("/feriados/{id}", feriadoHandler.Delete)
