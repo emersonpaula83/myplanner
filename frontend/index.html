@@ -3568,6 +3568,25 @@ function drawPieChart(wrapEl, slices) {
     });
 
     svg.appendChild(path);
+
+    if (pct > 0.10) {
+      var midAngle = startAngle + angle / 2;
+      var labelR = r * 0.65;
+      var lx = cx + labelR * Math.cos(midAngle);
+      var ly = cy + labelR * Math.sin(midAngle);
+      var sliceLabel = document.createElementNS(svgNS, 'text');
+      sliceLabel.setAttribute('x', lx.toFixed(2));
+      sliceLabel.setAttribute('y', ly.toFixed(2));
+      sliceLabel.setAttribute('text-anchor', 'middle');
+      sliceLabel.setAttribute('dominant-baseline', 'central');
+      sliceLabel.setAttribute('font-size', '11');
+      sliceLabel.setAttribute('font-weight', '600');
+      sliceLabel.setAttribute('fill', '#fff');
+      sliceLabel.setAttribute('pointer-events', 'none');
+      sliceLabel.textContent = (pct * 100).toFixed(0) + '%';
+      svg.appendChild(sliceLabel);
+    }
+
     startAngle = endAngle;
   });
 
