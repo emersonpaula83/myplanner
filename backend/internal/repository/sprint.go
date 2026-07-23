@@ -607,7 +607,7 @@ func (r *SprintRepository) GetDisclaimerTasks(ctx context.Context, sprintID uuid
 		}
 		result = append(result, t)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (r *SprintRepository) GetDisclaimerTarefaProdutos(ctx context.Context, tarefaIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
@@ -636,7 +636,7 @@ func (r *SprintRepository) GetDisclaimerTarefaProdutos(ctx context.Context, tare
 		}
 		result[tarefaID] = append(result[tarefaID], produtoNome)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 type HistoricalUnplannedItem struct {

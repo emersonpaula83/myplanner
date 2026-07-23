@@ -3560,8 +3560,11 @@ function drawPieChart(wrapEl, slices) {
     path.setAttribute('fill', PIE_COLORS[i % PIE_COLORS.length]);
     path.setAttribute('data-slice-index', i);
 
+    path.addEventListener('mouseenter', function() {
+      buildPieTooltipContent(slice.tarefas);
+    });
     path.addEventListener('mousemove', function(e) {
-      showPieTooltip(e, slice.tarefas, slice.label, slice.horas);
+      positionPieTooltip(e);
     });
     path.addEventListener('mouseleave', function() {
       document.getElementById('pie-tooltip').style.display = 'none';
@@ -3613,14 +3616,16 @@ function drawPieChart(wrapEl, slices) {
 
   var legend = document.createElement('div');
   legend.className = 'pie-legend';
+  var legendHtml = '';
   slices.forEach(function(slice, i) {
     var pct = (slice.horas / total * 100).toFixed(1);
-    legend.innerHTML += '<div class="pie-legend-item">' +
+    legendHtml += '<div class="pie-legend-item">' +
       '<span class="pie-legend-color" style="background:' + PIE_COLORS[i % PIE_COLORS.length] + '"></span>' +
       '<span class="pie-legend-label">' + esc(slice.label) + '</span>' +
       '<span class="pie-legend-value">' + slice.horas.toFixed(1) + 'h (' + pct + '%)</span>' +
       '</div>';
   });
+  legend.innerHTML = legendHtml;
   wrapEl.appendChild(legend);
 }
 
@@ -3661,9 +3666,8 @@ function renderDisclaimerPies(container, tarefas, taskType) {
   container.appendChild(contentDiv);
 }
 
-function showPieTooltip(event, tarefas, label, horas) {
+function buildPieTooltipContent(tarefas) {
   var tip = document.getElementById('pie-tooltip');
-
   var html = '<table><thead><tr><th>Ticket</th><th>Descrição</th><th>Relator</th></tr></thead><tbody>';
   tarefas.forEach(function(t) {
     var resumo = t.resumo || '';
@@ -3672,10 +3676,12 @@ function showPieTooltip(event, tarefas, label, horas) {
     html += '<tr><td>' + esc(t.numero_ticket) + '</td><td class="resumo-col">' + esc(resumo) + '</td><td>' + esc(relator) + '</td></tr>';
   });
   html += '</tbody></table>';
-
   tip.innerHTML = html;
   tip.style.display = 'block';
+}
 
+function positionPieTooltip(event) {
+  var tip = document.getElementById('pie-tooltip');
   var x = event.clientX + 16;
   var y = event.clientY + 16;
   var rect = tip.getBoundingClientRect();
@@ -3815,7 +3821,10 @@ async function applyEqualizer() {
 
 // === MODAL UTILS ===
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+    document.getElementById('pie-tooltip').style.display = 'none';
+  }
 });
 document.addEventListener('click', e => {
   const results = document.getElementById('equipe-search-results');
