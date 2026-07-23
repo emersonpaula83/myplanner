@@ -227,3 +227,85 @@ func (r *EquipeRepository) GetHorasTarefasEquipe(ctx context.Context, membroIDs 
 	}
 	return result, rows.Err()
 }
+
+func (r *EquipeRepository) UpdateMembroCargo(ctx context.Context, membroID uuid.UUID, cargo *string) error {
+	result, err := r.pool.Exec(ctx, `
+		UPDATE membros SET cargo = $2, updated_at = NOW() WHERE id = $1
+	`, membroID, cargo)
+	if err != nil {
+		return fmt.Errorf("updating membro cargo: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not found", membroID)
+	}
+	return nil
+}
+
+func (r *EquipeRepository) ListProdutos(ctx context.Context) ([]domain.Produto, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, fonte_dados_id, jira_id, nome, descricao, projeto_id, ativo, created_at, updated_at
+		FROM produtos
+		WHERE ativo = true
+		ORDER BY nome
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("listing produtos: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]domain.Produto, 0)
+	for rows.Next() {
+		var p domain.Produto
+		if err := rows.Scan(&p.ID, &p.FonteDadosID, &p.JiraID, &p.Nome, &p.Descricao, &p.ProjetoID, &p.Ativo, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scanning produto: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, rows.Err()
+}
+
+func (r *EquipeRepository) GetMembroProdutos(ctx context.Context, membroID uuid.UUID) ([]domain.Produto, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT p.id, p.fonte_dados_id, p.jira_id, p.nome, p.descricao, p.projeto_id, p.ativo, p.created_at, p.updated_at
+		FROM produtos p
+		INNER JOIN membro_produtos mp ON mp.produto_id = p.id
+		WHERE mp.membro_id = $1
+		ORDER BY p.nome
+	`, membroID)
+	if err != nil {
+		return nil, fmt.Errorf("getting membro produtos: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]domain.Produto, 0)
+	for rows.Next() {
+		var p domain.Produto
+		if err := rows.Scan(&p.ID, &p.FonteDadosID, &p.JiraID, &p.Nome, &p.Descricao, &p.ProjetoID, &p.Ativo, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scanning membro produto: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, rows.Err()
+}
+
+func (r *EquipeRepository) SetMembroProdutos(ctx context.Context, membroID uuid.UUID, produtoIDs []uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM membro_produtos WHERE membro_id = $1`, membroID); err != nil {
+		return fmt.Errorf("clearing membro produtos: %w", err)
+	}
+
+	for _, pid := range produtoIDs {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO membro_produtos (membro_id, produto_id) VALUES ($1, $2)
+		`, membroID, pid); err != nil {
+			return fmt.Errorf("inserting membro produto: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
