@@ -438,6 +438,21 @@ type UnplannedAnalysisResult struct {
 	EquipeNome     string               `json:"equipe_nome"`
 }
 
+type DisclaimerTask struct {
+	ID              uuid.UUID `json:"id"`
+	NumeroTicket    string    `json:"numero_ticket"`
+	Resumo          string    `json:"resumo"`
+	Tipo            string    `json:"tipo"`
+	TipoDemanda     *string   `json:"tipo_demanda"`
+	EstimativaTempo int64     `json:"estimativa_tempo"`
+	RelatorNome     *string   `json:"relator_nome"`
+	Produtos        []string  `json:"produtos"`
+}
+
+type DisclaimerTasksResult struct {
+	Tarefas []DisclaimerTask `json:"tarefas"`
+}
+
 func (s *SprintService) GetUnplannedAnalysis(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*UnplannedAnalysisResult, error) {
 	stats, err := s.repo.GetUnplannedStats(ctx, sprintID, equipeID)
 	if err != nil {
@@ -544,6 +559,44 @@ func (s *SprintService) GetUnplannedAnalysis(ctx context.Context, sprintID uuid.
 	}
 
 	return result, nil
+}
+
+func (s *SprintService) GetDisclaimerTasks(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID, taskType string) (*DisclaimerTasksResult, error) {
+	rows, err := s.repo.GetDisclaimerTasks(ctx, sprintID, equipeID, taskType)
+	if err != nil {
+		return nil, err
+	}
+
+	tarefaIDs := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		tarefaIDs[i] = r.ID
+	}
+
+	produtosMap, err := s.repo.GetDisclaimerTarefaProdutos(ctx, tarefaIDs)
+	if err != nil {
+		s.logger.Warn("could not get disclaimer tarefa produtos", zap.Error(err))
+		produtosMap = map[uuid.UUID][]string{}
+	}
+
+	tarefas := make([]DisclaimerTask, len(rows))
+	for i, r := range rows {
+		produtos := produtosMap[r.ID]
+		if produtos == nil {
+			produtos = []string{}
+		}
+		tarefas[i] = DisclaimerTask{
+			ID:              r.ID,
+			NumeroTicket:    r.NumeroTicket,
+			Resumo:          r.Resumo,
+			Tipo:            r.Tipo,
+			TipoDemanda:     r.TipoDemanda,
+			EstimativaTempo: r.EstimativaTempo,
+			RelatorNome:     r.RelatorNome,
+			Produtos:        produtos,
+		}
+	}
+
+	return &DisclaimerTasksResult{Tarefas: tarefas}, nil
 }
 
 func contarDiasUteisComFeriados(inicio, fim time.Time, feriados map[string]bool) int {

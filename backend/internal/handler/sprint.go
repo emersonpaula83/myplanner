@@ -21,6 +21,7 @@ type SprintStore interface {
 	GetUnplannedAnalysis(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.UnplannedAnalysisResult, error)
 	GetBurndown(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.BurndownResult, error)
 	GetSprintsTimeline(ctx context.Context, equipeID uuid.UUID, ano int) ([]service.SprintTimelineItem, error)
+	GetDisclaimerTasks(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID, taskType string) (*service.DisclaimerTasksResult, error)
 }
 
 type SprintHandler struct {
@@ -139,6 +140,37 @@ func (h *SprintHandler) GetUnplanned(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Error("getting unplanned analysis", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to get unplanned analysis")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *SprintHandler) GetDisclaimerTasks(w http.ResponseWriter, r *http.Request) {
+	sprintID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid sprint id")
+		return
+	}
+
+	taskType := r.URL.Query().Get("type")
+	if taskType != "manutencao" && taskType != "outras" {
+		respondError(w, http.StatusBadRequest, "type must be 'manutencao' or 'outras'")
+		return
+	}
+
+	var equipeID *uuid.UUID
+	if e := r.URL.Query().Get("equipe"); e != "" {
+		id, err := uuid.Parse(e)
+		if err == nil {
+			equipeID = &id
+		}
+	}
+
+	result, err := h.store.GetDisclaimerTasks(r.Context(), sprintID, equipeID, taskType)
+	if err != nil {
+		h.logger.Error("getting disclaimer tasks", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "failed to get disclaimer tasks")
 		return
 	}
 
