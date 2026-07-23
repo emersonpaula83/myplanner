@@ -475,6 +475,16 @@ type UnplannedStats struct {
 	OutrasHoras           float64
 }
 
+type DisclaimerTarefaRow struct {
+	ID              uuid.UUID `json:"id"`
+	NumeroTicket    string    `json:"numero_ticket"`
+	Resumo          string    `json:"resumo"`
+	Tipo            string    `json:"tipo"`
+	TipoDemanda     *string   `json:"tipo_demanda"`
+	EstimativaTempo int64     `json:"estimativa_tempo"`
+	RelatorNome     *string   `json:"relator_nome"`
+}
+
 func (r *SprintRepository) GetUnplannedStats(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*UnplannedStats, error) {
 	var baseQuery string
 	var args []interface{}
@@ -545,6 +555,88 @@ func (r *SprintRepository) GetUnplannedStats(ctx context.Context, sprintID uuid.
 		return nil, fmt.Errorf("getting unplanned stats: %w", err)
 	}
 	return &stats, nil
+}
+
+func (r *SprintRepository) GetDisclaimerTasks(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID, taskType string) ([]DisclaimerTarefaRow, error) {
+	naoPlanejadasFilter := `
+		t.data_entrada_sprint > s.data_inicio
+		OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+	`
+	manutencaoFilter := `LOWER(t.tipo) IN ('bug') OR LOWER(t.tipo) LIKE '%incidente%'`
+
+	var typeFilter string
+	if taskType == "manutencao" {
+		typeFilter = fmt.Sprintf("AND (%s) AND (%s)", naoPlanejadasFilter, manutencaoFilter)
+	} else {
+		typeFilter = fmt.Sprintf("AND (%s) AND NOT (%s)", naoPlanejadasFilter, manutencaoFilter)
+	}
+
+	var equipeJoin, equipeWhere string
+	args := []interface{}{sprintID}
+	if equipeID != nil {
+		equipeJoin = "INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id"
+		equipeWhere = fmt.Sprintf("AND em.equipe_id = $%d", len(args)+1)
+		args = append(args, *equipeID)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.tipo_demanda,
+		       COALESCE(t.estimativa_tempo, 0), m.nome
+		FROM tarefas t
+		INNER JOIN sprints s ON s.id = t.sprint_id
+		LEFT JOIN membros m ON m.id = t.relator_id
+		%s
+		WHERE t.sprint_id = $1 AND t.responsavel_id IS NOT NULL
+		  AND s.data_inicio IS NOT NULL
+		  %s %s
+		ORDER BY t.numero_ticket
+	`, equipeJoin, typeFilter, equipeWhere)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("getting disclaimer tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var result []DisclaimerTarefaRow
+	for rows.Next() {
+		var t DisclaimerTarefaRow
+		if err := rows.Scan(&t.ID, &t.NumeroTicket, &t.Resumo, &t.Tipo, &t.TipoDemanda,
+			&t.EstimativaTempo, &t.RelatorNome); err != nil {
+			return nil, fmt.Errorf("scanning disclaimer task: %w", err)
+		}
+		result = append(result, t)
+	}
+	return result, nil
+}
+
+func (r *SprintRepository) GetDisclaimerTarefaProdutos(ctx context.Context, tarefaIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
+	if len(tarefaIDs) == 0 {
+		return map[uuid.UUID][]string{}, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT tp.tarefa_id, p.nome
+		FROM tarefa_produtos tp
+		INNER JOIN produtos p ON p.id = tp.produto_id
+		WHERE tp.tarefa_id = ANY($1)
+		ORDER BY p.nome
+	`, tarefaIDs)
+	if err != nil {
+		return nil, fmt.Errorf("getting disclaimer tarefa produtos: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID][]string)
+	for rows.Next() {
+		var tarefaID uuid.UUID
+		var produtoNome string
+		if err := rows.Scan(&tarefaID, &produtoNome); err != nil {
+			return nil, fmt.Errorf("scanning tarefa produto: %w", err)
+		}
+		result[tarefaID] = append(result[tarefaID], produtoNome)
+	}
+	return result, nil
 }
 
 type HistoricalUnplannedItem struct {
