@@ -2199,7 +2199,7 @@ async function loadMembroDetail(membroId, periodo) {
       });
     });
 
-    loadMembroCargo(membroId);
+    loadMembroCargo(membroId, m.cargo);
     loadMembroSkills(membroId);
   } catch (err) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(err.message) + '</div></div>';
@@ -3577,13 +3577,11 @@ document.addEventListener('click', e => {
 var allCargos = null;
 var allProdutos = null;
 
-async function loadMembroCargo(membroId) {
+async function loadMembroCargo(membroId, cargo) {
   var section = document.getElementById('membro-cargo-section');
   if (!section) return;
   try {
     if (!allCargos) allCargos = await api('/cargos');
-    var membro = await api('/membros/' + membroId);
-    var cargo = membro.membro.cargo;
     renderMembroCargo(cargo, membroId, section);
   } catch (err) {
     section.innerHTML = '';

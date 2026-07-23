@@ -443,7 +443,15 @@ func (h *EquipeHandler) SetMembroProdutos(w http.ResponseWriter, r *http.Request
 		}
 		ids = append(ids, id)
 	}
-	if err := h.store.SetMembroProdutos(r.Context(), membroID, ids); err != nil {
+	seen := make(map[uuid.UUID]bool, len(ids))
+	deduped := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			deduped = append(deduped, id)
+		}
+	}
+	if err := h.store.SetMembroProdutos(r.Context(), membroID, deduped); err != nil {
 		h.logger.Error("failed to set membro produtos", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao atualizar produtos do membro")
 		return
