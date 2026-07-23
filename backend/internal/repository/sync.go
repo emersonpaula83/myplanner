@@ -110,6 +110,28 @@ func (r *SyncRepository) UpsertSprint(ctx context.Context, fonteDadosID uuid.UUI
 	return id, nil
 }
 
+func (r *SyncRepository) GetDistinctBoardProjects(ctx context.Context, fonteDadosID uuid.UUID) (map[int]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT board_id, projeto_id
+		FROM sprints
+		WHERE fonte_dados_id = $1 AND board_id IS NOT NULL AND projeto_id IS NOT NULL
+	`, fonteDadosID)
+	if err != nil {
+		return nil, fmt.Errorf("getting board projects: %w", err)
+	}
+	defer rows.Close()
+	result := make(map[int]uuid.UUID)
+	for rows.Next() {
+		var boardID int
+		var projetoID uuid.UUID
+		if err := rows.Scan(&boardID, &projetoID); err != nil {
+			return nil, err
+		}
+		result[boardID] = projetoID
+	}
+	return result, nil
+}
+
 func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams) (uuid.UUID, error) {
 	ce := t.CamposExtras
 	if ce == nil {

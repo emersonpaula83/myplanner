@@ -408,6 +408,7 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 	memberCache := make(map[string]uuid.UUID)
 	sprintCache := make(map[int]uuid.UUID)
 	projectCache := make(map[string]uuid.UUID)
+	boardProjectMap := make(map[int]uuid.UUID)
 	var allPendingParents []parentRef
 
 	for i, issue := range issues {
@@ -419,6 +420,10 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 
 		s.ensureMember(ctx, fonte, issue.Fields.Assignee, issue.Fields.Project.Name, memberCache, &totals)
 		s.ensureMember(ctx, fonte, issue.Fields.Reporter, issue.Fields.Project.Name, memberCache, &totals)
+
+		if issue.Fields.Sprint != nil && issue.Fields.Sprint.OriginBoardID > 0 {
+			boardProjectMap[issue.Fields.Sprint.OriginBoardID] = projetoID
+		}
 
 		tarefaID, err := s.processIssue(ctx, fonte, projetoID, issue, memberCache, sprintCache)
 		if err != nil {
@@ -453,6 +458,11 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 	totals.Projetos = len(projectCache)
 	totals.Sprints = len(sprintCache)
 	syncErrors = append(syncErrors, s.resolveParents(ctx, fonte, allPendingParents)...)
+
+	extraSprints, sprintErrors := s.syncEmptyBoardSprints(ctx, client, fonte, boardProjectMap, sprintCache)
+	totals.Sprints += extraSprints
+	syncErrors = append(syncErrors, sprintErrors...)
+
 	return totals, syncErrors
 }
 
@@ -510,6 +520,7 @@ func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client,
 	memberCache := make(map[string]uuid.UUID)
 	sprintCache := make(map[int]uuid.UUID)
 	projectCache := make(map[string]uuid.UUID)
+	boardProjectMap := make(map[int]uuid.UUID)
 	var pendingParents []parentRef
 
 	for i, issue := range issues {
@@ -521,6 +532,10 @@ func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client,
 
 		s.ensureMember(ctx, fonte, issue.Fields.Assignee, issue.Fields.Project.Name, memberCache, &totals)
 		s.ensureMember(ctx, fonte, issue.Fields.Reporter, issue.Fields.Project.Name, memberCache, &totals)
+
+		if issue.Fields.Sprint != nil && issue.Fields.Sprint.OriginBoardID > 0 {
+			boardProjectMap[issue.Fields.Sprint.OriginBoardID] = projetoID
+		}
 
 		tarefaID, err := s.processIssue(ctx, fonte, projetoID, issue, memberCache, sprintCache)
 		if err != nil {
@@ -556,7 +571,60 @@ func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client,
 	totals.Sprints = len(sprintCache)
 	s.flushProgress(ctx, syncLogID, totals)
 	syncErrors = append(syncErrors, s.resolveParents(ctx, fonte, pendingParents)...)
+
+	extraSprints, sprintErrors := s.syncEmptyBoardSprints(ctx, client, fonte, boardProjectMap, sprintCache)
+	totals.Sprints += extraSprints
+	syncErrors = append(syncErrors, sprintErrors...)
+
 	return totals, syncErrors
+}
+
+func (s *SyncService) syncEmptyBoardSprints(ctx context.Context, client jira.Client, fonte *domain.FonteDados, boardProjectMap map[int]uuid.UUID, sprintCache map[int]uuid.UUID) (int, []error) {
+	dbBoards, err := s.repo.GetDistinctBoardProjects(ctx, fonte.ID)
+	if err == nil {
+		for bid, pid := range dbBoards {
+			if _, ok := boardProjectMap[bid]; !ok {
+				boardProjectMap[bid] = pid
+			}
+		}
+	}
+
+	var count int
+	var errs []error
+	for boardID, projetoID := range boardProjectMap {
+		boardSprints, err := client.GetBoardSprints(ctx, boardID)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("fetching board %d sprints: %w", boardID, err))
+			continue
+		}
+		for _, bs := range boardSprints {
+			if _, ok := sprintCache[bs.ID]; ok {
+				continue
+			}
+			var estado *string
+			if bs.State != "" {
+				estado = &bs.State
+			}
+			bid := bs.OriginBoardID
+			var boardPtr *int
+			if bid > 0 {
+				boardPtr = &bid
+			}
+			_, err := s.repo.UpsertSprint(ctx, fonte.ID, bs.ID, bs.Name, estado,
+				parseOptionalTime(bs.StartDate), parseOptionalTime(bs.EndDate),
+				parseOptionalTime(bs.CompleteDate), boardPtr, &projetoID)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("upserting board sprint %d: %w", bs.ID, err))
+				continue
+			}
+			sprintCache[bs.ID] = uuid.Nil
+			count++
+		}
+	}
+	if count > 0 {
+		s.logger.Info("synced empty board sprints", zap.Int("count", count))
+	}
+	return count, errs
 }
 
 func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados, projetoID uuid.UUID, issue jira.JiraIssue, memberCache map[string]uuid.UUID, sprintCache map[int]uuid.UUID) (uuid.UUID, error) {
