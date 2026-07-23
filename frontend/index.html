@@ -528,6 +528,27 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .skill-dropdown-item { padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--text-primary); }
 .skill-dropdown-item:hover { background: var(--accent-soft); }
 .skill-dropdown-item.create { color: var(--accent); font-style: italic; }
+.cargo-section { margin-bottom: 16px; }
+.cargo-section .form-label { font-size: 12px; margin-bottom: 4px; display: block; color: var(--text-secondary); }
+.cargo-select { padding: 5px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); min-width: 220px; }
+.produto-section { margin-top: 10px; }
+.produto-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.produto-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); color: var(--accent); border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+.produto-chip .produto-remove { cursor: pointer; opacity: .6; font-size: 14px; line-height: 1; }
+.produto-chip .produto-remove:hover { opacity: 1; }
+.produto-chip .produto-remove.disabled { pointer-events: none; opacity: .2; }
+.produto-input-wrap { position: relative; display: inline-block; margin-top: 6px; }
+.produto-input-wrap input { padding: 4px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); width: 220px; }
+.produto-dropdown { position: absolute; top: 100%; left: 0; width: 220px; max-height: 160px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; z-index: 100; display: none; }
+.produto-dropdown.open { display: block; }
+.produto-dropdown-item { padding: 6px 10px; font-size: 12px; cursor: pointer; color: var(--text-primary); }
+.produto-dropdown-item:hover { background: var(--accent-soft); }
+.po-warning { color: var(--red); font-size: 11px; margin-top: 4px; }
+.cargo-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+.cargo-badge.blue { background: rgba(59,130,246,.15); color: #3b82f6; }
+.cargo-badge.purple { background: rgba(139,92,246,.15); color: #8b5cf6; }
+.cargo-badge.green { background: rgba(34,197,94,.15); color: #22c55e; }
+.cargo-badge.gray { background: rgba(148,163,184,.15); color: #94a3b8; }
 .membro-detail-period-chips { display: flex; gap: 6px; margin-bottom: 16px; }
 .membro-detail-period-chips .chip { cursor: pointer; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--chip-bg); color: var(--chip-text); border: none; transition: background .15s, color .15s; }
 .membro-detail-period-chips .chip.active { background: var(--chip-active-bg); color: var(--chip-active-text); }
@@ -2133,6 +2154,7 @@ async function loadMembroDetail(membroId, periodo) {
         '<button class="btn-sm" onclick="salvarDesligamento(\'' + membroId + '\')">Salvar</button>' +
         (m.data_desligamento ? '<button class="btn-sm danger" onclick="limparDesligamento(\'' + membroId + '\')">Limpar</button>' : '') +
       '</div>' +
+      '<div class="cargo-section" id="membro-cargo-section"></div>' +
       '<div class="skill-section" id="membro-skills-section"></div>' +
       '<div class="membro-detail-period-chips" id="membro-period-chips"><span style="font-size:12px;color:var(--text-secondary);margin-right:4px">Período</span>' + periodChips + '</div>' +
       '<div class="membro-stats-grid">' +
@@ -2156,6 +2178,7 @@ async function loadMembroDetail(membroId, periodo) {
       });
     });
 
+    loadMembroCargo(membroId);
     loadMembroSkills(membroId);
   } catch (err) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(err.message) + '</div></div>';
@@ -3528,6 +3551,159 @@ document.addEventListener('click', e => {
     results.classList.remove('open');
   }
 });
+
+// === CARGO / PRODUTOS (membro detail) ===
+var allCargos = null;
+var allProdutos = null;
+
+async function loadMembroCargo(membroId) {
+  var section = document.getElementById('membro-cargo-section');
+  if (!section) return;
+  try {
+    if (!allCargos) allCargos = await api('/cargos');
+    var membro = await api('/membros/' + membroId);
+    var cargo = membro.membro.cargo;
+    renderMembroCargo(cargo, membroId, section);
+  } catch (err) {
+    section.innerHTML = '';
+  }
+}
+
+function renderMembroCargo(cargo, membroId, container) {
+  var options = '<option value="">Sem cargo</option>';
+  (allCargos || []).forEach(function(c) {
+    options += '<option value="' + c.value + '"' + (cargo === c.value ? ' selected' : '') + '>' + esc(c.label) + '</option>';
+  });
+  var html = '<label class="form-label">Cargo</label>' +
+    '<select class="cargo-select" id="cargo-select-' + membroId + '" onchange="updateMembroCargo(\'' + membroId + '\')">' + options + '</select>' +
+    '<div id="produto-section-' + membroId + '"></div>';
+  container.innerHTML = html;
+  if (cargo === 'po_produto') {
+    loadMembroProdutos(membroId);
+  }
+}
+
+async function updateMembroCargo(membroId) {
+  var sel = document.getElementById('cargo-select-' + membroId);
+  var cargo = sel.value || null;
+  try {
+    await api('/membros/' + membroId + '/cargo', { method: 'PUT', body: JSON.stringify({ cargo: cargo }) });
+    var prodSection = document.getElementById('produto-section-' + membroId);
+    if (cargo === 'po_produto') {
+      loadMembroProdutos(membroId);
+    } else {
+      prodSection.innerHTML = '';
+    }
+  } catch (err) {
+    alert('Falha ao atualizar cargo');
+  }
+}
+
+async function loadMembroProdutos(membroId) {
+  var section = document.getElementById('produto-section-' + membroId);
+  if (!section) return;
+  try {
+    if (!allProdutos) allProdutos = await api('/produtos');
+    var produtos = await api('/membros/' + membroId + '/produtos');
+    renderMembroProdutos(produtos, membroId, section);
+  } catch (err) {
+    section.innerHTML = '';
+  }
+}
+
+function renderMembroProdutos(produtos, membroId, container) {
+  var html = '<div class="produto-section"><label class="form-label">Produtos (obrigatório para P.O.)</label><div class="produto-chips">';
+  var disableRemove = produtos.length <= 1;
+  produtos.forEach(function(p) {
+    html += '<span class="produto-chip">' + esc(p.nome) +
+      '<span class="produto-remove' + (disableRemove ? ' disabled' : '') + '" onclick="removeProdutoFromMembro(\'' + membroId + '\',\'' + p.id + '\',' + produtos.length + ')">&times;</span></span>';
+  });
+  html += '<button class="skill-add-btn" onclick="showProdutoInput(\'' + membroId + '\')" title="Adicionar produto">+</button>';
+  html += '</div>';
+  if (produtos.length === 0) {
+    html += '<div class="po-warning">Selecione ao menos 1 produto</div>';
+  }
+  html += '<div class="produto-input-wrap" id="produto-input-wrap-' + membroId + '" style="display:none">' +
+    '<input type="text" id="produto-input-' + membroId + '" placeholder="Buscar produto..." ' +
+    'oninput="searchProdutos(\'' + membroId + '\')" onkeydown="produtoInputKeydown(event,\'' + membroId + '\')">' +
+    '<div class="produto-dropdown" id="produto-dropdown-' + membroId + '"></div></div>';
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function showProdutoInput(membroId) {
+  var wrap = document.getElementById('produto-input-wrap-' + membroId);
+  wrap.style.display = 'inline-block';
+  var inp = document.getElementById('produto-input-' + membroId);
+  inp.value = '';
+  inp.focus();
+}
+
+var produtoSearchTimer;
+
+function searchProdutos(membroId) {
+  clearTimeout(produtoSearchTimer);
+  var inp = document.getElementById('produto-input-' + membroId);
+  var q = inp.value.trim().toLowerCase();
+  var dd = document.getElementById('produto-dropdown-' + membroId);
+  if (q.length === 0) { dd.classList.remove('open'); return; }
+  produtoSearchTimer = setTimeout(function() {
+    var currentChips = document.querySelectorAll('#produto-section-' + membroId + ' .produto-chip');
+    var currentIds = new Set();
+    currentChips.forEach(function(c) {
+      var onclick = c.querySelector('.produto-remove')?.getAttribute('onclick') || '';
+      var match = onclick.match(/'([a-f0-9-]+)'/g);
+      if (match && match[1]) currentIds.add(match[1].replace(/'/g, ''));
+    });
+    var filtered = (allProdutos || []).filter(function(p) {
+      return p.nome.toLowerCase().includes(q);
+    }).slice(0, 20);
+    var html = '';
+    filtered.forEach(function(p) {
+      html += '<div class="produto-dropdown-item" onclick="addProdutoToMembro(\'' + membroId + '\',\'' + p.id + '\')">' + esc(p.nome) + '</div>';
+    });
+    if (filtered.length === 0) {
+      html = '<div class="produto-dropdown-item" style="color:var(--text-secondary)">Nenhum produto encontrado</div>';
+    }
+    dd.innerHTML = html;
+    dd.classList.add('open');
+  }, 200);
+}
+
+function produtoInputKeydown(e, membroId) {
+  if (e.key === 'Escape') {
+    var wrap = document.getElementById('produto-input-wrap-' + membroId);
+    wrap.style.display = 'none';
+    document.getElementById('produto-dropdown-' + membroId).classList.remove('open');
+  }
+}
+
+async function addProdutoToMembro(membroId, produtoId) {
+  try {
+    var existing = await api('/membros/' + membroId + '/produtos');
+    var ids = existing.map(function(p) { return p.id; });
+    if (ids.indexOf(produtoId) === -1) ids.push(produtoId);
+    await api('/membros/' + membroId + '/produtos', { method: 'PUT', body: JSON.stringify({ produto_ids: ids }) });
+    var wrap = document.getElementById('produto-input-wrap-' + membroId);
+    wrap.style.display = 'none';
+    document.getElementById('produto-dropdown-' + membroId).classList.remove('open');
+    loadMembroProdutos(membroId);
+  } catch (err) {
+    alert('Falha ao adicionar produto');
+  }
+}
+
+async function removeProdutoFromMembro(membroId, produtoId, currentCount) {
+  if (currentCount <= 1) return;
+  try {
+    var existing = await api('/membros/' + membroId + '/produtos');
+    var ids = existing.filter(function(p) { return p.id !== produtoId; }).map(function(p) { return p.id; });
+    await api('/membros/' + membroId + '/produtos', { method: 'PUT', body: JSON.stringify({ produto_ids: ids }) });
+    loadMembroProdutos(membroId);
+  } catch (err) {
+    alert('Falha ao remover produto');
+  }
+}
 
 // === SKILLS (membro detail) ===
 let skillSearchTimer = null;
