@@ -3493,12 +3493,161 @@ function closeDisclaimerModal() {
   document.getElementById('pie-tooltip').style.display = 'none';
 }
 
+var PIE_COLORS = ['#0D7C66', '#5B7FBF', '#D4483B', '#C78D2E', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
+
+function aggregateTarefasByKey(tarefas, keyFn) {
+  var groups = {};
+  tarefas.forEach(function(t) {
+    var keys = keyFn(t);
+    if (!keys || keys.length === 0) keys = ['Sem componente'];
+    var horas = (t.estimativa_tempo || 0) / 3600;
+    keys.forEach(function(k) {
+      if (!groups[k]) groups[k] = { label: k, horas: 0, tarefas: [] };
+      groups[k].horas += horas;
+      if (groups[k].tarefas.indexOf(t) === -1) groups[k].tarefas.push(t);
+    });
+  });
+  var arr = Object.values(groups).sort(function(a, b) { return b.horas - a.horas; });
+  return arr;
+}
+
+function drawPieChart(wrapEl, slices) {
+  if (!slices || slices.length === 0) {
+    wrapEl.innerHTML = '<div class="pie-no-data">Sem dados</div>';
+    return;
+  }
+
+  var total = slices.reduce(function(s, d) { return s + d.horas; }, 0);
+  if (total === 0) {
+    wrapEl.innerHTML = '<div class="pie-no-data">Sem horas estimadas</div>';
+    return;
+  }
+
+  var size = 200, cx = size / 2, cy = size / 2, r = 85;
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 ' + size + ' ' + size);
+  svg.classList.add('pie-chart-svg');
+
+  var startAngle = -Math.PI / 2;
+
+  slices.forEach(function(slice, i) {
+    var pct = slice.horas / total;
+    var angle = pct * 2 * Math.PI;
+    var endAngle = startAngle + angle;
+
+    var path = document.createElementNS(svgNS, 'path');
+    var d;
+    if (pct >= 0.999) {
+      d = 'M ' + cx + ' ' + (cy - r) +
+          ' A ' + r + ' ' + r + ' 0 1 1 ' + cx + ' ' + (cy + r) +
+          ' A ' + r + ' ' + r + ' 0 1 1 ' + cx + ' ' + (cy - r) + ' Z';
+    } else {
+      var x1 = cx + r * Math.cos(startAngle);
+      var y1 = cy + r * Math.sin(startAngle);
+      var x2 = cx + r * Math.cos(endAngle);
+      var y2 = cy + r * Math.sin(endAngle);
+      var largeArc = angle > Math.PI ? 1 : 0;
+      d = 'M ' + cx + ' ' + cy +
+          ' L ' + x1.toFixed(2) + ' ' + y1.toFixed(2) +
+          ' A ' + r + ' ' + r + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) +
+          ' Z';
+    }
+
+    path.setAttribute('d', d);
+    path.setAttribute('fill', PIE_COLORS[i % PIE_COLORS.length]);
+    path.setAttribute('data-slice-index', i);
+
+    path.addEventListener('mousemove', function(e) {
+      showPieTooltip(e, slice.tarefas, slice.label, slice.horas);
+    });
+    path.addEventListener('mouseleave', function() {
+      document.getElementById('pie-tooltip').style.display = 'none';
+    });
+
+    svg.appendChild(path);
+    startAngle = endAngle;
+  });
+
+  var centerText = document.createElementNS(svgNS, 'text');
+  centerText.setAttribute('x', cx);
+  centerText.setAttribute('y', cy - 6);
+  centerText.setAttribute('text-anchor', 'middle');
+  centerText.setAttribute('font-size', '16');
+  centerText.setAttribute('font-weight', '700');
+  centerText.setAttribute('fill', 'var(--text-primary)');
+  centerText.textContent = total.toFixed(1) + 'h';
+  svg.appendChild(centerText);
+
+  var centerLabel = document.createElementNS(svgNS, 'text');
+  centerLabel.setAttribute('x', cx);
+  centerLabel.setAttribute('y', cy + 12);
+  centerLabel.setAttribute('text-anchor', 'middle');
+  centerLabel.setAttribute('font-size', '10');
+  centerLabel.setAttribute('fill', 'var(--text-secondary)');
+  centerLabel.textContent = 'total';
+  svg.appendChild(centerLabel);
+
+  wrapEl.appendChild(svg);
+
+  var legend = document.createElement('div');
+  legend.className = 'pie-legend';
+  slices.forEach(function(slice, i) {
+    var pct = (slice.horas / total * 100).toFixed(1);
+    legend.innerHTML += '<div class="pie-legend-item">' +
+      '<span class="pie-legend-color" style="background:' + PIE_COLORS[i % PIE_COLORS.length] + '"></span>' +
+      '<span class="pie-legend-label">' + esc(slice.label) + '</span>' +
+      '<span class="pie-legend-value">' + slice.horas.toFixed(1) + 'h (' + pct + '%)</span>' +
+      '</div>';
+  });
+  wrapEl.appendChild(legend);
+}
+
 function renderDisclaimerPies(container, tarefas, taskType) {
   if (!tarefas || tarefas.length === 0) {
     container.innerHTML = '<div class="pie-no-data">Nenhuma tarefa encontrada</div>';
     return;
   }
-  container.innerHTML = '<div class="pie-no-data">Gráfico será implementado na próxima etapa (' + tarefas.length + ' tarefas carregadas)</div>';
+
+  var contentDiv = document.createElement('div');
+  contentDiv.className = 'pie-modal-content';
+
+  if (taskType === 'manutencao') {
+    contentDiv.classList.add('single');
+    var wrap = document.createElement('div');
+    wrap.className = 'pie-chart-wrap';
+    wrap.innerHTML = '<h4>Por Produto</h4>';
+    var slices = aggregateTarefasByKey(tarefas, function(t) { return t.produtos && t.produtos.length > 0 ? t.produtos : null; });
+    drawPieChart(wrap, slices);
+    contentDiv.appendChild(wrap);
+  } else {
+    var wrap1 = document.createElement('div');
+    wrap1.className = 'pie-chart-wrap';
+    wrap1.innerHTML = '<h4>Por Tipo de Demanda</h4>';
+    var slicesTipo = aggregateTarefasByKey(tarefas, function(t) { return [t.tipo_demanda || 'Não classificado']; });
+    drawPieChart(wrap1, slicesTipo);
+    contentDiv.appendChild(wrap1);
+
+    var wrap2 = document.createElement('div');
+    wrap2.className = 'pie-chart-wrap';
+    wrap2.innerHTML = '<h4>Por Produto</h4>';
+    var slicesProd = aggregateTarefasByKey(tarefas, function(t) { return t.produtos && t.produtos.length > 0 ? t.produtos : null; });
+    drawPieChart(wrap2, slicesProd);
+    contentDiv.appendChild(wrap2);
+  }
+
+  container.innerHTML = '';
+  container.appendChild(contentDiv);
+}
+
+function showPieTooltip(event, tarefas, label, horas) {
+  var tip = document.getElementById('pie-tooltip');
+  tip.textContent = label + ': ' + horas.toFixed(1) + 'h (' + tarefas.length + ' tarefas)';
+  tip.style.display = 'block';
+  tip.style.left = (event.clientX + 12) + 'px';
+  tip.style.top = (event.clientY + 12) + 'px';
 }
 
 function renderEqualizerModal() {
