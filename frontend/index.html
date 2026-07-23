@@ -1196,6 +1196,27 @@ async function removeMembroFromEquipe(equipeId, membroId) {
   } catch (e) { alert('Erro: ' + e.message); }
 }
 
+function cargoLabelMap(cargo) {
+  var labels = {
+    'coordenador_desenvolvimento': 'Coord. Dev',
+    'po_produto': 'P.O.',
+    'gerente_tecnologia': 'Ger. Tecnologia',
+    'gerente_executivo': 'Ger. Executivo',
+    'scrum_master': 'Scrum Master',
+    'agile_master': 'Agile Master',
+    'desenvolvedor': 'Dev'
+  };
+  return labels[cargo] || '';
+}
+
+function cargoBadgeColor(cargo) {
+  if (!cargo) return '';
+  if (cargo === 'po_produto') return 'purple';
+  if (cargo === 'scrum_master' || cargo === 'agile_master') return 'green';
+  if (cargo === 'desenvolvedor') return 'gray';
+  return 'blue';
+}
+
 function renderEquipeResumo(r, equipeId, activePeriod) {
   if (!activePeriod) activePeriod = currentEquipePeriod || '3m';
   const pctBar = v => Math.min(100, Math.max(0, v));
@@ -1208,7 +1229,7 @@ function renderEquipeResumo(r, equipeId, activePeriod) {
     const c = colors[i % colors.length]; const pct = m.atuacao_rastreada || 0;
     membersHtml += '<div class="member-row" onclick="openMembroDetail(\'' + m.id + '\')">' +
       '<div class="member-avatar" style="background:' + c + '">' + initials(m.nome) + '</div>' +
-      '<div class="member-info"><div class="member-name">' + esc(m.nome) + '</div><div class="member-email">' + esc(m.email) + '</div></div>' +
+      '<div class="member-info"><div class="member-name">' + esc(m.nome) + (m.cargo ? '<span class="cargo-badge ' + cargoBadgeColor(m.cargo) + '">' + cargoLabelMap(m.cargo) + '</span>' : '') + '</div><div class="member-email">' + esc(m.email) + '</div></div>' +
       '<div class="member-metric-wrap"><div class="member-bar-wrap"><div class="member-bar"><div class="member-bar-fill ' + barClass(pct) + '" style="width:' + pctBar(pct) + '%"></div></div></div><div class="member-pct">' + pct.toFixed(1) + '%</div>' +
       '<button class="btn-remove-member" onclick="event.stopPropagation();removeMembroFromEquipe(\'' + equipeId + '\',\'' + m.id + '\')">Remover</button></div></div>';
   });
