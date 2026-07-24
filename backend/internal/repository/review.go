@@ -86,8 +86,8 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 		       CASE WHEN t.data_entrada_sprint > s.data_inicio
 		            OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
 		            THEN true ELSE false END AS nao_planejada,
-		       ARRAY_AGG(DISTINCT p.nome) FILTER (WHERE p.nome IS NOT NULL) AS produtos,
-		       ARRAY_AGG(DISTINCT p.id) FILTER (WHERE p.id IS NOT NULL) AS produto_ids
+		       ARRAY_AGG(p.nome ORDER BY p.id) FILTER (WHERE p.nome IS NOT NULL) AS produtos,
+		       ARRAY_AGG(p.id ORDER BY p.id) FILTER (WHERE p.id IS NOT NULL) AS produto_ids
 		FROM tarefas t
 		INNER JOIN sprints s ON s.id = t.sprint_id
 		LEFT JOIN membros m ON m.id = t.relator_id

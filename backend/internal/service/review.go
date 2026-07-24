@@ -139,13 +139,15 @@ func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, e
 			stats.Detalhes.EmAndamento[t.Status]++
 		}
 
+		isBugIncidente := tipoLower == "bug" || strings.Contains(tipoLower, "incidente")
+
 		// Planejada tracking
 		if !t.NaoPlanejada {
 			stats.PlanejadasTotal++
 			planejamento.Planejadas++
 		} else {
 			planejamento.NaoPlanejadas++
-			if tipoLower == "bug" || strings.Contains(tipoLower, "incidente") {
+			if isBugIncidente {
 				planejamento.NaoPlanejadasBugs++
 			} else {
 				planejamento.NaoPlanejadasOutras++
@@ -153,7 +155,6 @@ func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, e
 		}
 
 		// Type classification
-		isBugIncidente := tipoLower == "bug" || strings.Contains(tipoLower, "incidente")
 		isGDPTC := gdptcSet[t.ID]
 
 		if isBugIncidente {
