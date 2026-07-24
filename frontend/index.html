@@ -2171,6 +2171,135 @@ function drawReviewPieCharts(data) {
   if (planEl) drawPieChart(planEl, planSlices);
 }
 
+function loadReviewDestaques() {
+  var container = document.getElementById('review-destaques-list');
+  if (!container || !_reviewEquipeID) return;
+
+  api('/sprints/' + window._currentSprintID + '/review/destaques?equipe_id=' + _reviewEquipeID)
+    .then(function(destaques) {
+      renderDestaques(container, destaques || []);
+    })
+    .catch(function(err) {
+      container.innerHTML = '<div style="color:#c00;font-size:12px">Erro ao carregar destaques: ' + esc(err.message) + '</div>';
+    });
+}
+
+function renderDestaques(container, destaques) {
+  // Group by produto
+  var byProduto = {};
+  var produtoNames = {};
+  destaques.forEach(function(d) {
+    if (!byProduto[d.produto_id]) {
+      byProduto[d.produto_id] = [];
+      produtoNames[d.produto_id] = d.produto_nome;
+    }
+    byProduto[d.produto_id].push(d);
+  });
+
+  var html = '';
+  Object.keys(byProduto).forEach(function(prodID) {
+    var items = byProduto[prodID];
+    var prodName = produtoNames[prodID] || 'Produto';
+    html += '<div class="review-produto-destaques">';
+    html += '<h4>' + esc(prodName) + '</h4>';
+    html += '<button class="review-add-destaque" onclick="showDestaqueForm(\'' + prodID + '\',\'' + esc(prodName) + '\')">+ Adicionar destaque</button>';
+    html += '<div id="destaque-form-' + prodID + '"></div>';
+    items.forEach(function(d) {
+      html += '<div class="review-destaque-item">';
+      html += '<div class="review-destaque-actions">';
+      html += '<button onclick="showDestaqueForm(\'' + prodID + '\',\'' + esc(prodName) + '\',' + JSON.stringify(d).replace(/"/g, '&quot;') + ')" title="Editar">&#9998;</button>';
+      html += '<button onclick="deleteDestaque(\'' + d.id + '\')" title="Remover">&#128465;</button>';
+      html += '</div>';
+      html += '<div class="destaque-title">' + esc(d.titulo) + '</div>';
+      html += '<div class="destaque-desc">' + esc(d.descricao) + '</div>';
+      if (d.link) html += '<a class="destaque-link" href="' + esc(d.link) + '" target="_blank">' + esc(d.link) + '</a>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  // Add blocks for products that have no destaques yet
+  if (_reviewData && _reviewData.grafico_produtos) {
+    _reviewData.grafico_produtos.forEach(function(p) {
+      if (p.produto === 'Sem Produto' || byProduto[p.produto_id]) return;
+      html += '<div class="review-produto-destaques">';
+      html += '<h4>' + esc(p.produto) + '</h4>';
+      html += '<button class="review-add-destaque" onclick="showDestaqueForm(\'' + p.produto_id + '\',\'' + esc(p.produto) + '\')">+ Adicionar destaque</button>';
+      html += '<div id="destaque-form-' + p.produto_id + '"></div>';
+      html += '</div>';
+    });
+  }
+
+  container.innerHTML = html;
+}
+
+function showDestaqueForm(produtoID, produtoNome, destaque) {
+  var formContainer = document.getElementById('destaque-form-' + produtoID);
+  if (!formContainer) {
+    // If no existing destaques for this product, we need to create the block
+    var list = document.getElementById('review-destaques-list');
+    if (!list) return;
+    var block = document.createElement('div');
+    block.className = 'review-produto-destaques';
+    block.innerHTML = '<h4>' + esc(produtoNome) + '</h4><div id="destaque-form-' + produtoID + '"></div>';
+    list.appendChild(block);
+    formContainer = document.getElementById('destaque-form-' + produtoID);
+  }
+
+  var titulo = destaque ? destaque.titulo : '';
+  var descricao = destaque ? destaque.descricao : '';
+  var link = destaque && destaque.link ? destaque.link : '';
+  var destaqueID = destaque ? destaque.id : '';
+
+  formContainer.innerHTML = '<div class="review-destaque-form">' +
+    '<input type="text" id="destaque-titulo-' + produtoID + '" placeholder="Título" value="' + esc(titulo).replace(/"/g, '&quot;') + '" maxlength="200">' +
+    '<textarea id="destaque-desc-' + produtoID + '" placeholder="Descrição">' + esc(descricao) + '</textarea>' +
+    '<input type="text" id="destaque-link-' + produtoID + '" placeholder="Link (opcional)" value="' + esc(link).replace(/"/g, '&quot;') + '">' +
+    '<div class="form-actions">' +
+    '<button class="btn-cancel" onclick="document.getElementById(\'destaque-form-' + produtoID + '\').innerHTML=\'\'">Cancelar</button>' +
+    '<button class="btn-save" onclick="saveDestaque(\'' + produtoID + '\',\'' + destaqueID + '\')">Salvar</button>' +
+    '</div></div>';
+}
+
+function saveDestaque(produtoID, destaqueID) {
+  var titulo = document.getElementById('destaque-titulo-' + produtoID).value.trim();
+  var descricao = document.getElementById('destaque-desc-' + produtoID).value.trim();
+  var link = document.getElementById('destaque-link-' + produtoID).value.trim() || null;
+
+  if (!titulo || !descricao) {
+    alert('Título e descrição são obrigatórios');
+    return;
+  }
+
+  var body, url, method;
+  if (destaqueID) {
+    url = '/destaques/' + destaqueID;
+    method = 'PUT';
+    body = { titulo: titulo, descricao: descricao, link: link };
+  } else {
+    url = '/sprints/' + window._currentSprintID + '/review/destaques';
+    method = 'POST';
+    body = {
+      equipe_id: _reviewEquipeID,
+      produto_id: produtoID,
+      titulo: titulo,
+      descricao: descricao,
+      link: link
+    };
+  }
+
+  api(url, { method: method, body: JSON.stringify(body) })
+    .then(function() { loadReviewDestaques(); })
+    .catch(function(err) { alert('Erro: ' + err.message); });
+}
+
+function deleteDestaque(id) {
+  if (!confirm('Remover destaque?')) return;
+  api('/destaques/' + id, { method: 'DELETE' })
+    .then(function() { loadReviewDestaques(); })
+    .catch(function(err) { alert('Erro: ' + err.message); });
+}
+
 function drawBurndown(canvas, bd) {
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
