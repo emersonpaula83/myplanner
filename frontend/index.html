@@ -2014,7 +2014,7 @@ function renderReviewContent(container, data) {
     html += '<div class="review-produto-filter">';
     html += '<span style="font-size:12px;color:#888;margin-right:4px">Filtrar produto:</span>';
     _allReviewProdutos.forEach(function(p) {
-      html += '<span class="review-produto-chip" onclick="toggleReviewProduto(this)" data-produto-id="' + p.id + '">' + esc(p.nome) + '</span>';
+      html += '<span class="review-produto-chip selected" onclick="toggleReviewProduto(this)" data-produto-id="' + p.id + '">' + esc(p.nome) + '</span>';
     });
     html += '</div>';
   }
@@ -2107,11 +2107,20 @@ function buildMapTooltip(map) {
 
 function toggleReviewProduto(chip) {
   chip.classList.toggle('selected');
-  var selected = document.querySelectorAll('.review-produto-chip.selected');
-  _reviewProdutoIDs = [];
-  selected.forEach(function(s) {
-    if (s.dataset.produtoId) _reviewProdutoIDs.push(s.dataset.produtoId);
-  });
+
+  // Collect all selected product IDs
+  var selectedChips = document.querySelectorAll('.review-produto-chip.selected');
+  var allChips = document.querySelectorAll('.review-produto-chip');
+
+  if (selectedChips.length === allChips.length || selectedChips.length === 0) {
+    // All selected or none selected = no filter (backend treats empty as "all")
+    _reviewProdutoIDs = [];
+  } else {
+    _reviewProdutoIDs = [];
+    selectedChips.forEach(function(s) {
+      if (s.dataset.produtoId) _reviewProdutoIDs.push(s.dataset.produtoId);
+    });
+  }
 
   // Re-fetch from API with produto filter for accurate stats
   var container = document.getElementById('sprint-tab-review');
@@ -2121,11 +2130,14 @@ function toggleReviewProduto(chip) {
   api(url).then(function(data) {
     _reviewData = data;
     renderReviewContent(container, data);
-    // Re-apply chip selections after re-render
+    // Re-apply chip selections after re-render (chips render selected by default,
+    // so only deselect the ones not in the active filter)
     setTimeout(function() {
-      document.querySelectorAll('.review-produto-chip').forEach(function(c) {
-        if (_reviewProdutoIDs.indexOf(c.dataset.produtoId) >= 0) c.classList.add('selected');
-      });
+      if (_reviewProdutoIDs.length > 0) {
+        document.querySelectorAll('.review-produto-chip').forEach(function(c) {
+          if (_reviewProdutoIDs.indexOf(c.dataset.produtoId) < 0) c.classList.remove('selected');
+        });
+      }
     }, 0);
   });
 }
@@ -2133,7 +2145,7 @@ function toggleReviewProduto(chip) {
 function drawReviewPieCharts(data) {
   // Produtos pie
   var prodSlices = (data.grafico_produtos || []).map(function(p) {
-    return { label: p.produto, horas: p.total };
+    return { label: p.produto, horas: p.total, tarefas: [] };
   });
   var prodEl = document.getElementById('review-pie-produtos');
   if (prodEl) drawPieChart(prodEl, prodSlices);
@@ -2141,7 +2153,7 @@ function drawReviewPieCharts(data) {
   // Categorias pie
   var catLabels = { manutencao: 'Manutenção', novos_projetos: 'Novos Projetos', melhorias: 'Melhorias', outros: 'Outros' };
   var catSlices = (data.grafico_categorias || []).filter(function(c) { return c.total > 0; }).map(function(c) {
-    return { label: catLabels[c.categoria] || c.categoria, horas: c.total };
+    return { label: catLabels[c.categoria] || c.categoria, horas: c.total, tarefas: [] };
   });
   var catEl = document.getElementById('review-pie-categorias');
   if (catEl) drawPieChart(catEl, catSlices);
@@ -2149,10 +2161,11 @@ function drawReviewPieCharts(data) {
   // Planejamento pie
   var plan = data.grafico_planejamento || {};
   var planSlices = [];
-  if (plan.planejadas > 0) planSlices.push({ label: 'Planejadas', horas: plan.planejadas });
+  if (plan.planejadas > 0) planSlices.push({ label: 'Planejadas', horas: plan.planejadas, tarefas: [] });
   if (plan.nao_planejadas > 0) planSlices.push({
     label: 'Não Planejadas (Bugs: ' + (plan.nao_planejadas_bugs || 0) + ', Outras: ' + (plan.nao_planejadas_outras || 0) + ')',
-    horas: plan.nao_planejadas
+    horas: plan.nao_planejadas,
+    tarefas: []
   });
   var planEl = document.getElementById('review-pie-planejamento');
   if (planEl) drawPieChart(planEl, planSlices);
