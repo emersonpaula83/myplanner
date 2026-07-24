@@ -139,6 +139,10 @@ func main() {
 	skillRepo := repository.NewSkillRepository(pool)
 	skillHandler := handler.NewSkillHandler(skillRepo, logger)
 
+	reviewRepo := repository.NewReviewRepository(pool)
+	reviewService := service.NewReviewService(reviewRepo, logger)
+	reviewHandler := handler.NewReviewHandler(reviewService, logger)
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -243,6 +247,12 @@ func main() {
 			r.Get("/sprints/{id}/disclaimer-tasks", sprintHandler.GetDisclaimerTasks)
 			r.Get("/sprints/{id}/equalizer", equalizerHandler.GetSuggestions)
 			r.Post("/sprints/{id}/equalizer/apply", equalizerHandler.ApplyTransfers)
+
+			r.Get("/sprints/{id}/review", reviewHandler.GetReviewData)
+			r.Get("/sprints/{sprintId}/review/destaques", reviewHandler.ListDestaques)
+			r.Post("/sprints/{sprintId}/review/destaques", reviewHandler.CreateDestaque)
+			r.Put("/destaques/{id}", reviewHandler.UpdateDestaque)
+			r.Delete("/destaques/{id}", reviewHandler.DeleteDestaque)
 
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)
