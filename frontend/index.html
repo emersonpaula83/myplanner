@@ -2571,6 +2571,9 @@ function buildExportContainer() {
   var div = document.createElement('div');
   div.id = 'review-export-container';
   div.style.cssText = 'position:absolute;left:-9999px;top:0;width:1200px;background:#fff;color:#333;padding:40px;font-family:Arial,sans-serif;';
+  div.style.setProperty('--text-primary', '#1C1D20');
+  div.style.setProperty('--text-secondary', '#6B6D76');
+  div.style.setProperty('--text-tertiary', '#9496A1');
 
   var data = _reviewData;
   var stats = data.stats;
