@@ -3,11 +3,13 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
@@ -182,6 +184,10 @@ func (h *ReviewHandler) UpdateDestaque(w http.ResponseWriter, r *http.Request) {
 
 	updated, err := h.store.UpdateDestaque(r.Context(), id, req.Titulo, req.Descricao, req.Link)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondError(w, http.StatusNotFound, "destaque not found")
+			return
+		}
 		h.logger.Error("updating destaque", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "error updating destaque")
 		return
@@ -198,6 +204,10 @@ func (h *ReviewHandler) DeleteDestaque(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.DeleteDestaque(r.Context(), id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondError(w, http.StatusNotFound, "destaque not found")
+			return
+		}
 		h.logger.Error("deleting destaque", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "error deleting destaque")
 		return

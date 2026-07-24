@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
@@ -129,6 +130,108 @@ func TestCreateDestaque(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetReviewDataProdutosValid(t *testing.T) {
+	sprintID := uuid.New()
+	equipeID := uuid.New()
+	produtoID1 := uuid.New()
+	produtoID2 := uuid.New()
+
+	store := &mockReviewStore{
+		getReviewDataFn: func(ctx context.Context, sid, eid uuid.UUID, pids []uuid.UUID) (*service.ReviewData, error) {
+			if len(pids) != 2 || pids[0] != produtoID1 || pids[1] != produtoID2 {
+				t.Errorf("unexpected produto ids: %v", pids)
+			}
+			return &service.ReviewData{}, nil
+		},
+	}
+	h := newTestReviewHandler(store)
+
+	url := "/sprints/" + sprintID.String() + "/review?equipe_id=" + equipeID.String() +
+		"&produtos=" + produtoID1.String() + "," + produtoID2.String()
+	req := httptest.NewRequest("GET", url, nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", sprintID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.GetReviewData(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetReviewDataProdutosInvalid(t *testing.T) {
+	sprintID := uuid.New()
+	equipeID := uuid.New()
+	produtoID1 := uuid.New()
+
+	h := newTestReviewHandler(&mockReviewStore{})
+
+	url := "/sprints/" + sprintID.String() + "/review?equipe_id=" + equipeID.String() +
+		"&produtos=" + produtoID1.String() + ",not-a-uuid"
+	req := httptest.NewRequest("GET", url, nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", sprintID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.GetReviewData(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateDestaqueNotFound(t *testing.T) {
+	destaqueID := uuid.New()
+	store := &mockReviewStore{
+		updateDestaqueFn: func(ctx context.Context, id uuid.UUID, titulo, descricao string, link *string) (repository.ReviewDestaque, error) {
+			return repository.ReviewDestaque{}, pgx.ErrNoRows
+		},
+	}
+	h := newTestReviewHandler(store)
+
+	body, _ := json.Marshal(map[string]string{
+		"titulo":    "Test Title",
+		"descricao": "Test Description",
+	})
+	req := httptest.NewRequest("PUT", "/destaques/"+destaqueID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", destaqueID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.UpdateDestaque(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteDestaqueNotFound(t *testing.T) {
+	destaqueID := uuid.New()
+	store := &mockReviewStore{
+		deleteDestaqueFn: func(ctx context.Context, id uuid.UUID) error {
+			return pgx.ErrNoRows
+		},
+	}
+	h := newTestReviewHandler(store)
+
+	req := httptest.NewRequest("DELETE", "/destaques/"+destaqueID.String(), nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", destaqueID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.DeleteDestaque(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

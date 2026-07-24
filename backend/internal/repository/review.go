@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -264,7 +265,7 @@ func (r *ReviewRepository) DeleteDestaque(ctx context.Context, id uuid.UUID) err
 		return fmt.Errorf("deleting destaque: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("destaque not found")
+		return pgx.ErrNoRows
 	}
 	return nil
 }
