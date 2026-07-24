@@ -128,8 +128,8 @@ func TestCreateDestaque(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.CreateDestaque(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -232,6 +232,135 @@ func TestDeleteDestaqueNotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestListDestaquesSuccess(t *testing.T) {
+	sprintID := uuid.New()
+	equipeID := uuid.New()
+	destaqueID := uuid.New()
+
+	store := &mockReviewStore{
+		listDestaquesFn: func(ctx context.Context, sid, eid uuid.UUID) ([]repository.ReviewDestaque, error) {
+			if sid != sprintID || eid != equipeID {
+				t.Errorf("unexpected IDs: sprint=%s equipe=%s", sid, eid)
+			}
+			return []repository.ReviewDestaque{
+				{ID: destaqueID, SprintID: sprintID, EquipeID: equipeID, Titulo: "Test Title", Descricao: "Test Description"},
+			}, nil
+		},
+	}
+	h := newTestReviewHandler(store)
+
+	req := httptest.NewRequest("GET", "/sprints/"+sprintID.String()+"/review/destaques?equipe_id="+equipeID.String(), nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("sprintId", sprintID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.ListDestaques(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var result []repository.ReviewDestaque
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result) != 1 || result[0].ID != destaqueID {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestUpdateDestaqueSuccess(t *testing.T) {
+	destaqueID := uuid.New()
+
+	store := &mockReviewStore{
+		updateDestaqueFn: func(ctx context.Context, id uuid.UUID, titulo, descricao string, link *string) (repository.ReviewDestaque, error) {
+			if id != destaqueID {
+				t.Errorf("unexpected ID: %s", id)
+			}
+			return repository.ReviewDestaque{ID: id, Titulo: titulo, Descricao: descricao, Link: link}, nil
+		},
+	}
+	h := newTestReviewHandler(store)
+
+	body, _ := json.Marshal(map[string]string{
+		"titulo":    "Updated Title",
+		"descricao": "Updated Description",
+	})
+	req := httptest.NewRequest("PUT", "/destaques/"+destaqueID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", destaqueID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.UpdateDestaque(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var result repository.ReviewDestaque
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.ID != destaqueID || result.Titulo != "Updated Title" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestCreateDestaqueInvalidLink(t *testing.T) {
+	sprintID := uuid.New()
+	equipeID := uuid.New()
+	produtoID := uuid.New()
+
+	h := newTestReviewHandler(&mockReviewStore{})
+
+	body, _ := json.Marshal(map[string]string{
+		"equipe_id":  equipeID.String(),
+		"produto_id": produtoID.String(),
+		"titulo":     "Test Title",
+		"descricao":  "Test Description",
+		"link":       "javascript:alert(1)",
+	})
+	req := httptest.NewRequest("POST", "/sprints/"+sprintID.String()+"/review/destaques", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("sprintId", sprintID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.CreateDestaque(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateDestaqueInvalidLink(t *testing.T) {
+	destaqueID := uuid.New()
+
+	h := newTestReviewHandler(&mockReviewStore{})
+
+	body, _ := json.Marshal(map[string]string{
+		"titulo":    "Test Title",
+		"descricao": "Test Description",
+		"link":      "javascript:alert(1)",
+	})
+	req := httptest.NewRequest("PUT", "/destaques/"+destaqueID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", destaqueID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.UpdateDestaque(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

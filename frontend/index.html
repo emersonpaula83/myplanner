@@ -1509,6 +1509,7 @@ function api(path, opts = {}) {
 
 function formatDate(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function fmtDateBR(s) { if (!s) return ''; var p = s.split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : s; }
 function fmtDateTimeBR(s) {
   if (!s) return '';
@@ -2794,17 +2795,17 @@ function renderDestaques(container, destaques) {
     var prodName = produtoNames[prodID] || 'Produto';
     html += '<div class="review-produto-destaques">';
     html += '<h4>' + esc(prodName) + '</h4>';
-    html += '<button class="review-add-destaque" onclick="showDestaqueForm(\'' + prodID + '\',\'' + esc(prodName) + '\')">+ Adicionar destaque</button>';
+    html += '<button class="review-add-destaque" onclick="showDestaqueForm(' + JSON.stringify(prodID).replace(/"/g, '&quot;') + ',' + JSON.stringify(prodName).replace(/"/g, '&quot;') + ')">+ Adicionar destaque</button>';
     html += '<div id="destaque-form-' + prodID + '"></div>';
     items.forEach(function(d) {
       html += '<div class="review-destaque-item">';
       html += '<div class="review-destaque-actions">';
-      html += '<button onclick="showDestaqueForm(\'' + prodID + '\',\'' + esc(prodName) + '\',' + JSON.stringify(d).replace(/"/g, '&quot;') + ')" title="Editar">&#9998;</button>';
-      html += '<button onclick="deleteDestaque(\'' + d.id + '\')" title="Remover">&#128465;</button>';
+      html += '<button onclick="showDestaqueForm(' + JSON.stringify(prodID).replace(/"/g, '&quot;') + ',' + JSON.stringify(prodName).replace(/"/g, '&quot;') + ',' + JSON.stringify(d).replace(/"/g, '&quot;') + ')" title="Editar">&#9998;</button>';
+      html += '<button onclick="deleteDestaque(' + JSON.stringify(d.id).replace(/"/g, '&quot;') + ')" title="Remover">&#128465;</button>';
       html += '</div>';
       html += '<div class="destaque-title">' + esc(d.titulo) + '</div>';
       html += '<div class="destaque-desc">' + esc(d.descricao) + '</div>';
-      if (d.link) html += '<a class="destaque-link" href="' + esc(d.link) + '" target="_blank">' + esc(d.link) + '</a>';
+      if (d.link) html += '<a class="destaque-link" href="' + escAttr(d.link) + '" target="_blank">' + esc(d.link) + '</a>';
       html += '</div>';
     });
     html += '</div>';
@@ -2816,7 +2817,7 @@ function renderDestaques(container, destaques) {
       if (p.produto === 'Sem Produto' || byProduto[p.produto_id]) return;
       html += '<div class="review-produto-destaques">';
       html += '<h4>' + esc(p.produto) + '</h4>';
-      html += '<button class="review-add-destaque" onclick="showDestaqueForm(\'' + p.produto_id + '\',\'' + esc(p.produto) + '\')">+ Adicionar destaque</button>';
+      html += '<button class="review-add-destaque" onclick="showDestaqueForm(' + JSON.stringify(p.produto_id).replace(/"/g, '&quot;') + ',' + JSON.stringify(p.produto).replace(/"/g, '&quot;') + ')">+ Adicionar destaque</button>';
       html += '<div id="destaque-form-' + p.produto_id + '"></div>';
       html += '</div>';
     });
@@ -2844,12 +2845,12 @@ function showDestaqueForm(produtoID, produtoNome, destaque) {
   var destaqueID = destaque ? destaque.id : '';
 
   formContainer.innerHTML = '<div class="review-destaque-form">' +
-    '<input type="text" id="destaque-titulo-' + produtoID + '" placeholder="Título" value="' + esc(titulo).replace(/"/g, '&quot;') + '" maxlength="200">' +
+    '<input type="text" id="destaque-titulo-' + produtoID + '" placeholder="Título" value="' + escAttr(titulo) + '" maxlength="200">' +
     '<textarea id="destaque-desc-' + produtoID + '" placeholder="Descrição">' + esc(descricao) + '</textarea>' +
-    '<input type="text" id="destaque-link-' + produtoID + '" placeholder="Link (opcional)" value="' + esc(link).replace(/"/g, '&quot;') + '">' +
+    '<input type="text" id="destaque-link-' + produtoID + '" placeholder="Link (opcional)" value="' + escAttr(link) + '">' +
     '<div class="form-actions">' +
-    '<button class="btn-cancel" onclick="document.getElementById(\'destaque-form-' + produtoID + '\').innerHTML=\'\'">Cancelar</button>' +
-    '<button class="btn-save" onclick="saveDestaque(\'' + produtoID + '\',\'' + destaqueID + '\')">Salvar</button>' +
+    '<button class="btn-cancel" onclick="document.getElementById(' + JSON.stringify('destaque-form-' + produtoID).replace(/"/g, '&quot;') + ').innerHTML=\'\'">Cancelar</button>' +
+    '<button class="btn-save" onclick="saveDestaque(' + JSON.stringify(produtoID).replace(/"/g, '&quot;') + ',' + JSON.stringify(destaqueID).replace(/"/g, '&quot;') + ')">Salvar</button>' +
     '</div></div>';
 }
 

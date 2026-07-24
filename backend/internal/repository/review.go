@@ -132,11 +132,12 @@ func (r *ReviewRepository) GetGDPTCAncestorTaskIDs(ctx context.Context, taskIDs 
 
 	rows, err := r.pool.Query(ctx, `
 		WITH RECURSIVE ancestors AS (
-			SELECT t.id AS original_id, t.id, t.parent_id, t.numero_ticket
+			SELECT t.id AS original_id, t.id, t.parent_id, t.numero_ticket, 1 AS depth
 			FROM tarefas t WHERE t.id = ANY($1)
 			UNION ALL
-			SELECT a.original_id, p.id, p.parent_id, p.numero_ticket
+			SELECT a.original_id, p.id, p.parent_id, p.numero_ticket, a.depth + 1
 			FROM tarefas p JOIN ancestors a ON p.id = a.parent_id
+			WHERE a.depth < 10
 		)
 		SELECT DISTINCT original_id FROM ancestors
 		WHERE numero_ticket LIKE 'GDPTC-%' AND original_id != id

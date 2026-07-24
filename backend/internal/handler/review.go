@@ -134,6 +134,10 @@ func (h *ReviewHandler) CreateDestaque(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "equipe_id and produto_id are required")
 		return
 	}
+	if req.Link != nil && *req.Link != "" && !strings.HasPrefix(*req.Link, "http://") && !strings.HasPrefix(*req.Link, "https://") {
+		respondError(w, http.StatusBadRequest, "link must start with http:// or https://")
+		return
+	}
 
 	d := repository.ReviewDestaque{
 		SprintID:  sprintID,
@@ -151,7 +155,7 @@ func (h *ReviewHandler) CreateDestaque(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, created)
+	respondJSON(w, http.StatusCreated, created)
 }
 
 type updateDestaqueRequest struct {
@@ -179,6 +183,10 @@ func (h *ReviewHandler) UpdateDestaque(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Titulo) > 200 {
 		respondError(w, http.StatusBadRequest, "titulo max 200 characters")
+		return
+	}
+	if req.Link != nil && *req.Link != "" && !strings.HasPrefix(*req.Link, "http://") && !strings.HasPrefix(*req.Link, "https://") {
+		respondError(w, http.StatusBadRequest, "link must start with http:// or https://")
 		return
 	}
 
