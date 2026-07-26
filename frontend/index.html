@@ -1653,6 +1653,23 @@ async function createEquipe() {
   } catch (e) { alert('Erro: ' + e.message); }
 }
 
+async function saveEquipeBoardId(equipeId) {
+  var input = document.getElementById('equipe-board-id');
+  var val = input.value.trim();
+  var boardId = val ? parseInt(val, 10) : null;
+  if (val && isNaN(boardId)) { alert('Board ID deve ser um número'); return; }
+  var sel = document.getElementById('equipe-select');
+  var nome = sel.options[sel.selectedIndex].textContent;
+  try {
+    await api('/equipes/' + equipeId, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({nome: nome, board_id: boardId})
+    });
+    loadEquipeResumo();
+  } catch (e) { alert('Erro: ' + e.message); }
+}
+
 async function loadEquipeResumo() {
   const equipeId = document.getElementById('equipe-select').value;
   if (!equipeId) {
@@ -1668,7 +1685,12 @@ async function loadEquipeResumo() {
   currentEquipeNome = sel.options[sel.selectedIndex].textContent;
   document.getElementById('equipe-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const resumo = await api('/equipes/' + equipeId + '/resumo?periodo=' + currentEquipePeriod);
+    const [resumo, equipes] = await Promise.all([
+      api('/equipes/' + equipeId + '/resumo?periodo=' + currentEquipePeriod),
+      api('/equipes')
+    ]);
+    var eq = equipes.find(function(e) { return e.id === equipeId; });
+    if (eq) resumo.board_id = eq.board_id;
     document.getElementById('equipe-title').textContent = currentEquipeNome;
     document.getElementById('equipe-badge').textContent = 'TIME'; document.getElementById('equipe-badge').style.display = '';
     if (!resumo.membros || resumo.membros.length === 0) {
@@ -1831,6 +1853,12 @@ function renderEquipeResumo(r, equipeId, activePeriod) {
       '<input class="equipe-search" id="equipe-member-search" placeholder="Pesquisar membro para adicionar..." oninput="searchMembroToAdd(\'' + equipeId + '\')" />' +
       '<div class="equipe-search-results" id="equipe-search-results"></div>' +
     '</div>' +
+    '<div class="equipe-board-row fade-in" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--text-secondary)">' +
+      '<label style="white-space:nowrap">Board ID (Jira):</label>' +
+      '<input type="number" id="equipe-board-id" value="' + (r.board_id != null ? r.board_id : '') + '" placeholder="Auto-detectado no sync" style="width:120px;padding:4px 8px;border:1px solid var(--border-subtle);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:13px" />' +
+      '<button class="btn-sm" onclick="saveEquipeBoardId(\'' + equipeId + '\')" style="font-size:12px;padding:2px 10px">Salvar</button>' +
+      (r.board_id != null ? '<span style="color:var(--green);font-size:11px">✓ Configurado</span>' : '<span style="color:var(--text-tertiary);font-size:11px">Não configurado</span>') +
+    '</div>' +
     '<div class="period-filter fade-in" id="equipe-period"><span class="period-label">Período</span>' + ['1m','2m','3m','6m','1a'].map(p => '<button class="period-chip' + (p === activePeriod ? ' active' : '') + '" data-period="' + p + '">' + p + '</button>').join('') + '</div>' +
     '<div class="metrics-grid fade-in"><div class="metric-card accent"><div class="metric-label">Atuação Rastreada</div><div class="metric-value">' + (r.atuacao_rastreada||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.atuacao_rastreada||0) + '%;background:var(--accent)"></div></div></div><div class="metric-card neutral"><div class="metric-label">Total Horas Estimadas</div><div class="metric-value">' + (r.total_horas_estimadas||0).toFixed(1) + '<span class="unit">h</span></div></div><div class="metric-card neutral"><div class="metric-label">Metas</div><div class="metric-value">' + (r.percentual_metas||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.percentual_metas||0) + '%;background:var(--text-tertiary)"></div></div></div><div class="metric-card neutral"><div class="metric-label">Compromissos</div><div class="metric-value">' + (r.percentual_compromissos||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.percentual_compromissos||0) + '%;background:var(--text-tertiary)"></div></div></div><div class="metric-card neutral"><div class="metric-label">Iniciativas</div><div class="metric-value">' + (r.percentual_iniciativas||0).toFixed(1) + '<span class="unit">%</span></div><div class="metric-bar"><div class="metric-bar-fill" style="width:' + pctBar(r.percentual_iniciativas||0) + '%;background:var(--text-tertiary)"></div></div></div></div>' +
     '<div class="breakdown-section fade-in"><div class="breakdown-header"><span class="breakdown-title">Iniciativas — Detalhamento</span><span class="breakdown-total">' + (r.percentual_iniciativas||0).toFixed(1) + '%</span></div>' +
@@ -1845,7 +1873,7 @@ function renderEquipeResumo(r, equipeId, activePeriod) {
     chip.addEventListener('click', async () => {
       document.querySelector('#equipe-period .period-chip.active').classList.remove('active');
       chip.classList.add('active');
-      try { const p = chip.dataset.period; currentEquipePeriod = p; const data = await api('/equipes/' + equipeId + '/resumo?periodo=' + p); renderEquipeResumo(data, equipeId, p); } catch(e) { console.error(e); }
+      try { const p = chip.dataset.period; currentEquipePeriod = p; loadEquipeResumo(); } catch(e) { console.error(e); }
     });
   });
 }

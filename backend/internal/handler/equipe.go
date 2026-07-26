@@ -16,7 +16,7 @@ type EquipeStore interface {
 	ListEquipes(ctx context.Context) ([]domain.Equipe, error)
 	GetEquipeByID(ctx context.Context, id uuid.UUID) (*domain.Equipe, error)
 	CreateEquipe(ctx context.Context, nome string) (*domain.Equipe, error)
-	UpdateEquipe(ctx context.Context, id uuid.UUID, nome string) error
+	UpdateEquipe(ctx context.Context, id uuid.UUID, nome string, boardID *int) error
 	DeleteEquipe(ctx context.Context, id uuid.UUID) error
 	GetMembrosEquipe(ctx context.Context, equipeID uuid.UUID) ([]domain.Membro, error)
 	AddMembroEquipe(ctx context.Context, equipeID uuid.UUID, membroID uuid.UUID) error
@@ -196,7 +196,8 @@ func (h *EquipeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Nome string `json:"nome"`
+		Nome    string `json:"nome"`
+		BoardID *int   `json:"board_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "corpo inválido")
@@ -206,7 +207,7 @@ func (h *EquipeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "nome é obrigatório")
 		return
 	}
-	if err := h.store.UpdateEquipe(r.Context(), id, req.Nome); err != nil {
+	if err := h.store.UpdateEquipe(r.Context(), id, req.Nome, req.BoardID); err != nil {
 		h.logger.Error("failed to update equipe", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao atualizar equipe")
 		return

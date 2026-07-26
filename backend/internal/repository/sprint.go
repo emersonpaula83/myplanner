@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 )
@@ -120,15 +121,15 @@ func (r *SprintRepository) ListByProjeto(ctx context.Context, projetoID uuid.UUI
 	return result, nil
 }
 
-func (r *SprintRepository) ListSprints(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]SprintListItem, error) {
-	return r.listSprints(ctx, equipeID, estado, false)
+func (r *SprintRepository) ListSprints(ctx context.Context, equipeID *uuid.UUID, estado *string, boardID *int) ([]SprintListItem, error) {
+	return r.listSprints(ctx, equipeID, estado, false, boardID)
 }
 
-func (r *SprintRepository) ListSprintsIncludeEmpty(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]SprintListItem, error) {
-	return r.listSprints(ctx, equipeID, estado, true)
+func (r *SprintRepository) ListSprintsIncludeEmpty(ctx context.Context, equipeID *uuid.UUID, estado *string, boardID *int) ([]SprintListItem, error) {
+	return r.listSprints(ctx, equipeID, estado, true, boardID)
 }
 
-func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID, estado *string, includeEmpty bool) ([]SprintListItem, error) {
+func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID, estado *string, includeEmpty bool, boardID *int) ([]SprintListItem, error) {
 	query := `
 		SELECT s.id, s.nome, s.estado, s.data_inicio, s.data_fim,
 		       (SELECT COUNT(*) FROM tarefas t WHERE t.sprint_id = s.id) AS total_tarefas,
@@ -166,6 +167,12 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 			)`, argN)
 		}
 		args = append(args, *equipeID)
+		argN++
+	}
+
+	if boardID != nil {
+		query += fmt.Sprintf(" AND s.board_id = $%d", argN)
+		args = append(args, *boardID)
 		argN++
 	}
 
@@ -725,6 +732,18 @@ func (r *SprintRepository) GetEquipeNome(ctx context.Context, equipeID uuid.UUID
 		return "", fmt.Errorf("getting equipe nome: %w", err)
 	}
 	return nome, nil
+}
+
+func (r *SprintRepository) GetEquipeBoardID(ctx context.Context, equipeID uuid.UUID) (*int, error) {
+	var boardID *int
+	err := r.pool.QueryRow(ctx, `SELECT board_id FROM equipes WHERE id = $1`, equipeID).Scan(&boardID)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("getting equipe board_id: %w", err)
+	}
+	return boardID, nil
 }
 
 func (r *SprintRepository) GetSprintProjetoID(ctx context.Context, sprintID uuid.UUID) (*uuid.UUID, error) {

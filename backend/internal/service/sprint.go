@@ -109,7 +109,7 @@ func (s *SprintService) ListByProjeto(ctx context.Context, projetoID uuid.UUID, 
 }
 
 func (s *SprintService) ListSprints(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]repository.SprintListItem, error) {
-	return s.repo.ListSprints(ctx, equipeID, estado)
+	return s.repo.ListSprints(ctx, equipeID, estado, nil)
 }
 
 func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*SprintCapacityResult, error) {
@@ -805,24 +805,14 @@ type SprintTimelineItem struct {
 }
 
 func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UUID, ano int) ([]SprintTimelineItem, error) {
-	allSprints, err := s.repo.ListSprintsIncludeEmpty(ctx, &equipeID, nil)
+	boardID, err := s.repo.GetEquipeBoardID(ctx, equipeID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting equipe board_id: %w", err)
 	}
 
-	projetoCount := make(map[uuid.UUID]int)
-	for _, sp := range allSprints {
-		if sp.ProjetoID != nil {
-			projetoCount[*sp.ProjetoID]++
-		}
-	}
-	var dominantProjeto uuid.UUID
-	maxCount := 0
-	for pid, cnt := range projetoCount {
-		if cnt > maxCount {
-			maxCount = cnt
-			dominantProjeto = pid
-		}
+	allSprints, err := s.repo.ListSprintsIncludeEmpty(ctx, &equipeID, nil, boardID)
+	if err != nil {
+		return nil, err
 	}
 
 	anoInicio := time.Date(ano, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -833,9 +823,6 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 			continue
 		}
 		if sp.DataFim.Before(anoInicio) || sp.DataInicio.After(anoFim) {
-			continue
-		}
-		if maxCount > 0 && sp.ProjetoID != nil && *sp.ProjetoID != dominantProjeto {
 			continue
 		}
 		sprints = append(sprints, sp)

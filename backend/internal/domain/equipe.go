@@ -9,6 +9,7 @@ import (
 type Equipe struct {
 	ID        uuid.UUID `json:"id"`
 	Nome      string    `json:"nome"`
+	BoardID   *int      `json:"board_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
