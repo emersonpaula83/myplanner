@@ -191,8 +191,8 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 	if req.Apelido != nil {
 		upper := strings.ToUpper(*req.Apelido)
 		req.Apelido = &upper
-		if utf8.RuneCountInString(*req.Apelido) > 15 {
-			respondError(w, http.StatusBadRequest, "apelido deve ter no máximo 15 caracteres")
+		if utf8.RuneCountInString(*req.Apelido) > 20 {
+			respondError(w, http.StatusBadRequest, "apelido deve ter no máximo 20 caracteres")
 			return
 		}
 	}
