@@ -393,7 +393,7 @@ func (r *SyncRepository) AutoDetectEquipeBoardIDs(ctx context.Context, fonteDado
 	rows, err := r.pool.Query(ctx, `
 		WITH equipe_boards AS (
 			SELECT em.equipe_id, s.board_id, COUNT(*) as cnt,
-			       ROW_NUMBER() OVER (PARTITION BY em.equipe_id ORDER BY COUNT(*) DESC) as rn
+			       ROW_NUMBER() OVER (PARTITION BY em.equipe_id ORDER BY COUNT(*) DESC, s.board_id ASC) as rn
 			FROM sprints s
 			JOIN tarefas t ON t.sprint_id = s.id
 			JOIN equipe_membros em ON em.membro_id = t.responsavel_id

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 )
@@ -636,6 +637,9 @@ func (r *SprintRepository) GetEquipeNome(ctx context.Context, equipeID uuid.UUID
 func (r *SprintRepository) GetEquipeBoardID(ctx context.Context, equipeID uuid.UUID) (*int, error) {
 	var boardID *int
 	err := r.pool.QueryRow(ctx, `SELECT board_id FROM equipes WHERE id = $1`, equipeID).Scan(&boardID)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("getting equipe board_id: %w", err)
 	}
