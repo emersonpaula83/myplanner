@@ -32,6 +32,7 @@ type SprintListItem struct {
 	ProjetoChave *string    `json:"projeto_chave,omitempty"`
 	ProjetoNome  *string    `json:"projeto_nome,omitempty"`
 	FonteDadosID *uuid.UUID `json:"fonte_dados_id,omitempty"`
+	ProjetoID    *uuid.UUID `json:"projeto_id,omitempty"`
 }
 
 type ProjetoComSprints struct {
@@ -131,7 +132,7 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 	query := `
 		SELECT s.id, s.nome, s.estado, s.data_inicio, s.data_fim,
 		       (SELECT COUNT(*) FROM tarefas t WHERE t.sprint_id = s.id) AS total_tarefas,
-		       p.chave, p.nome, s.fonte_dados_id
+		       p.chave, p.nome, s.fonte_dados_id, s.projeto_id
 		FROM sprints s
 		INNER JOIN projetos p ON p.id = s.projeto_id
 		WHERE 1=1
@@ -189,7 +190,7 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 	result := make([]SprintListItem, 0)
 	for rows.Next() {
 		var item SprintListItem
-		if err := rows.Scan(&item.ID, &item.Nome, &item.Estado, &item.DataInicio, &item.DataFim, &item.TotalTarefas, &item.ProjetoChave, &item.ProjetoNome, &item.FonteDadosID); err != nil {
+		if err := rows.Scan(&item.ID, &item.Nome, &item.Estado, &item.DataInicio, &item.DataFim, &item.TotalTarefas, &item.ProjetoChave, &item.ProjetoNome, &item.FonteDadosID, &item.ProjetoID); err != nil {
 			return nil, fmt.Errorf("scanning sprint: %w", err)
 		}
 		result = append(result, item)
@@ -580,7 +581,14 @@ func (r *SprintRepository) GetDisclaimerTasks(ctx context.Context, sprintID uuid
 	}
 
 	query := fmt.Sprintf(`
-		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.tipo_demanda,
+		SELECT t.id, t.numero_ticket, t.resumo, t.tipo,
+		       COALESCE(t.tipo_demanda,
+		           CASE
+		               WHEN t.tipo IN ('Épico', 'Projeto') THEN 'Meta'
+		               WHEN t.tipo IN ('Spike', 'Implantação', 'Aditivo - Delivery') THEN 'Compromisso'
+		               ELSE 'Iniciativa'
+		           END
+		       ),
 		       COALESCE(t.estimativa_tempo, 0), m.nome
 		FROM tarefas t
 		INNER JOIN sprints s ON s.id = t.sprint_id
@@ -852,6 +860,55 @@ func (r *SprintRepository) GetBurndownTarefas(ctx context.Context, sprintID uuid
 			return nil, fmt.Errorf("scanning burndown tarefa: %w", err)
 		}
 		result = append(result, bt)
+	}
+	return result, nil
+}
+
+type TimelineDetailTarefa struct {
+	NumeroTicket    string  `json:"numero_ticket"`
+	Resumo          string  `json:"resumo"`
+	TipoDemanda     string  `json:"tipo_demanda"`
+	EstimativaTempo int64   `json:"estimativa_tempo"`
+	EpicoApelido    *string `json:"epico_apelido"`
+	RelatorNome     *string `json:"relator_nome"`
+}
+
+func (r *SprintRepository) GetTimelineDetailTarefas(ctx context.Context, sprintID uuid.UUID, equipeID uuid.UUID) ([]TimelineDetailTarefa, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT
+			t.numero_ticket,
+			t.resumo,
+			COALESCE(t.tipo_demanda,
+				CASE
+					WHEN t.tipo IN ('Épico', 'Projeto') THEN 'Meta'
+					WHEN t.tipo IN ('Spike', 'Implantação', 'Aditivo - Delivery') THEN 'Compromisso'
+					ELSE 'Iniciativa'
+				END
+			) AS tipo_demanda,
+			COALESCE(t.estimativa_tempo, 0) AS estimativa_tempo,
+			COALESCE(parent.apelido, parent.numero_ticket) AS epico_apelido,
+			m.nome AS relator_nome
+		FROM tarefas t
+		LEFT JOIN tarefas parent ON t.parent_id = parent.id
+		LEFT JOIN membros m ON m.id = t.relator_id
+		WHERE t.sprint_id = $1
+		  AND t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $2)
+		  AND t.tipo NOT IN ('Épico', 'Projeto')
+		  AND t.status != 'Cancelado'
+		ORDER BY t.numero_ticket
+	`, sprintID, equipeID)
+	if err != nil {
+		return nil, fmt.Errorf("getting timeline detail tarefas: %w", err)
+	}
+	defer rows.Close()
+
+	var result []TimelineDetailTarefa
+	for rows.Next() {
+		var td TimelineDetailTarefa
+		if err := rows.Scan(&td.NumeroTicket, &td.Resumo, &td.TipoDemanda, &td.EstimativaTempo, &td.EpicoApelido, &td.RelatorNome); err != nil {
+			return nil, fmt.Errorf("scanning timeline detail tarefa: %w", err)
+		}
+		result = append(result, td)
 	}
 	return result, nil
 }

@@ -22,6 +22,7 @@ type SprintStore interface {
 	GetBurndown(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.BurndownResult, error)
 	GetSprintsTimeline(ctx context.Context, equipeID uuid.UUID, ano int) ([]service.SprintTimelineItem, error)
 	GetDisclaimerTasks(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID, taskType string) (*service.DisclaimerTasksResult, error)
+	GetTimelineDetail(ctx context.Context, sprintID uuid.UUID, equipeID uuid.UUID) (*service.TimelineDetailResult, error)
 }
 
 type SprintHandler struct {
@@ -226,6 +227,34 @@ func (h *SprintHandler) GetSprintsTimeline(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		h.logger.Error("getting sprints timeline", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to get sprints timeline")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *SprintHandler) GetTimelineDetail(w http.ResponseWriter, r *http.Request) {
+	sprintID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid sprint id")
+		return
+	}
+
+	equipeStr := r.URL.Query().Get("equipe")
+	if equipeStr == "" {
+		respondError(w, http.StatusBadRequest, "equipe parameter required")
+		return
+	}
+	equipeID, err := uuid.Parse(equipeStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid equipe id")
+		return
+	}
+
+	result, err := h.store.GetTimelineDetail(r.Context(), sprintID, equipeID)
+	if err != nil {
+		h.logger.Error("getting timeline detail", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "failed to get timeline detail")
 		return
 	}
 

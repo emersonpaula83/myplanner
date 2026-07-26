@@ -42,7 +42,11 @@ func (m *mockJiraClient) GetBoardSprints(ctx context.Context, boardID int) ([]ji
 func (m *mockJiraClient) GetSprintFieldID(ctx context.Context) (string, error) {
 	return "customfield_10020", nil
 }
-func (m *mockJiraClient) SetSprintFieldID(id string) {}
+func (m *mockJiraClient) SetSprintFieldID(id string)    {}
+func (m *mockJiraClient) SetCustomFieldIDs(ids []string) {}
+func (m *mockJiraClient) DiscoverCustomFields(ctx context.Context) (map[string]string, error) {
+	return nil, nil
+}
 func (m *mockJiraClient) CreateSprint(ctx context.Context, boardID int, name string, startDate, endDate time.Time) (*jira.JiraSprint, error) {
 	return &jira.JiraSprint{ID: 999, Name: name}, nil
 }

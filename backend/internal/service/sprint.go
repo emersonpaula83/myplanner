@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -704,6 +705,14 @@ func (s *SprintService) GetBurndown(ctx context.Context, sprintID uuid.UUID, equ
 		"Teste": true, "Validação do Solicitante": true, "Deploy": true,
 	}
 
+	isPlanned := func(t repository.BurndownTarefa) bool {
+		entrou := sprintInicio
+		if t.DataEntradaSprint != nil {
+			entrou = t.DataEntradaSprint.Truncate(24 * time.Hour)
+		}
+		return !entrou.After(sprintInicio)
+	}
+
 	hoje := time.Now().Truncate(24 * time.Hour)
 	var real []BurndownPoint
 	horasRestantes := horasIniciais
@@ -712,16 +721,13 @@ func (s *SprintService) GetBurndown(ctx context.Context, sprintID uuid.UUID, equ
 			break
 		}
 		for _, t := range tarefas {
-			horas := float64(t.EstimativaSegundos) / 3600.0
-			if t.DataEntradaSprint != nil {
-				entrou := t.DataEntradaSprint.Truncate(24 * time.Hour)
-				if entrou.Equal(d) && entrou.After(sprintInicio) {
-					horasRestantes += horas
-				}
+			if !isPlanned(t) {
+				continue
 			}
 			if t.DataResolvido != nil {
 				resolvido := t.DataResolvido.Truncate(24 * time.Hour)
 				if resolvido.Equal(d) {
+					horas := float64(t.EstimativaSegundos) / 3600.0
 					horasRestantes -= horas
 				}
 			}
@@ -729,7 +735,7 @@ func (s *SprintService) GetBurndown(ctx context.Context, sprintID uuid.UUID, equ
 
 		desconto80 := 0.0
 		for _, t := range tarefas {
-			if t.DataResolvido != nil {
+			if !isPlanned(t) || t.DataResolvido != nil {
 				continue
 			}
 			if !status80pct[t.Status] {
@@ -766,20 +772,10 @@ func (s *SprintService) GetBurndown(ctx context.Context, sprintID uuid.UUID, equ
 			if entrou.Equal(d) {
 				horasNaoPlan += horas
 			}
-			if t.DataResolvido != nil {
-				resolvido := t.DataResolvido.Truncate(24 * time.Hour)
-				if resolvido.Equal(d) {
-					horasNaoPlan -= horas
-				}
-			}
-		}
-		val := horasNaoPlan
-		if val < 0 {
-			val = 0
 		}
 		unplanned = append(unplanned, BurndownPoint{
 			Data:  d.Format("2006-01-02"),
-			Horas: math.Round(val*10) / 10,
+			Horas: math.Round(horasNaoPlan*10) / 10,
 		})
 	}
 
@@ -814,6 +810,21 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 		return nil, err
 	}
 
+	projetoCount := make(map[uuid.UUID]int)
+	for _, sp := range allSprints {
+		if sp.ProjetoID != nil {
+			projetoCount[*sp.ProjetoID]++
+		}
+	}
+	var dominantProjeto uuid.UUID
+	maxCount := 0
+	for pid, cnt := range projetoCount {
+		if cnt > maxCount {
+			maxCount = cnt
+			dominantProjeto = pid
+		}
+	}
+
 	anoInicio := time.Date(ano, 1, 1, 0, 0, 0, 0, time.UTC)
 	anoFim := time.Date(ano, 12, 31, 23, 59, 59, 0, time.UTC)
 	sprints := make([]repository.SprintListItem, 0)
@@ -822,6 +833,9 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 			continue
 		}
 		if sp.DataFim.Before(anoInicio) || sp.DataInicio.After(anoFim) {
+			continue
+		}
+		if maxCount > 0 && sp.ProjetoID != nil && *sp.ProjetoID != dominantProjeto {
 			continue
 		}
 		sprints = append(sprints, sp)
@@ -956,4 +970,106 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 	}
 
 	return result, nil
+}
+
+type TimelineDetailResult struct {
+	SprintNome string                 `json:"sprint_nome"`
+	DataInicio string                 `json:"data_inicio"`
+	DataFim    string                 `json:"data_fim"`
+	Ausentes   []TimelineAusente      `json:"ausentes"`
+	Tarefas    []TimelineDetailTarefa `json:"tarefas"`
+}
+
+type TimelineAusente struct {
+	Nome       string `json:"nome"`
+	Tipo       string `json:"tipo"`
+	DataInicio string `json:"data_inicio"`
+	DataFim    string `json:"data_fim"`
+}
+
+type TimelineDetailTarefa struct {
+	NumeroTicket    string  `json:"numero_ticket"`
+	Resumo          string  `json:"resumo"`
+	TipoDemanda     string  `json:"tipo_demanda"`
+	EstimativaTempo int64   `json:"estimativa_tempo"`
+	EpicoApelido    *string `json:"epico_apelido"`
+	RelatorNome     *string `json:"relator_nome"`
+}
+
+func (s *SprintService) GetTimelineDetail(ctx context.Context, sprintID uuid.UUID, equipeID uuid.UUID) (*TimelineDetailResult, error) {
+	sprint, err := s.repo.GetByID(ctx, sprintID)
+	if err != nil {
+		return nil, fmt.Errorf("getting sprint: %w", err)
+	}
+	if sprint.DataInicio == nil || sprint.DataFim == nil {
+		return nil, fmt.Errorf("sprint has no start/end date")
+	}
+
+	membros, err := s.repo.GetMembrosEquipeInfo(ctx, equipeID, *sprint.DataFim)
+	if err != nil {
+		return nil, fmt.Errorf("getting membros: %w", err)
+	}
+
+	membroIDs := make([]uuid.UUID, len(membros))
+	membroNomes := make(map[uuid.UUID]string, len(membros))
+	for i, m := range membros {
+		membroIDs[i] = m.ID
+		membroNomes[m.ID] = m.Nome
+	}
+
+	ausencias, err := s.repo.GetAusenciasNoPeriodo(ctx, membroIDs, *sprint.DataInicio, *sprint.DataFim)
+	if err != nil {
+		return nil, fmt.Errorf("getting ausencias: %w", err)
+	}
+
+	ausentes := make([]TimelineAusente, 0)
+	seen := make(map[string]bool)
+	for _, a := range ausencias {
+		key := a.MembroID.String() + "|" + a.Tipo + "|" + a.DataInicio.Format("2006-01-02")
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		inicio := a.DataInicio
+		if inicio.Before(*sprint.DataInicio) {
+			inicio = *sprint.DataInicio
+		}
+		fim := a.DataFim
+		if fim.After(*sprint.DataFim) {
+			fim = *sprint.DataFim
+		}
+
+		ausentes = append(ausentes, TimelineAusente{
+			Nome:       membroNomes[a.MembroID],
+			Tipo:       a.Tipo,
+			DataInicio: inicio.Format("2006-01-02"),
+			DataFim:    fim.Format("2006-01-02"),
+		})
+	}
+
+	repoTarefas, err := s.repo.GetTimelineDetailTarefas(ctx, sprintID, equipeID)
+	if err != nil {
+		return nil, fmt.Errorf("getting tarefas: %w", err)
+	}
+
+	tarefas := make([]TimelineDetailTarefa, len(repoTarefas))
+	for i, t := range repoTarefas {
+		tarefas[i] = TimelineDetailTarefa{
+			NumeroTicket:    t.NumeroTicket,
+			Resumo:          t.Resumo,
+			TipoDemanda:     t.TipoDemanda,
+			EstimativaTempo: t.EstimativaTempo,
+			EpicoApelido:    t.EpicoApelido,
+			RelatorNome:     t.RelatorNome,
+		}
+	}
+
+	return &TimelineDetailResult{
+		SprintNome: sprint.Nome,
+		DataInicio: sprint.DataInicio.Format("2006-01-02"),
+		DataFim:    sprint.DataFim.Format("2006-01-02"),
+		Ausentes:   ausentes,
+		Tarefas:    tarefas,
+	}, nil
 }

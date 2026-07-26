@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64" fill="none">
+  <!-- Icon -->
+  <rect width="64" height="64" rx="14" fill="#0D7C66"/>
+  <rect x="12" y="34" width="10" height="18" rx="3" fill="white" opacity="0.7"/>
+  <rect x="27" y="22" width="10" height="30" rx="3" fill="white" opacity="0.85"/>
+  <rect x="42" y="12" width="10" height="40" rx="3" fill="white"/>
+  <!-- Text -->
+  <text x="76" y="43" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="28" font-weight="700" fill="#1A1B1E">
+    <tspan fill="#0D7C66">My</tspan><tspan fill="#1A1B1E">Planner</tspan>
+  </text>
+</svg>

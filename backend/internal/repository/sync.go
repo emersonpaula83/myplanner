@@ -239,15 +239,29 @@ func (r *SyncRepository) HasRunningSync(ctx context.Context, fonteDadosID uuid.U
 	return exists, nil
 }
 
+func (r *SyncRepository) HasRunningSyncForProject(ctx context.Context, fonteDadosID uuid.UUID, projectKey string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM sync_logs
+			WHERE fonte_dados_id = $1 AND status = 'running' AND project_key = $2
+		)
+	`, fonteDadosID, projectKey).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("checking running sync for project: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *SyncRepository) CreateSyncLog(ctx context.Context, log *domain.SyncLog) error {
 	origem := log.Origem
 	if origem == "" {
 		origem = "manual"
 	}
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO sync_logs (id, fonte_dados_id, tipo, status, iniciado_em, mensagem, origem)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, log.ID, log.FonteDadosID, log.Tipo, log.Status, log.IniciadoEm, log.Mensagem, origem)
+		INSERT INTO sync_logs (id, fonte_dados_id, tipo, status, iniciado_em, mensagem, origem, project_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, log.ID, log.FonteDadosID, log.Tipo, log.Status, log.IniciadoEm, log.Mensagem, origem, log.ProjectKey)
 	if err != nil {
 		return fmt.Errorf("creating sync log: %w", err)
 	}
@@ -387,4 +401,9 @@ func (r *SyncRepository) GetFonteDadosAtivas(ctx context.Context) ([]domain.Font
 		result = append(result, fd)
 	}
 	return result, rows.Err()
+}
+
+func (r *SyncRepository) UpdateCustomFieldMap(ctx context.Context, fonteID uuid.UUID, cfMap json.RawMessage) error {
+	_, err := r.pool.Exec(ctx, `UPDATE fonte_dados SET custom_field_map = $2 WHERE id = $1`, fonteID, cfMap)
+	return err
 }

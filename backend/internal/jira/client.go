@@ -22,21 +22,28 @@ type Client interface {
 	GetBoardSprints(ctx context.Context, boardID int) ([]JiraSprint, error)
 	GetSprintFieldID(ctx context.Context) (string, error)
 	SetSprintFieldID(id string)
+	SetCustomFieldIDs(ids []string)
+	DiscoverCustomFields(ctx context.Context) (map[string]string, error)
 	CreateSprint(ctx context.Context, boardID int, name string, startDate, endDate time.Time) (*JiraSprint, error)
 	AssignIssue(ctx context.Context, issueKey, accountID string) error
 	AddComment(ctx context.Context, issueKey, body string) error
 }
 
 type HTTPClient struct {
-	baseURL       string
-	authType      string
-	email         string
-	apiToken      string
-	accessToken   string
-	httpClient    *http.Client
-	limiter       *rate.Limiter
-	logger        *zap.Logger
-	sprintFieldID string
+	baseURL        string
+	authType       string
+	email          string
+	apiToken       string
+	accessToken    string
+	httpClient     *http.Client
+	limiter        *rate.Limiter
+	logger         *zap.Logger
+	sprintFieldID  string
+	customFieldIDs []string
+}
+
+func (c *HTTPClient) SetCustomFieldIDs(ids []string) {
+	c.customFieldIDs = ids
 }
 
 func NewHTTPClient(baseURL, email, apiToken string, ratePerSec int, logger *zap.Logger) *HTTPClient {
@@ -169,6 +176,7 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 	if c.sprintFieldID != "" && c.sprintFieldID != "sprint" {
 		fields = append(fields, c.sprintFieldID)
 	}
+	fields = append(fields, c.customFieldIDs...)
 
 	all := make([]JiraIssue, 0)
 	var nextPageToken string
@@ -239,6 +247,7 @@ func (c *HTTPClient) GetIssuesByProjects(ctx context.Context, projectKeys []stri
 	if c.sprintFieldID != "" && c.sprintFieldID != "sprint" {
 		fields = append(fields, c.sprintFieldID)
 	}
+	fields = append(fields, c.customFieldIDs...)
 
 	all := make([]JiraIssue, 0)
 	var nextPageToken string
@@ -438,6 +447,32 @@ func (c *HTTPClient) GetSprintFieldID(ctx context.Context) (string, error) {
 
 func (c *HTTPClient) SetSprintFieldID(id string) {
 	c.sprintFieldID = id
+}
+
+var knownCustomFields = map[string]string{
+	"customfield_12930": "tipo_demanda",
+}
+
+func (c *HTTPClient) DiscoverCustomFields(ctx context.Context) (map[string]string, error) {
+	body, err := c.do(ctx, "/rest/api/3/field")
+	if err != nil {
+		return nil, err
+	}
+	var fields []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, fmt.Errorf("decoding fields: %w", err)
+	}
+	result := make(map[string]string)
+	for _, f := range fields {
+		if mapped, ok := knownCustomFields[f.ID]; ok {
+			result[f.ID] = mapped
+			c.logger.Info("discovered custom field", zap.String("id", f.ID), zap.String("mapped", mapped), zap.String("jiraName", f.Name))
+		}
+	}
+	return result, nil
 }
 
 func (c *HTTPClient) GetBoards(ctx context.Context, projectKey string) ([]JiraBoard, error) {

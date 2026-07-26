@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MyPlanner</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <style>
 :root {
   --accent: #0D7C66;
@@ -579,7 +580,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .pie-legend-color { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
 .pie-legend-label { flex: 1; }
 .pie-legend-value { font-weight: 600; white-space: nowrap; }
-.pie-tooltip-card { position: fixed; z-index: 1000; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 16px rgba(0,0,0,.15); pointer-events: none; max-width: 420px; max-height: 300px; overflow-y: auto; }
+.pie-tooltip-card { position: fixed; z-index: 1000; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 16px rgba(0,0,0,.15); max-width: 500px; max-height: 60vh; overflow-y: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.pie-tooltip-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 999; background: rgba(0,0,0,.3); }
+.pie-tooltip-close { position: absolute; top: 6px; right: 10px; background: none; border: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; line-height: 1; padding: 2px 6px; }
 .pie-tooltip-card table { border-collapse: collapse; font-size: 11px; width: 100%; }
 .pie-tooltip-card th { text-align: left; padding: 2px 8px 4px 0; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border); }
 .pie-tooltip-card td { padding: 3px 8px 3px 0; color: var(--text-primary); white-space: nowrap; }
@@ -618,7 +621,12 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .capacity-summary-item.has-tip { position: relative; cursor: help; }
 .capacity-summary-tip { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: var(--tooltip-bg); color: var(--tooltip-text); padding: 12px 16px; border-radius: 8px; font-size: 12px; z-index: 60; width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,.25); line-height: 1.5; }
 .capacity-summary-item.has-tip:hover .capacity-summary-tip { display: block; }
-.capacity-external-label { font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .3px; margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.capacity-external-label { font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .3px; margin: 16px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-subtle); cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
+.capacity-external-label:hover { color: var(--text-secondary); }
+.capacity-external-label .accordion-arrow { transition: transform .2s; font-size: 10px; }
+.capacity-external-label.open .accordion-arrow { transform: rotate(90deg); }
+.capacity-external-body { display: none; }
+.capacity-external-body.open { display: block; }
 .capacity-card.external { opacity: 0.7; }
 .capacity-card.desligado { opacity: 0.5; border-left: 3px solid var(--red); }
 .capacity-back-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: inherit; transition: all .15s; margin-bottom: 16px; }
@@ -992,8 +1000,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="modal-title" id="projmeta-title">Editar Épico</div>
     <form id="projmeta-form" onsubmit="return handleProjMetaSubmit(event)">
       <input type="hidden" id="projmeta-id">
-      <div class="form-group"><label class="form-label">Apelido (max 15 chars, uppercase)</label><input class="form-input" type="text" id="projmeta-apelido" maxlength="15" style="text-transform:uppercase"></div>
-      <div class="form-group"><label class="form-label">Data Início Execução</label><input class="form-input" type="date" id="projmeta-data-inicio"></div>
+      <div class="form-group"><label class="form-label">Apelido (max 20 chars, uppercase)</label><input class="form-input" type="text" id="projmeta-apelido" maxlength="20" style="text-transform:uppercase"></div>
+      <div class="form-group"><label class="form-label">Data Início Execução</label><input class="form-input" type="text" id="projmeta-data-inicio" placeholder="dd/mm/aaaa" maxlength="10"></div>
       <div class="modal-actions">
         <button class="btn-cancel" type="button" onclick="closeProjMetaModal()">Cancelar</button>
         <button class="btn-primary" type="submit" style="width:auto">Salvar</button>
@@ -1018,8 +1026,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
           <option value="licenca_maternidade">Licença Maternidade</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Data Início</label><input class="form-input" type="date" id="disp-data-inicio" required></div>
-      <div class="form-group"><label class="form-label">Data Fim</label><input class="form-input" type="date" id="disp-data-fim" required></div>
+      <div class="form-group"><label class="form-label">Data Início</label><input class="form-input" type="text" id="disp-data-inicio" placeholder="dd/mm/aaaa" maxlength="10" required></div>
+      <div class="form-group"><label class="form-label">Data Fim</label><input class="form-input" type="text" id="disp-data-fim" placeholder="dd/mm/aaaa" maxlength="10" required></div>
       <div class="form-group"><label class="form-label">Descrição (opcional)</label><input class="form-input" type="text" id="disp-descricao" placeholder="Ex: Férias de verão"></div>
       <div class="modal-actions">
         <button class="btn-cancel" type="button" onclick="closeDispModal()">Cancelar</button>
@@ -1033,7 +1041,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
   <div class="modal" style="max-width:520px">
     <div class="modal-title">Cadastrar Feriados</div>
     <form id="feriado-form" onsubmit="return handleFeriadoSubmit(event)">
-      <div class="form-group"><label class="form-label">Data</label><input class="form-input" type="date" id="feriado-data" required></div>
+      <div class="form-group"><label class="form-label">Data</label><input class="form-input" type="text" id="feriado-data" placeholder="dd/mm/aaaa" maxlength="10" required></div>
       <div class="form-group"><label class="form-label">Nome</label><input class="form-input" type="text" id="feriado-nome" placeholder="Ex: Natal, Tiradentes..." required></div>
       <div class="modal-actions">
         <button class="btn-cancel" type="button" onclick="closeFeriadoModal()">Cancelar</button>
@@ -1060,6 +1068,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="modal-title" id="disclaimer-modal-title"></div>
     <div id="disclaimer-modal-content"></div>
     <div class="modal-actions"><button class="btn-cancel" onclick="closeDisclaimerModal()">Fechar</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="timeline-detail-modal" onclick="if(event.target===this)closeTimelineDetailModal()">
+  <div class="modal pie-modal">
+    <div class="modal-title" id="timeline-detail-title"></div>
+    <div id="timeline-detail-content"></div>
+    <div class="modal-actions"><button class="btn-cancel" onclick="closeTimelineDetailModal()">Fechar</button></div>
   </div>
 </div>
 <div class="pie-tooltip-card" id="pie-tooltip" style="display:none"></div>
@@ -1511,6 +1526,15 @@ function formatDate(d) { if (!d) return '—'; const dt = new Date(d); return dt
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function fmtDateBR(s) { if (!s) return ''; var p = s.split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : s; }
+function parseDateBR(s) { if (!s) return ''; var p = s.split('/'); return p.length === 3 ? p[2] + '-' + p[1] + '-' + p[0] : s; }
+function applyDateMask(input) {
+  input.addEventListener('input', function() {
+    var v = this.value.replace(/\D/g, '').substring(0, 8);
+    if (v.length > 4) v = v.substring(0,2) + '/' + v.substring(2,4) + '/' + v.substring(4);
+    else if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
+    this.value = v;
+  });
+}
 function fmtDateTimeBR(s) {
   if (!s) return '';
   var d = new Date(s);
@@ -2051,7 +2075,7 @@ function openProjMetaModal(id, ticket, apelido, dataInicio) {
   document.getElementById('projmeta-id').value = id;
   document.getElementById('projmeta-title').textContent = 'Editar — ' + ticket;
   document.getElementById('projmeta-apelido').value = apelido;
-  document.getElementById('projmeta-data-inicio').value = dataInicio;
+  document.getElementById('projmeta-data-inicio').value = fmtDateBR(dataInicio);
   document.getElementById('projmeta-modal').classList.add('open');
 }
 function closeProjMetaModal() { document.getElementById('projmeta-modal').classList.remove('open'); }
@@ -2062,8 +2086,8 @@ async function handleProjMetaSubmit(e) {
   const body = {};
   const apelido = document.getElementById('projmeta-apelido').value.trim();
   if (apelido) body.apelido = apelido;
-  const dataInicio = document.getElementById('projmeta-data-inicio').value;
-  if (dataInicio) body.data_inicio_execucao = new Date(dataInicio).toISOString();
+  const dataInicioRaw = document.getElementById('projmeta-data-inicio').value;
+  if (dataInicioRaw) { var iso = parseDateBR(dataInicioRaw); body.data_inicio_execucao = new Date(iso + 'T12:00:00').toISOString(); }
   try {
     await api('/projetos/' + id + '/metadata', { method: 'PUT', body: JSON.stringify(body) });
     closeProjMetaModal();
@@ -2331,10 +2355,10 @@ async function openSprintCapacity(sprintID) {
       }
 
       if (membrosExternos.length > 0) {
-        html += '<div class="capacity-external-label">Externos (não contabilizados na equipe)</div>';
-        html += '<div class="capacity-members">';
+        html += '<div class="capacity-external-label" onclick="toggleExternosAccordion(this)"><span class="accordion-arrow">▶</span> Externos (não contabilizados na equipe) — ' + membrosExternos.length + '</div>';
+        html += '<div class="capacity-external-body"><div class="capacity-members">';
         membrosExternos.forEach((m, idx) => { html += renderCapacityCard(m, membrosEquipe.length + idx); });
-        html += '</div>';
+        html += '</div></div>';
       }
     }
     html += '</div>';
@@ -3101,6 +3125,12 @@ function toggleCapacityTarefas(idx) {
   card.classList.toggle('expanded', !visible);
 }
 
+function toggleExternosAccordion(labelEl) {
+  labelEl.classList.toggle('open');
+  var body = labelEl.nextElementSibling;
+  if (body) body.classList.toggle('open');
+}
+
 function formatTipoAusencia(tipo) {
   const map = { ferias: 'Férias', folga: 'Folga', licenca: 'Licença', dayoff: 'Day Off', atestado: 'Atestado' };
   return map[tipo] || tipo;
@@ -3268,7 +3298,7 @@ async function loadMembroDetail(membroId, periodo) {
       '</div>' +
       '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
         '<label class="form-label" style="margin:0;font-size:12px">Data de Desligamento:</label>' +
-        '<input class="form-input" type="date" id="membro-desligamento" value="' + (m.data_desligamento ? m.data_desligamento.substring(0,10) : '') + '" style="width:160px;padding:5px 10px;font-size:12px">' +
+        '<input class="form-input date-br" type="text" id="membro-desligamento" placeholder="dd/mm/aaaa" maxlength="10" value="' + (m.data_desligamento ? fmtDateBR(m.data_desligamento.substring(0,10)) : '') + '" style="width:160px;padding:5px 10px;font-size:12px">' +
         '<button class="btn-sm" onclick="salvarDesligamento(\'' + membroId + '\')">Salvar</button>' +
         (m.data_desligamento ? '<button class="btn-sm danger" onclick="limparDesligamento(\'' + membroId + '\')">Limpar</button>' : '') +
       '</div>' +
@@ -3296,6 +3326,8 @@ async function loadMembroDetail(membroId, periodo) {
       });
     });
 
+    var desligEl = document.getElementById('membro-desligamento');
+    if (desligEl) applyDateMask(desligEl);
     loadMembroCargo(membroId, m.cargo);
     loadMembroSkills(membroId);
   } catch (err) {
@@ -3318,8 +3350,8 @@ function openDispModal(membroId, editId, tipo, di, df, desc) {
   document.getElementById('disp-membro-id').value = membroId;
   document.getElementById('disp-edit-id').value = editId || '';
   document.getElementById('disp-tipo').value = tipo || 'ferias';
-  document.getElementById('disp-data-inicio').value = di || '';
-  document.getElementById('disp-data-fim').value = df || '';
+  document.getElementById('disp-data-inicio').value = fmtDateBR(di) || '';
+  document.getElementById('disp-data-fim').value = fmtDateBR(df) || '';
   document.getElementById('disp-descricao').value = desc || '';
   document.getElementById('disp-modal-title').textContent = editId ? 'Editar Ausência' : 'Nova Ausência';
   document.getElementById('disp-modal').classList.add('open');
@@ -3336,8 +3368,8 @@ async function handleDispSubmit(e) {
   const editId = document.getElementById('disp-edit-id').value;
   const payload = {
     tipo: document.getElementById('disp-tipo').value,
-    data_inicio: document.getElementById('disp-data-inicio').value,
-    data_fim: document.getElementById('disp-data-fim').value,
+    data_inicio: parseDateBR(document.getElementById('disp-data-inicio').value),
+    data_fim: parseDateBR(document.getElementById('disp-data-fim').value),
     descricao: document.getElementById('disp-descricao').value || null
   };
   try {
@@ -3683,13 +3715,14 @@ async function openGerarSprintsForm() {
     + '<input id="gen-board" type="number" placeholder="Ex: 42" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:100px">'
     + '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">Da URL do board JIRA: /boards/<b>ID</b></div></div>'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Inicial</label><br>'
-    + '<input id="gen-start-date" type="date" min="' + today + '" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:160px"></div>'
+    + '<input id="gen-start-date" type="text" placeholder="dd/mm/aaaa" maxlength="10" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:160px"></div>'
     + '<button class="btn-sm" style="padding:6px 16px;font-size:13px" onclick="previewGerarSprints()">Calcular</button>'
     + '<button class="btn-sm" style="padding:6px 16px;font-size:13px;background:var(--border-subtle)" onclick="cancelGerarSprints()">Cancelar</button>'
     + '</div>'
     + '<div id="gen-preview" style="margin-top:16px"></div>'
     + '</div>';
   el.dataset.prevHtml = prevHTML;
+  applyDateMask(document.getElementById('gen-start-date'));
 }
 
 function cancelGerarSprints() {
@@ -3720,9 +3753,9 @@ function openCheckpointForm() {
     + '</div>'
     + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Início</label><br>'
-    + '<input id="cp-inicio" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:150px"></div>'
+    + '<input id="cp-inicio" type="text" placeholder="dd/mm/aaaa" maxlength="10" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:150px"></div>'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Fim (opcional)</label><br>'
-    + '<input id="cp-fim" type="date" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:150px"></div>'
+    + '<input id="cp-fim" type="text" placeholder="dd/mm/aaaa" maxlength="10" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:150px"></div>'
     + '<label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input id="cp-global" type="checkbox"> Global (todas equipes)</label>'
     + '</div>'
     + '<div style="margin-top:16px;display:flex;gap:8px">'
@@ -3730,6 +3763,8 @@ function openCheckpointForm() {
     + '<button class="btn-sm" style="padding:6px 16px;font-size:13px;background:var(--border-subtle)" onclick="cancelCheckpointForm()">Cancelar</button>'
     + '</div></div>';
   el.dataset.prevHtml = prevHTML;
+  applyDateMask(document.getElementById('cp-inicio'));
+  applyDateMask(document.getElementById('cp-fim'));
 }
 
 function cancelCheckpointForm() {
@@ -3749,8 +3784,9 @@ async function criarCheckpoint() {
   var equipe = document.getElementById('stl-equipe').value;
   var nome = document.getElementById('cp-nome').value.trim();
   var resumo = document.getElementById('cp-resumo').value.trim();
-  var inicio = document.getElementById('cp-inicio').value;
-  var fim = document.getElementById('cp-fim').value || null;
+  var inicio = parseDateBR(document.getElementById('cp-inicio').value);
+  var fimRaw = document.getElementById('cp-fim').value;
+  var fim = fimRaw ? parseDateBR(fimRaw) : null;
   var global = document.getElementById('cp-global').checked;
 
   if (!nome) { alert('Informe o nome.'); return; }
@@ -3778,9 +3814,10 @@ async function criarCheckpoint() {
 async function previewGerarSprints() {
   var equipe = document.getElementById('stl-equipe').value;
   var boardId = document.getElementById('gen-board').value.trim();
-  var startDate = document.getElementById('gen-start-date').value;
+  var startDateRaw = document.getElementById('gen-start-date').value;
   if (!boardId || isNaN(parseInt(boardId))) { alert('Informe o Board ID (número).'); return; }
-  if (!startDate) { alert('Informe a Data Inicial.'); return; }
+  if (!startDateRaw) { alert('Informe a Data Inicial.'); return; }
+  var startDate = parseDateBR(startDateRaw);
   var previewEl = document.getElementById('gen-preview');
   previewEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
@@ -4178,12 +4215,14 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
     }
     if (!found) { if (tip) tip.style.display = 'none'; return; }
     if (tip) {
+      var pctAlocCap = found.d.horas_capacidade > 0 ? (found.d.horas_alocadas / found.d.horas_capacidade * 100) : 0;
+      var pctLivre = Math.max(0, 100 - pctAlocCap);
+      var hcProp = found.d.horas_maximo_teorico > 0 ? (found.d.horas_capacidade / found.d.horas_maximo_teorico * found.d.headcount) : found.d.headcount;
       tip.innerHTML = '<b>' + esc(found.d.sprint_nome) + '</b><br>'
         + fmtDateBR(found.d.data_inicio) + ' — ' + fmtDateBR(found.d.data_fim) + '<br>'
-        + 'Capacidade: ' + found.d.horas_capacidade.toFixed(1) + 'h (' + found.pctCap.toFixed(1) + '%)<br>'
-        + 'Alocadas: ' + found.d.horas_alocadas.toFixed(1) + 'h (' + found.pctAloc.toFixed(1) + '%)<br>'
-        + 'Máx teórico: ' + found.d.horas_maximo_teorico.toFixed(1) + 'h<br>'
-        + 'Headcount: ' + found.d.headcount;
+        + 'Alocação: ' + pctAlocCap.toFixed(1) + '%<br>'
+        + 'Livre: ' + pctLivre.toFixed(1) + '%<br>'
+        + 'Headcount: ' + hcProp.toFixed(1);
       tip.style.display = 'block';
       tip.style.left = (e.clientX + 12) + 'px';
       tip.style.top = (e.clientY - 10) + 'px';
@@ -4192,6 +4231,18 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
   canvas.onmouseleave = function() {
     var tip = document.getElementById('gantt-tooltip');
     if (tip) tip.style.display = 'none';
+  };
+
+  canvas.onclick = function(e) {
+    var r = canvas.getBoundingClientRect();
+    var mx = e.clientX - r.left;
+    var found = null;
+    for (var i = 0; i < sprintRects.length; i++) {
+      var sr = sprintRects[i];
+      if (mx >= sr.x && mx <= sr.x + sr.w) { found = sr; break; }
+    }
+    if (!found) return;
+    openTimelineDetailModal(found.d.sprint_id);
   };
 
   canvas.oncontextmenu = function(e) {
@@ -4429,8 +4480,9 @@ async function deleteSchedule(fonteId) {
 
 // === DESLIGAMENTO ===
 async function salvarDesligamento(membroId) {
-  const dt = document.getElementById('membro-desligamento').value;
-  if (!dt) { alert('Informe a data de desligamento'); return; }
+  const dtRaw = document.getElementById('membro-desligamento').value;
+  if (!dtRaw) { alert('Informe a data de desligamento'); return; }
+  var dt = parseDateBR(dtRaw);
   try {
     await api('/membros/' + membroId + '/desligamento', { method: 'PUT', body: JSON.stringify({ data_desligamento: dt }) });
     loadMembroDetail(membroId, currentMembroPeriod);
@@ -4476,7 +4528,8 @@ async function loadFeriados() {
 
 async function handleFeriadoSubmit(e) {
   e.preventDefault();
-  const data = document.getElementById('feriado-data').value;
+  const dataRaw = document.getElementById('feriado-data').value;
+  const data = parseDateBR(dataRaw);
   const nome = document.getElementById('feriado-nome').value.trim();
   if (!data || !nome) return;
   try {
@@ -4551,7 +4604,7 @@ async function openDisclaimerModal(sprintID, taskType) {
 
 function closeDisclaimerModal() {
   document.getElementById('disclaimer-modal').classList.remove('open');
-  document.getElementById('pie-tooltip').style.display = 'none';
+  closePieTooltip();
 }
 
 var PIE_COLORS = ['#0D7C66', '#5B7FBF', '#D4483B', '#C78D2E', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
@@ -4572,7 +4625,8 @@ function aggregateTarefasByKey(tarefas, keyFn) {
   return arr;
 }
 
-function drawPieChart(wrapEl, slices) {
+function drawPieChart(wrapEl, slices, colorOffset) {
+  colorOffset = colorOffset || 0;
   if (!slices || slices.length === 0) {
     wrapEl.innerHTML = '<div class="pie-no-data">Sem dados</div>';
     return;
@@ -4618,17 +4672,13 @@ function drawPieChart(wrapEl, slices) {
     }
 
     path.setAttribute('d', d);
-    path.setAttribute('fill', PIE_COLORS[i % PIE_COLORS.length]);
+    path.setAttribute('fill', PIE_COLORS[(i + colorOffset) % PIE_COLORS.length]);
     path.setAttribute('data-slice-index', i);
 
-    path.addEventListener('mouseenter', function() {
-      buildPieTooltipContent(slice.tarefas);
-    });
-    path.addEventListener('mousemove', function(e) {
-      positionPieTooltip(e);
-    });
-    path.addEventListener('mouseleave', function() {
-      document.getElementById('pie-tooltip').style.display = 'none';
+    path.style.cursor = 'pointer';
+    path.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showPieTooltip(slice.tarefas);
     });
 
     svg.appendChild(path);
@@ -4681,7 +4731,7 @@ function drawPieChart(wrapEl, slices) {
   slices.forEach(function(slice, i) {
     var pct = (slice.horas / total * 100).toFixed(1);
     legendHtml += '<div class="pie-legend-item">' +
-      '<span class="pie-legend-color" style="background:' + PIE_COLORS[i % PIE_COLORS.length] + '"></span>' +
+      '<span class="pie-legend-color" style="background:' + PIE_COLORS[(i + colorOffset) % PIE_COLORS.length] + '"></span>' +
       '<span class="pie-legend-label">' + esc(slice.label) + '</span>' +
       '<span class="pie-legend-value">' + slice.horas.toFixed(1) + 'h (' + pct + '%)</span>' +
       '</div>';
@@ -4719,7 +4769,7 @@ function renderDisclaimerPies(container, tarefas, taskType) {
     wrap2.className = 'pie-chart-wrap';
     wrap2.innerHTML = '<h4>Por Produto</h4>';
     var slicesProd = aggregateTarefasByKey(tarefas, function(t) { return t.produtos && t.produtos.length > 0 ? t.produtos : null; });
-    drawPieChart(wrap2, slicesProd);
+    drawPieChart(wrap2, slicesProd, 5);
     contentDiv.appendChild(wrap2);
   }
 
@@ -4727,9 +4777,81 @@ function renderDisclaimerPies(container, tarefas, taskType) {
   container.appendChild(contentDiv);
 }
 
-function buildPieTooltipContent(tarefas) {
+var AUSENCIA_LABELS = {
+  'ferias': 'Férias', 'dayoff': 'Day Off', 'licenca_medica': 'Lic. Médica',
+  'licenca_paternidade': 'Lic. Paternidade', 'licenca_maternidade': 'Lic. Maternidade',
+  'desligamento': 'Desligamento'
+};
+
+async function openTimelineDetailModal(sprintId) {
+  var modal = document.getElementById('timeline-detail-modal');
+  var titleEl = document.getElementById('timeline-detail-title');
+  var content = document.getElementById('timeline-detail-content');
+
+  titleEl.textContent = 'Carregando...';
+  content.innerHTML = '<div class="pie-no-data">Carregando...</div>';
+  modal.classList.add('open');
+
+  var equipe = document.getElementById('stl-equipe').value;
+  if (!equipe) { content.innerHTML = '<div class="pie-no-data">Nenhuma equipe selecionada</div>'; return; }
+
+  try {
+    var data = await api('/sprints/' + sprintId + '/timeline-detail?equipe=' + equipe);
+
+    titleEl.textContent = data.sprint_nome + ' (' + fmtDateBR(data.data_inicio) + ' — ' + fmtDateBR(data.data_fim) + ')';
+
+    var html = '';
+
+    if (data.ausentes && data.ausentes.length > 0) {
+      var parts = data.ausentes.map(function(a) {
+        var label = AUSENCIA_LABELS[a.tipo] || a.tipo;
+        return '<b>' + esc(a.nome) + '</b> (' + label + ': ' + fmtDateBR(a.data_inicio) + ' — ' + fmtDateBR(a.data_fim) + ')';
+      });
+      html += '<div class="unplanned-disclaimer warn" style="margin-bottom:16px">';
+      html += '<span class="unplanned-disclaimer-icon">⚠</span>';
+      html += '<div>' + parts.join(', ') + ' — ausente(s) neste período.</div>';
+      html += '</div>';
+    }
+
+    content.innerHTML = html;
+
+    if (!data.tarefas || data.tarefas.length === 0) {
+      content.innerHTML += '<div class="pie-no-data">Nenhuma tarefa encontrada nesta sprint</div>';
+      return;
+    }
+
+    var contentDiv = document.createElement('div');
+    contentDiv.className = 'pie-modal-content';
+
+    var wrap1 = document.createElement('div');
+    wrap1.className = 'pie-chart-wrap';
+    wrap1.innerHTML = '<h4>Por Tipo de Demanda</h4>';
+    var slicesTipo = aggregateTarefasByKey(data.tarefas, function(t) { return [t.tipo_demanda]; });
+    drawPieChart(wrap1, slicesTipo);
+    contentDiv.appendChild(wrap1);
+
+    var wrap2 = document.createElement('div');
+    wrap2.className = 'pie-chart-wrap';
+    wrap2.innerHTML = '<h4>Por Épico</h4>';
+    var slicesEpico = aggregateTarefasByKey(data.tarefas, function(t) { return [t.epico_apelido || 'Outras Tarefas']; });
+    drawPieChart(wrap2, slicesEpico, 5);
+    contentDiv.appendChild(wrap2);
+
+    content.appendChild(contentDiv);
+  } catch (e) {
+    content.innerHTML = '<div class="pie-no-data">Erro ao carregar dados: ' + esc(e.message || 'erro desconhecido') + '</div>';
+  }
+}
+
+function closeTimelineDetailModal() {
+  document.getElementById('timeline-detail-modal').classList.remove('open');
+}
+
+function showPieTooltip(tarefas) {
+  closePieTooltip();
   var tip = document.getElementById('pie-tooltip');
-  var html = '<table><thead><tr><th>Ticket</th><th>Descrição</th><th>Relator</th></tr></thead><tbody>';
+  var html = '<button class="pie-tooltip-close" onclick="closePieTooltip()">&times;</button>';
+  html += '<table><thead><tr><th>Ticket</th><th>Descrição</th><th>Relator</th></tr></thead><tbody>';
   tarefas.forEach(function(t) {
     var resumo = t.resumo || '';
     if (resumo.length > 60) resumo = resumo.substring(0, 57) + '...';
@@ -4738,18 +4860,18 @@ function buildPieTooltipContent(tarefas) {
   });
   html += '</tbody></table>';
   tip.innerHTML = html;
+  var backdrop = document.createElement('div');
+  backdrop.className = 'pie-tooltip-backdrop';
+  backdrop.id = 'pie-tooltip-backdrop';
+  backdrop.onclick = closePieTooltip;
+  document.body.appendChild(backdrop);
   tip.style.display = 'block';
 }
 
-function positionPieTooltip(event) {
-  var tip = document.getElementById('pie-tooltip');
-  var x = event.clientX + 16;
-  var y = event.clientY + 16;
-  var rect = tip.getBoundingClientRect();
-  if (x + rect.width > window.innerWidth - 8) x = event.clientX - rect.width - 16;
-  if (y + rect.height > window.innerHeight - 8) y = event.clientY - rect.height - 16;
-  tip.style.left = x + 'px';
-  tip.style.top = y + 'px';
+function closePieTooltip() {
+  document.getElementById('pie-tooltip').style.display = 'none';
+  var backdrop = document.getElementById('pie-tooltip-backdrop');
+  if (backdrop) backdrop.remove();
 }
 
 function renderEqualizerModal() {
@@ -4884,7 +5006,7 @@ async function applyEqualizer() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-    document.getElementById('pie-tooltip').style.display = 'none';
+    closePieTooltip();
   }
 });
 document.addEventListener('click', e => {
@@ -5185,6 +5307,12 @@ async function removeSkillFromMembro(membroId, skillId) {
     alert('Falha ao remover skill');
   }
 }
+
+// === DATE MASKS ===
+['projmeta-data-inicio','disp-data-inicio','disp-data-fim','feriado-data'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) applyDateMask(el);
+});
 
 // === INIT ===
 if (token) { api('/usuarios').then(() => showApp()).catch(() => logout()); }

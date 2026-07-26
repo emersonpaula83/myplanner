@@ -245,6 +245,7 @@ func main() {
 			r.Get("/sprints/{id}/unplanned", sprintHandler.GetUnplanned)
 			r.Get("/sprints/{id}/burndown", sprintHandler.GetBurndown)
 			r.Get("/sprints/{id}/disclaimer-tasks", sprintHandler.GetDisclaimerTasks)
+			r.Get("/sprints/{id}/timeline-detail", sprintHandler.GetTimelineDetail)
 			r.Get("/sprints/{id}/equalizer", equalizerHandler.GetSuggestions)
 			r.Post("/sprints/{id}/equalizer/apply", equalizerHandler.ApplyTransfers)
 

@@ -120,7 +120,7 @@ func (s *SyncService) ListJiraProjects(ctx context.Context, fonteDadosID uuid.UU
 }
 
 func (s *SyncService) SyncProject(ctx context.Context, fonteDadosID uuid.UUID, projectKey string) (*domain.SyncLog, error) {
-	running, err := s.repo.HasRunningSync(ctx, fonteDadosID)
+	running, err := s.repo.HasRunningSyncForProject(ctx, fonteDadosID, projectKey)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +137,7 @@ func (s *SyncService) SyncProject(ctx context.Context, fonteDadosID uuid.UUID, p
 		return nil, err
 	}
 
+	pk := projectKey
 	syncLog := &domain.SyncLog{
 		ID:           uuid.New(),
 		FonteDadosID: fonte.ID,
@@ -144,6 +145,7 @@ func (s *SyncService) SyncProject(ctx context.Context, fonteDadosID uuid.UUID, p
 		Status:       "running",
 		IniciadoEm:   time.Now(),
 		Origem:       "manual",
+		ProjectKey:   &pk,
 	}
 	if err := s.repo.CreateSyncLog(ctx, syncLog); err != nil {
 		return nil, fmt.Errorf("creating sync log: %w", err)
@@ -155,7 +157,7 @@ func (s *SyncService) SyncProject(ctx context.Context, fonteDadosID uuid.UUID, p
 }
 
 func (s *SyncService) SyncProjectScheduled(ctx context.Context, fonteDadosID uuid.UUID, projectKey string) (*domain.SyncLog, error) {
-	running, err := s.repo.HasRunningSync(ctx, fonteDadosID)
+	running, err := s.repo.HasRunningSyncForProject(ctx, fonteDadosID, projectKey)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +174,7 @@ func (s *SyncService) SyncProjectScheduled(ctx context.Context, fonteDadosID uui
 		return nil, err
 	}
 
+	pk := projectKey
 	syncLog := &domain.SyncLog{
 		ID:           uuid.New(),
 		FonteDadosID: fonte.ID,
@@ -179,6 +182,7 @@ func (s *SyncService) SyncProjectScheduled(ctx context.Context, fonteDadosID uui
 		Status:       "running",
 		IniciadoEm:   time.Now(),
 		Origem:       "scheduled",
+		ProjectKey:   &pk,
 	}
 	if err := s.repo.CreateSyncLog(ctx, syncLog); err != nil {
 		return nil, fmt.Errorf("creating sync log: %w", err)
@@ -381,6 +385,32 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 	} else {
 		s.logger.Debug("could not discover sprint field", zap.Error(err))
 	}
+	var cfMap map[string]string
+	if fonte.CustomFieldMap != nil {
+		_ = json.Unmarshal(fonte.CustomFieldMap, &cfMap)
+	}
+	if cfMap == nil {
+		cfMap = make(map[string]string)
+	}
+	if len(cfMap) == 0 {
+		if discovered, err := client.DiscoverCustomFields(ctx); err == nil && len(discovered) > 0 {
+			for k, v := range discovered {
+				cfMap[k] = v
+			}
+			if raw, err := json.Marshal(cfMap); err == nil {
+				fonte.CustomFieldMap = raw
+				_ = s.repo.UpdateCustomFieldMap(ctx, fonte.ID, raw)
+				s.logger.Info("auto-discovered custom fields", zap.Any("map", cfMap))
+			}
+		}
+	}
+	if len(cfMap) > 0 {
+		ids := make([]string, 0, len(cfMap))
+		for fieldID := range cfMap {
+			ids = append(ids, fieldID)
+		}
+		client.SetCustomFieldIDs(ids)
+	}
 
 	projectKeys, err := s.repo.GetProjectKeysForSync(ctx, fonte.ID)
 	if err != nil {
@@ -508,6 +538,32 @@ func (s *SyncService) ensureMember(ctx context.Context, fonte *domain.FonteDados
 func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client, fonte *domain.FonteDados, projectKey string, syncLogID *uuid.UUID) (repository.SyncTotals, []error) {
 	if sprintFieldID, err := client.GetSprintFieldID(ctx); err == nil {
 		client.SetSprintFieldID(sprintFieldID)
+	}
+	var cfMap map[string]string
+	if fonte.CustomFieldMap != nil {
+		_ = json.Unmarshal(fonte.CustomFieldMap, &cfMap)
+	}
+	if cfMap == nil {
+		cfMap = make(map[string]string)
+	}
+	if len(cfMap) == 0 {
+		if discovered, err := client.DiscoverCustomFields(ctx); err == nil && len(discovered) > 0 {
+			for k, v := range discovered {
+				cfMap[k] = v
+			}
+			if raw, err := json.Marshal(cfMap); err == nil {
+				fonte.CustomFieldMap = raw
+				_ = s.repo.UpdateCustomFieldMap(ctx, fonte.ID, raw)
+				s.logger.Info("auto-discovered custom fields", zap.Any("map", cfMap))
+			}
+		}
+	}
+	if len(cfMap) > 0 {
+		ids := make([]string, 0, len(cfMap))
+		for fieldID := range cfMap {
+			ids = append(ids, fieldID)
+		}
+		client.SetCustomFieldIDs(ids)
 	}
 
 	issues, err := client.GetIssuesByProjects(ctx, []string{projectKey}, nil)

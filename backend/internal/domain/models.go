@@ -175,4 +175,5 @@ type SyncLog struct {
 	Mensagem       *string         `json:"mensagem" db:"mensagem"`
 	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
 	Origem         string          `json:"origem" db:"origem"`
+	ProjectKey     *string         `json:"project_key" db:"project_key"`
 }
