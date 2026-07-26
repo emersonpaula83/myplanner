@@ -80,10 +80,12 @@ myplanner/
 
 ## Funcionalidades
 
-- **Sync Jira** — sincronizacao automatica e manual de projetos, sprints, tarefas e membros
+- **Sync Jira** — sincronizacao automatica e manual de projetos, sprints, tarefas e membros. Auto-deteccao de custom fields (tipo de demanda) e preservacao de dados manuais (apelido, data inicio) durante sync via COALESCE
 - **Sprints** — visualizacao de capacidade por membro, tarefas nao planejadas, burndown chart
-- **Timeline** — Gantt de projetos (epicos) e ausencias de membros, capacidade mensal
-- **Equipes** — gestao de membros, resumo de equipe
+- **Sprint Review** — relatorio de review por sprint com estatisticas (GDPTC), destaques, exportacao PDF/imagem, graficos de pizza por tipo de demanda e epico com tooltips clicaveis mostrando tickets, descricao e relator
+- **Timeline** — Gantt de sprints e projetos (epicos) com capacidade mensal. Filtragem por board_id da equipe para evitar vazamento de sprints de outros times. Checkpoints visuais e analise IA
+- **Equipes** — gestao de membros com cargos (dev, QA, scrum master, etc), associacao de produtos, resumo de equipe. Board ID configuravel para isolamento de sprints
+- **Disclaimers** — modal de ressalvas por sprint com graficos de pizza interativos (tipo de demanda, epico), tooltips com detalhes de tarefas
 - **Skills** — catalogo global de skills (tags tecnicas) com associacao N:N a membros, autocomplete e criacao inline
 - **Equalizer** — redistribuicao automatica de tarefas entre membros da sprint, algoritmo greedy com visualizacao before/after e apply via Jira
 - **Ausencias** — ferias, licencas, dayoffs com impacto automatico na capacidade
@@ -91,6 +93,7 @@ myplanner/
 - **Desligamento** — membros desligados sao excluidos automaticamente dos calculos
 - **Analise IA** — analise de capacidade mensal via Google Gemini (requer `GEMINI_API_KEY`)
 - **Auth** — JWT com controle de acesso por projeto
+- **UX** — favicon e logo SVG, datas no formato brasileiro (dd/mm/aaaa), dark mode completo com exportacao
 
 ## Configuracao
 
