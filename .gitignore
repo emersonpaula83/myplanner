@@ -31,8 +31,12 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
+# Claude worktrees
+.claude/worktrees/
+
 # Binary
 backend/bin/
+myplanner
 backend/migrate
 backend/api
 backend/myplanner
