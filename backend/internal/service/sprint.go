@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -108,7 +109,7 @@ func (s *SprintService) ListByProjeto(ctx context.Context, projetoID uuid.UUID, 
 }
 
 func (s *SprintService) ListSprints(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]repository.SprintListItem, error) {
-	return s.repo.ListSprints(ctx, equipeID, estado)
+	return s.repo.ListSprints(ctx, equipeID, estado, nil)
 }
 
 func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*SprintCapacityResult, error) {
@@ -756,7 +757,12 @@ type SprintTimelineItem struct {
 }
 
 func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UUID, ano int) ([]SprintTimelineItem, error) {
-	allSprints, err := s.repo.ListSprintsIncludeEmpty(ctx, &equipeID, nil)
+	boardID, err := s.repo.GetEquipeBoardID(ctx, equipeID)
+	if err != nil {
+		return nil, fmt.Errorf("getting equipe board_id: %w", err)
+	}
+
+	allSprints, err := s.repo.ListSprintsIncludeEmpty(ctx, &equipeID, nil, boardID)
 	if err != nil {
 		return nil, err
 	}
