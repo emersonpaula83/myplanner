@@ -21,7 +21,7 @@ func NewEquipeRepository(pool *pgxpool.Pool) *EquipeRepository {
 
 func (r *EquipeRepository) ListEquipes(ctx context.Context) ([]domain.Equipe, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, nome, created_at, updated_at FROM equipes ORDER BY nome
+		SELECT id, nome, board_id, created_at, updated_at FROM equipes ORDER BY nome
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("listing equipes: %w", err)
@@ -31,7 +31,7 @@ func (r *EquipeRepository) ListEquipes(ctx context.Context) ([]domain.Equipe, er
 	result := make([]domain.Equipe, 0)
 	for rows.Next() {
 		var e domain.Equipe
-		if err := rows.Scan(&e.ID, &e.Nome, &e.CreatedAt, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Nome, &e.BoardID, &e.CreatedAt, &e.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning equipe: %w", err)
 		}
 		result = append(result, e)
@@ -42,8 +42,8 @@ func (r *EquipeRepository) ListEquipes(ctx context.Context) ([]domain.Equipe, er
 func (r *EquipeRepository) GetEquipeByID(ctx context.Context, id uuid.UUID) (*domain.Equipe, error) {
 	var e domain.Equipe
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, nome, created_at, updated_at FROM equipes WHERE id = $1
-	`, id).Scan(&e.ID, &e.Nome, &e.CreatedAt, &e.UpdatedAt)
+		SELECT id, nome, board_id, created_at, updated_at FROM equipes WHERE id = $1
+	`, id).Scan(&e.ID, &e.Nome, &e.BoardID, &e.CreatedAt, &e.UpdatedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -57,18 +57,18 @@ func (r *EquipeRepository) CreateEquipe(ctx context.Context, nome string) (*doma
 	var e domain.Equipe
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO equipes (nome) VALUES ($1)
-		RETURNING id, nome, created_at, updated_at
-	`, nome).Scan(&e.ID, &e.Nome, &e.CreatedAt, &e.UpdatedAt)
+		RETURNING id, nome, board_id, created_at, updated_at
+	`, nome).Scan(&e.ID, &e.Nome, &e.BoardID, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("creating equipe: %w", err)
 	}
 	return &e, nil
 }
 
-func (r *EquipeRepository) UpdateEquipe(ctx context.Context, id uuid.UUID, nome string) error {
+func (r *EquipeRepository) UpdateEquipe(ctx context.Context, id uuid.UUID, nome string, boardID *int) error {
 	result, err := r.pool.Exec(ctx, `
-		UPDATE equipes SET nome = $2, updated_at = NOW() WHERE id = $1
-	`, id, nome)
+		UPDATE equipes SET nome = $2, board_id = $3, updated_at = NOW() WHERE id = $1
+	`, id, nome, boardID)
 	if err != nil {
 		return fmt.Errorf("updating equipe: %w", err)
 	}
