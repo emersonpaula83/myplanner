@@ -1,0 +1,1 @@
+ALTER TABLE equipes ADD COLUMN board_id INTEGER;

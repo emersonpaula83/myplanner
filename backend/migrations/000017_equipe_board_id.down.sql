@@ -1,0 +1,1 @@
+ALTER TABLE equipes DROP COLUMN IF EXISTS board_id;
