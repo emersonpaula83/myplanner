@@ -318,6 +318,12 @@ func (s *SyncService) syncOne(ctx context.Context, fonte *domain.FonteDados) (*d
 		s.logger.Error("failed to update ultimo_sync", zap.Error(err))
 	}
 
+	if detected, err := s.repo.AutoDetectEquipeBoardIDs(ctx, fonte.ID); err != nil {
+		s.logger.Warn("failed to auto-detect equipe board_ids", zap.Error(err))
+	} else if detected > 0 {
+		s.logger.Info("auto-detected equipe board_ids", zap.Int("count", detected))
+	}
+
 	syncLog.Status = status
 	syncLog.FinalizadoEm = &now
 	syncLog.TotalProjetos = totals.Projetos

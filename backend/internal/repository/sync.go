@@ -388,3 +388,36 @@ func (r *SyncRepository) GetFonteDadosAtivas(ctx context.Context) ([]domain.Font
 	}
 	return result, rows.Err()
 }
+
+func (r *SyncRepository) AutoDetectEquipeBoardIDs(ctx context.Context, fonteDadosID uuid.UUID) (int, error) {
+	rows, err := r.pool.Query(ctx, `
+		WITH equipe_boards AS (
+			SELECT em.equipe_id, s.board_id, COUNT(*) as cnt,
+			       ROW_NUMBER() OVER (PARTITION BY em.equipe_id ORDER BY COUNT(*) DESC) as rn
+			FROM sprints s
+			JOIN tarefas t ON t.sprint_id = s.id
+			JOIN equipe_membros em ON em.membro_id = t.responsavel_id
+			WHERE s.fonte_dados_id = $1 AND s.board_id IS NOT NULL
+			GROUP BY em.equipe_id, s.board_id
+		)
+		UPDATE equipes e
+		SET board_id = eb.board_id, updated_at = NOW()
+		FROM equipe_boards eb
+		WHERE eb.equipe_id = e.id AND eb.rn = 1 AND e.board_id IS NULL
+		RETURNING e.id
+	`, fonteDadosID)
+	if err != nil {
+		return 0, fmt.Errorf("auto-detecting equipe board_ids: %w", err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return count, err
+		}
+		count++
+	}
+	return count, nil
+}
