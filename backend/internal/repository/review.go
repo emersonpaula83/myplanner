@@ -28,6 +28,7 @@ type ReviewTaskRow struct {
 	NumeroTicket string      `json:"numero_ticket"`
 	Resumo       string      `json:"resumo"`
 	Tipo         string      `json:"tipo"`
+	TipoDemanda  string      `json:"tipo_demanda"`
 	Status       string      `json:"status"`
 	ParentID     *uuid.UUID  `json:"parent_id"`
 	RelatorNome  *string     `json:"relator_nome"`
@@ -82,7 +83,15 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 	}
 
 	query := fmt.Sprintf(`
-		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.status,
+		SELECT t.id, t.numero_ticket, t.resumo, t.tipo,
+		       COALESCE(t.tipo_demanda,
+		           CASE
+		               WHEN t.tipo IN ('Épico', 'Projeto') THEN 'Meta'
+		               WHEN t.tipo IN ('Spike', 'Implantação', 'Aditivo - Delivery') THEN 'Compromisso'
+		               ELSE 'Iniciativa'
+		           END
+		       ),
+		       t.status,
 		       t.parent_id, m.nome,
 		       CASE WHEN t.data_entrada_sprint > s.data_inicio
 		            OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
@@ -99,7 +108,7 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 		WHERE t.sprint_id = $1
 		  AND t.status NOT IN ('Cancelado', 'Rejeitada')
 		  %s %s
-		GROUP BY t.id, t.numero_ticket, t.resumo, t.tipo, t.status,
+		GROUP BY t.id, t.numero_ticket, t.resumo, t.tipo, t.tipo_demanda, t.status,
 		         t.parent_id, m.nome, t.data_entrada_sprint, t.data_criacao,
 		         s.data_inicio
 		ORDER BY t.numero_ticket
@@ -115,8 +124,8 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 	for rows.Next() {
 		var row ReviewTaskRow
 		if err := rows.Scan(
-			&row.ID, &row.NumeroTicket, &row.Resumo, &row.Tipo, &row.Status,
-			&row.ParentID, &row.RelatorNome, &row.NaoPlanejada, &row.Produtos, &row.ProdutoIDs,
+			&row.ID, &row.NumeroTicket, &row.Resumo, &row.Tipo, &row.TipoDemanda,
+			&row.Status, &row.ParentID, &row.RelatorNome, &row.NaoPlanejada, &row.Produtos, &row.ProdutoIDs,
 		); err != nil {
 			return nil, fmt.Errorf("scanning review task: %w", err)
 		}

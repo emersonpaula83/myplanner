@@ -70,9 +70,11 @@ type ReviewTarefa struct {
 	NumeroTicket string `json:"numero_ticket"`
 	Produto      string `json:"produto"`
 	Resumo       string `json:"resumo"`
-	Relator      string `json:"relator"`
+	Tipo         string `json:"tipo"`
+	TipoDemanda  string `json:"tipo_demanda"`
 	Categoria    string `json:"categoria"`
 	Status       string `json:"status"`
+	NaoPlanejada bool   `json:"nao_planejada"`
 }
 
 var statusEmAndamento = map[string]bool{
@@ -218,17 +220,15 @@ func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, e
 		if len(t.Produtos) > 0 {
 			produtoStr = strings.Join(t.Produtos, ", ")
 		}
-		relator := ""
-		if t.RelatorNome != nil {
-			relator = *t.RelatorNome
-		}
 		tarefaList = append(tarefaList, ReviewTarefa{
 			NumeroTicket: t.NumeroTicket,
 			Produto:      produtoStr,
 			Resumo:       t.Resumo,
-			Relator:      relator,
+			Tipo:         t.Tipo,
+			TipoDemanda:  t.TipoDemanda,
 			Categoria:    taskCategoria,
 			Status:       t.Status,
+			NaoPlanejada: t.NaoPlanejada,
 		})
 	}
 
