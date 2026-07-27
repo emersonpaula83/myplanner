@@ -32,6 +32,7 @@ type ReviewStats struct {
 	Total              int                 `json:"total"`
 	Concluidas         int                 `json:"concluidas"`
 	EmAndamento        int                 `json:"em_andamento"`
+	NaoIniciadas       int                 `json:"nao_iniciadas"`
 	PlanejadasTotal    int                 `json:"planejadas_total"`
 	PlanejadasConcl    int                 `json:"planejadas_concluidas"`
 	BugsIncidentes     int                 `json:"bugs_incidentes"`
@@ -70,6 +71,8 @@ type ReviewTarefa struct {
 	Produto      string `json:"produto"`
 	Resumo       string `json:"resumo"`
 	Relator      string `json:"relator"`
+	Categoria    string `json:"categoria"`
+	Status       string `json:"status"`
 }
 
 var statusEmAndamento = map[string]bool{
@@ -137,6 +140,8 @@ func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, e
 		} else if statusEmAndamento[t.Status] {
 			stats.EmAndamento++
 			stats.Detalhes.EmAndamento[t.Status]++
+		} else {
+			stats.NaoIniciadas++
 		}
 
 		isBugIncidente := tipoLower == "bug" || strings.Contains(tipoLower, "incidente")
@@ -157,21 +162,26 @@ func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, e
 		// Type classification
 		isGDPTC := gdptcSet[t.ID]
 
+		var taskCategoria string
 		if isBugIncidente {
 			stats.BugsIncidentes++
 			stats.Detalhes.BugsIncidentes[t.Tipo]++
 			catManutencao++
+			taskCategoria = "manutencao"
 		} else if isGDPTC {
 			stats.MelhoriasInovacoes++
 			stats.Detalhes.MelhoriasInovacoes["Portfólio (GDPTC)"]++
 			catNovos++
+			taskCategoria = "novos_projetos"
 		} else if tipoLower == "melhoria" || tipoLower == "história" || tipoLower == "historia" {
 			stats.MelhoriasInovacoes++
 			stats.Detalhes.MelhoriasInovacoes[t.Tipo]++
 			catMelhorias++
+			taskCategoria = "melhorias"
 		} else {
 			stats.Outros++
 			catOutros++
+			taskCategoria = "outros"
 		}
 
 		// Products chart (use ProdutoIDs for unique key, Produtos for display name)
@@ -217,6 +227,8 @@ func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, e
 			Produto:      produtoStr,
 			Resumo:       t.Resumo,
 			Relator:      relator,
+			Categoria:    taskCategoria,
+			Status:       t.Status,
 		})
 	}
 

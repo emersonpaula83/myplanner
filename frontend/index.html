@@ -2238,6 +2238,7 @@ async function openSprintCapacity(sprintID) {
     }
     window._currentSprintID = sprintID;
     window._currentSprintNome = data.sprint ? data.sprint.nome : '';
+    window._currentSprintEstado = data.sprint ? (data.sprint.estado || 'future') : 'future';
     window._currentSprintInicio = data.sprint ? data.sprint.data_inicio : null;
     window._currentSprintFim = data.sprint ? data.sprint.data_fim : null;
     let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
@@ -2518,30 +2519,50 @@ function renderReviewContent(container, data) {
   // Stats cards
   var total = data.stats.total || 1;
   var stats = data.stats;
-  var cards = [
-    { label: 'Concluídas', pct: ((stats.concluidas / total) * 100).toFixed(1),
-      tooltip: stats.concluidas + ' de ' + total + ' tarefas concluídas' },
-    { label: 'Em Andamento', pct: ((stats.em_andamento / total) * 100).toFixed(1),
-      tooltip: buildEmAndamentoTooltip(stats.detalhes ? stats.detalhes.em_andamento : {}) },
-    { label: 'Plan. Concluídas', pct: stats.planejadas_total > 0 ? ((stats.planejadas_concluidas / stats.planejadas_total) * 100).toFixed(1) : '0.0',
-      tooltip: stats.planejadas_concluidas + ' de ' + stats.planejadas_total + ' planejadas concluídas' },
-    { label: 'Bugs e Incidentes', pct: ((stats.bugs_incidentes / total) * 100).toFixed(1),
-      tooltip: buildMapTooltip(stats.detalhes ? stats.detalhes.bugs_incidentes : {}) },
-    { label: 'Melhorias e Inovações', pct: ((stats.melhorias_inovacoes / total) * 100).toFixed(1),
-      tooltip: buildMapTooltip(stats.detalhes ? stats.detalhes.melhorias_inovacoes : {}) },
-    { label: 'Outros', pct: ((stats.outros / total) * 100).toFixed(1),
-      tooltip: 'Tarefas: ' + stats.outros }
+
+  var sprintNome = window._currentSprintNome || '';
+  var sprintEstado = window._currentSprintEstado || 'future';
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">';
+  html += '<span style="font-size:18px;font-weight:700">' + esc(sprintNome) + '</span>';
+  html += '<span class="sprint-state-badge ' + sprintEstado + '" style="font-size:12px;padding:4px 12px">' + formatEstado(sprintEstado) + '</span>';
+  html += '</div>';
+  html += '<h3 style="font-size:16px;margin-bottom:12px">Status das Tarefas</h3>';
+
+  var cardsStatus = [
+    { label: 'Concluídas', value: ((stats.concluidas / total) * 100).toFixed(1) + '%',
+      tooltip: stats.concluidas + ' de ' + total + ' tarefas concluídas', color: '#1976d2' },
+    { label: 'Em Andamento', value: ((stats.em_andamento / total) * 100).toFixed(1) + '%',
+      tooltip: buildEmAndamentoTooltip(stats.detalhes ? stats.detalhes.em_andamento : {}), color: '#C78D2E' },
+    { label: 'Plan. Concluídas', value: stats.planejadas_total > 0 ? ((stats.planejadas_concluidas / stats.planejadas_total) * 100).toFixed(1) + '%' : '0.0%',
+      tooltip: stats.planejadas_concluidas + ' de ' + stats.planejadas_total + ' planejadas concluídas', color: '#0D7C66' },
+    { label: 'Não Iniciadas', value: String(stats.nao_iniciadas),
+      tooltip: stats.nao_iniciadas + ' de ' + total + ' tarefas não iniciadas', color: '#9E9E9E' }
   ];
 
-  html += '<div class="review-stats">';
-  cards.forEach(function(c) {
-    html += '<div class="review-stat-card">';
-    html += '<div class="review-stat-tooltip">' + esc(c.tooltip) + '</div>';
-    html += '<div class="stat-pct">' + c.pct + '%</div>';
-    html += '<div class="stat-label">' + c.label + '</div>';
-    html += '</div>';
-  });
-  html += '</div>';
+  var cardsTipo = [
+    { label: 'Melhorias e Inovações', value: ((stats.melhorias_inovacoes / total) * 100).toFixed(1) + '%',
+      tooltip: buildMapTooltip(stats.detalhes ? stats.detalhes.melhorias_inovacoes : {}), color: '#5B7FBF' },
+    { label: 'Bugs e Incidentes', value: ((stats.bugs_incidentes / total) * 100).toFixed(1) + '%',
+      tooltip: buildMapTooltip(stats.detalhes ? stats.detalhes.bugs_incidentes : {}), color: '#D4483B' },
+    { label: 'Outros', value: ((stats.outros / total) * 100).toFixed(1) + '%',
+      tooltip: 'Tarefas: ' + stats.outros, color: '#F97316' }
+  ];
+
+  function renderCardRow(cards) {
+    var h = '<div class="review-stats">';
+    cards.forEach(function(c) {
+      h += '<div class="review-stat-card">';
+      h += '<div class="review-stat-tooltip">' + esc(c.tooltip) + '</div>';
+      h += '<div class="stat-pct" style="color:' + c.color + '">' + c.value + '</div>';
+      h += '<div class="stat-label">' + c.label + '</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+    return h;
+  }
+  html += renderCardRow(cardsStatus);
+  html += '<h3 style="font-size:16px;margin-bottom:12px">% de Entregas por Categoria</h3>';
+  html += renderCardRow(cardsTipo);
 
   // Charts
   html += '<div class="review-charts">';
@@ -2553,20 +2574,28 @@ function renderReviewContent(container, data) {
   // Destaques placeholder (loaded separately in Task 5)
   html += '<div id="review-destaques-container" class="review-destaques"><h3>Destaques</h3><div id="review-destaques-list"></div></div>';
 
-  // Tasks table
-  html += '<h3 style="font-size:16px;margin-bottom:12px">Tarefas</h3>';
-  html += '<table class="review-tasks-table"><thead><tr>';
-  html += '<th>Ticket</th><th>Produto</th><th>Resumo</th><th>Relator</th>';
-  html += '</tr></thead><tbody>';
-  (data.tarefas || []).forEach(function(t) {
-    html += '<tr>';
-    html += '<td>' + esc(t.numero_ticket) + '</td>';
-    html += '<td>' + esc(t.produto || '') + '</td>';
-    html += '<td>' + esc(t.resumo) + '</td>';
-    html += '<td>' + esc(t.relator || '') + '</td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
+  // Tasks tables grouped by status
+  var emAndamentoStatuses = { 'Desenvolvimento': 1, 'Deploy': 1, 'Code Review': 1, 'Teste': 1, 'Validação do Solicitante': 1 };
+  var allT = data.tarefas || [];
+  var tConcluidas = allT.filter(function(t) { return t.status === 'Concluído'; });
+  var tEmAndamento = allT.filter(function(t) { return emAndamentoStatuses[t.status]; });
+  var tNaoIniciadas = allT.filter(function(t) { return t.status !== 'Concluído' && !emAndamentoStatuses[t.status]; });
+
+  function buildReviewTaskTable(title, color, tarefas) {
+    if (tarefas.length === 0) return '';
+    var h = '<h3 style="font-size:16px;margin-bottom:12px;color:' + color + '">' + title + ' (' + tarefas.length + ')</h3>';
+    h += '<table class="review-tasks-table"><thead><tr>';
+    h += '<th>Ticket</th><th>Produto</th><th>Resumo</th><th>Status</th><th>Relator</th>';
+    h += '</tr></thead><tbody>';
+    tarefas.forEach(function(t) {
+      h += '<tr><td>' + esc(t.numero_ticket) + '</td><td>' + esc(t.produto || '') + '</td><td>' + esc(t.resumo) + '</td><td>' + esc(t.status) + '</td><td>' + esc(t.relator || '') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+  }
+  html += buildReviewTaskTable('Tarefas Concluídas', '#1976d2', tConcluidas);
+  html += buildReviewTaskTable('Tarefas Em Andamento', '#C78D2E', tEmAndamento);
+  html += buildReviewTaskTable('Tarefas Não Iniciadas', '#9E9E9E', tNaoIniciadas);
 
   // Export bar (wired in Task 6)
   html += '<div class="review-export-bar">';
@@ -2664,23 +2693,32 @@ function buildExportContainer() {
   }
   html += '</div>';
 
-  // Stats row
-  var cards = [
-    { label: 'Concluídas', pct: ((stats.concluidas / total) * 100).toFixed(1) + '%' },
-    { label: 'Em Andamento', pct: ((stats.em_andamento / total) * 100).toFixed(1) + '%' },
-    { label: 'Plan. Concluídas', pct: stats.planejadas_total > 0 ? ((stats.planejadas_concluidas / stats.planejadas_total) * 100).toFixed(1) + '%' : '0.0%' },
-    { label: 'Bugs e Incidentes', pct: ((stats.bugs_incidentes / total) * 100).toFixed(1) + '%' },
-    { label: 'Melhorias e Inovações', pct: ((stats.melhorias_inovacoes / total) * 100).toFixed(1) + '%' },
-    { label: 'Outros', pct: ((stats.outros / total) * 100).toFixed(1) + '%' }
+  // Stats rows
+  html += '<div style="font-size:14px;font-weight:600;margin-bottom:8px">Status das Tarefas</div>';
+  var exportCardsStatus = [
+    { label: 'Concluídas', val: ((stats.concluidas / total) * 100).toFixed(1) + '%', color: '#1976d2' },
+    { label: 'Em Andamento', val: ((stats.em_andamento / total) * 100).toFixed(1) + '%', color: '#C78D2E' },
+    { label: 'Plan. Concluídas', val: stats.planejadas_total > 0 ? ((stats.planejadas_concluidas / stats.planejadas_total) * 100).toFixed(1) + '%' : '0.0%', color: '#0D7C66' },
+    { label: 'Não Iniciadas', val: String(stats.nao_iniciadas), color: '#9E9E9E' }
   ];
-  html += '<div style="display:flex;gap:12px;margin-bottom:24px">';
-  cards.forEach(function(c) {
-    html += '<div style="flex:1;text-align:center;border:1px solid #ddd;border-radius:8px;padding:12px">';
-    html += '<div style="font-size:24px;font-weight:700;color:#1976d2">' + c.pct + '</div>';
-    html += '<div style="font-size:10px;color:#666;text-transform:uppercase">' + esc(c.label) + '</div>';
-    html += '</div>';
-  });
-  html += '</div>';
+  var exportCardsTipo = [
+    { label: 'Bugs e Incidentes', val: ((stats.bugs_incidentes / total) * 100).toFixed(1) + '%', color: '#D4483B' },
+    { label: 'Melhorias e Inovações', val: ((stats.melhorias_inovacoes / total) * 100).toFixed(1) + '%', color: '#5B7FBF' },
+    { label: 'Outros', val: ((stats.outros / total) * 100).toFixed(1) + '%', color: '#F97316' }
+  ];
+  function renderExportCardRow(cards) {
+    var h = '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">';
+    cards.forEach(function(c) {
+      h += '<div style="flex:1;text-align:center;border:1px solid #ddd;border-radius:8px;padding:12px">';
+      h += '<div style="font-size:24px;font-weight:700;color:' + c.color + '">' + c.val + '</div>';
+      h += '<div style="font-size:10px;color:#666;text-transform:uppercase">' + esc(c.label) + '</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+    return h;
+  }
+  html += renderExportCardRow(exportCardsStatus);
+  html += renderExportCardRow(exportCardsTipo);
 
   // Charts placeholder divs
   html += '<div style="display:flex;gap:20px;margin-bottom:24px">';
@@ -2721,11 +2759,12 @@ function buildExportContainer() {
   document.body.appendChild(div);
 
   // Draw charts into export container
-  var catLabels = { manutencao: 'Manutenção', novos_projetos: 'Novos Projetos', melhorias: 'Melhorias', outros: 'Outros' };
+  var catLabels = { manutencao: 'Bugs e Incidentes', novos_projetos: 'Novos Projetos', melhorias: 'Melhorias e Inovações', outros: 'Outros' };
+  var catColors = { manutencao: '#D4483B', melhorias: '#5B7FBF', novos_projetos: '#0D7C66', outros: '#C78D2E' };
   drawPieChart(document.getElementById('export-pie-produtos'),
     (data.grafico_produtos || []).map(function(p) { return { label: p.produto, horas: p.total }; }));
   drawPieChart(document.getElementById('export-pie-categorias'),
-    (data.grafico_categorias || []).filter(function(c) { return c.total > 0; }).map(function(c) { return { label: catLabels[c.categoria] || c.categoria, horas: c.total }; }));
+    (data.grafico_categorias || []).filter(function(c) { return c.total > 0; }).map(function(c) { return { label: catLabels[c.categoria] || c.categoria, horas: c.total, color: catColors[c.categoria] }; }));
   var plan = data.grafico_planejamento || {};
   var planSlices = [];
   if (plan.planejadas > 0) planSlices.push({ label: 'Planejadas', horas: plan.planejadas });
@@ -2802,17 +2841,21 @@ function exportReviewPDF() {
 }
 
 function drawReviewPieCharts(data) {
-  // Produtos pie
+  // Produtos pie — populate tarefas from data.tarefas by matching produto
+  var allTarefas = data.tarefas || [];
   var prodSlices = (data.grafico_produtos || []).map(function(p) {
-    return { label: p.produto, horas: p.total, tarefas: [] };
+    var ts = allTarefas.filter(function(t) { return (t.produto || '').indexOf(p.produto) !== -1 || (!t.produto && p.produto === 'Sem Produto'); });
+    return { label: p.produto, horas: p.total, tarefas: ts };
   });
   var prodEl = document.getElementById('review-pie-produtos');
   if (prodEl) drawPieChart(prodEl, prodSlices);
 
-  // Categorias pie
-  var catLabels = { manutencao: 'Manutenção', novos_projetos: 'Novos Projetos', melhorias: 'Melhorias', outros: 'Outros' };
+  // Categorias pie — populate tarefas by matching categoria
+  var catLabels = { manutencao: 'Bugs e Incidentes', novos_projetos: 'Novos Projetos', melhorias: 'Melhorias e Inovações', outros: 'Outros' };
+  var catColors = { manutencao: '#D4483B', melhorias: '#5B7FBF', novos_projetos: '#0D7C66', outros: '#C78D2E' };
   var catSlices = (data.grafico_categorias || []).filter(function(c) { return c.total > 0; }).map(function(c) {
-    return { label: catLabels[c.categoria] || c.categoria, horas: c.total, tarefas: [] };
+    var ts = allTarefas.filter(function(t) { return t.categoria === c.categoria; });
+    return { label: catLabels[c.categoria] || c.categoria, horas: c.total, tarefas: ts, color: catColors[c.categoria] };
   });
   var catEl = document.getElementById('review-pie-categorias');
   if (catEl) drawPieChart(catEl, catSlices);
@@ -4720,7 +4763,7 @@ function drawPieChart(wrapEl, slices, colorOffset) {
     }
 
     path.setAttribute('d', d);
-    path.setAttribute('fill', PIE_COLORS[(i + colorOffset) % PIE_COLORS.length]);
+    path.setAttribute('fill', slice.color || PIE_COLORS[(i + colorOffset) % PIE_COLORS.length]);
     path.setAttribute('data-slice-index', i);
 
     path.style.cursor = 'pointer';
@@ -4779,7 +4822,7 @@ function drawPieChart(wrapEl, slices, colorOffset) {
   slices.forEach(function(slice, i) {
     var pct = (slice.horas / total * 100).toFixed(1);
     legendHtml += '<div class="pie-legend-item">' +
-      '<span class="pie-legend-color" style="background:' + PIE_COLORS[(i + colorOffset) % PIE_COLORS.length] + '"></span>' +
+      '<span class="pie-legend-color" style="background:' + (slice.color || PIE_COLORS[(i + colorOffset) % PIE_COLORS.length]) + '"></span>' +
       '<span class="pie-legend-label">' + esc(slice.label) + '</span>' +
       '<span class="pie-legend-value">' + slice.horas.toFixed(1) + 'h (' + pct + '%)</span>' +
       '</div>';
