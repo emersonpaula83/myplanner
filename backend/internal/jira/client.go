@@ -27,6 +27,8 @@ type Client interface {
 	CreateSprint(ctx context.Context, boardID int, name string, startDate, endDate time.Time) (*JiraSprint, error)
 	AssignIssue(ctx context.Context, issueKey, accountID string) error
 	AddComment(ctx context.Context, issueKey, body string) error
+	MoveToSprint(ctx context.Context, sprintJiraID int, issueKey string) error
+	UpdateTimeEstimate(ctx context.Context, issueKey string, seconds int) error
 }
 
 type HTTPClient struct {
@@ -589,6 +591,46 @@ func (c *HTTPClient) AddComment(ctx context.Context, issueKey, body string) erro
 	_, err := c.doPost(ctx, "/rest/api/3/issue/"+issueKey+"/comment", payload)
 	if err != nil {
 		return fmt.Errorf("adding comment to issue %q: %w", issueKey, err)
+	}
+	return nil
+}
+
+func (c *HTTPClient) MoveToSprint(ctx context.Context, sprintJiraID int, issueKey string) error {
+	path := fmt.Sprintf("/rest/agile/1.0/sprint/%d/issue", sprintJiraID)
+	payload := map[string]any{"issues": []string{issueKey}}
+	_, err := c.doPost(ctx, path, payload)
+	if err != nil {
+		return fmt.Errorf("moving issue %q to sprint %d: %w", issueKey, sprintJiraID, err)
+	}
+	return nil
+}
+
+func formatJiraDuration(seconds int) string {
+	days := seconds / 28800
+	remaining := seconds % 28800
+	hours := float64(remaining) / 3600.0
+
+	if days > 0 && hours > 0 {
+		return fmt.Sprintf("%dd %.4gh", days, hours)
+	}
+	if days > 0 {
+		return fmt.Sprintf("%dd", days)
+	}
+	return fmt.Sprintf("%.4gh", hours)
+}
+
+func (c *HTTPClient) UpdateTimeEstimate(ctx context.Context, issueKey string, seconds int) error {
+	estimate := formatJiraDuration(seconds)
+	payload := map[string]any{
+		"fields": map[string]any{
+			"timetracking": map[string]any{
+				"originalEstimate": estimate,
+			},
+		},
+	}
+	_, err := c.doPut(ctx, "/rest/api/3/issue/"+issueKey, payload)
+	if err != nil {
+		return fmt.Errorf("updating time estimate for %q: %w", issueKey, err)
 	}
 	return nil
 }

@@ -18,11 +18,13 @@ import (
 )
 
 type mockReviewStore struct {
-	getReviewDataFn  func(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*service.ReviewData, error)
-	listDestaquesFn  func(ctx context.Context, sprintID, equipeID uuid.UUID) ([]repository.ReviewDestaque, error)
-	createDestaqueFn func(ctx context.Context, d repository.ReviewDestaque) (repository.ReviewDestaque, error)
-	updateDestaqueFn func(ctx context.Context, id uuid.UUID, titulo, descricao string, link *string) (repository.ReviewDestaque, error)
-	deleteDestaqueFn func(ctx context.Context, id uuid.UUID) error
+	getReviewDataFn   func(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*service.ReviewData, error)
+	listDestaquesFn   func(ctx context.Context, sprintID, equipeID uuid.UUID) ([]repository.ReviewDestaque, error)
+	createDestaqueFn  func(ctx context.Context, d repository.ReviewDestaque) (repository.ReviewDestaque, error)
+	updateDestaqueFn  func(ctx context.Context, id uuid.UUID, titulo, descricao string, link *string) (repository.ReviewDestaque, error)
+	deleteDestaqueFn  func(ctx context.Context, id uuid.UUID) error
+	generateAnaliseFn func(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error)
+	getAnaliseFn      func(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error)
 }
 
 func (m *mockReviewStore) GetReviewData(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*service.ReviewData, error) {
@@ -40,9 +42,31 @@ func (m *mockReviewStore) UpdateDestaque(ctx context.Context, id uuid.UUID, titu
 func (m *mockReviewStore) DeleteDestaque(ctx context.Context, id uuid.UUID) error {
 	return m.deleteDestaqueFn(ctx, id)
 }
+func (m *mockReviewStore) GenerateAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error) {
+	return m.generateAnaliseFn(ctx, sprintID, equipeID, produtoIDs)
+}
+func (m *mockReviewStore) GetAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error) {
+	return m.getAnaliseFn(ctx, sprintID, equipeID, produtoIDs)
+}
+
+type mockConfigStore struct {
+	getConfigFn    func(ctx context.Context, chave string) (string, error)
+	setConfigFn    func(ctx context.Context, chave, valor string) error
+	configExistsFn func(ctx context.Context, chave string) (bool, error)
+}
+
+func (m *mockConfigStore) GetConfig(ctx context.Context, chave string) (string, error) {
+	return m.getConfigFn(ctx, chave)
+}
+func (m *mockConfigStore) SetConfig(ctx context.Context, chave, valor string) error {
+	return m.setConfigFn(ctx, chave, valor)
+}
+func (m *mockConfigStore) ConfigExists(ctx context.Context, chave string) (bool, error) {
+	return m.configExistsFn(ctx, chave)
+}
 
 func newTestReviewHandler(store *mockReviewStore) *ReviewHandler {
-	return NewReviewHandler(store, zap.NewNop())
+	return NewReviewHandler(store, &mockConfigStore{}, zap.NewNop())
 }
 
 func TestGetReviewData(t *testing.T) {

@@ -140,8 +140,13 @@ func main() {
 	skillHandler := handler.NewSkillHandler(skillRepo, logger)
 
 	reviewRepo := repository.NewReviewRepository(pool)
-	reviewService := service.NewReviewService(reviewRepo, logger)
-	reviewHandler := handler.NewReviewHandler(reviewService, logger)
+	configRepo := repository.NewConfigRepository(pool)
+	reviewService := service.NewReviewService(reviewRepo, configRepo, logger)
+	reviewHandler := handler.NewReviewHandler(reviewService, configRepo, logger)
+
+	allocRepo := repository.NewAllocationRepository(pool)
+	allocSvc := service.NewAllocationService(allocRepo, sprintService, sprintRepo, fonteDadosRepo, syncService, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
+	allocHandler := handler.NewAllocationHandler(allocSvc, logger)
 
 	r := chi.NewRouter()
 
@@ -255,6 +260,12 @@ func main() {
 			r.Put("/destaques/{id}", reviewHandler.UpdateDestaque)
 			r.Delete("/destaques/{id}", reviewHandler.DeleteDestaque)
 
+			r.Get("/sprints/{id}/review/analise", reviewHandler.GetReviewAnalise)
+			r.Post("/sprints/{id}/review/analise", reviewHandler.PostReviewAnalise)
+
+			r.Get("/config/{chave}", reviewHandler.GetConfig)
+			r.Post("/config", reviewHandler.SetConfig)
+
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)
 			r.Get("/sync/logs", syncHandler.ListSyncLogs)
@@ -264,6 +275,12 @@ func main() {
 			r.Put("/sync/schedules", scheduleHandler.Upsert)
 			r.Delete("/sync/schedules", scheduleHandler.Delete)
 			r.Patch("/sync/schedules/{id}/toggle", scheduleHandler.Toggle)
+
+			r.Get("/allocation/projects", allocHandler.ListProjects)
+			r.Get("/allocation/projects/{epicId}", allocHandler.GetProjectDetail)
+			r.Post("/allocation/tasks/{taskId}/allocate", allocHandler.AllocateTask)
+			r.Post("/allocation/projects/{epicId}/sync", allocHandler.SyncProject)
+			r.Get("/allocation/sprints", allocHandler.ListSprints)
 		})
 	})
 
@@ -293,7 +310,7 @@ func main() {
 		Addr:         addr,
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 60 * time.Second,
+		WriteTimeout: 300 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 

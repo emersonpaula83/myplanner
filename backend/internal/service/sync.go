@@ -641,6 +641,62 @@ func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client,
 	return totals, syncErrors
 }
 
+// SyncEpicTasks syncs only the tasks that are children of a specific epic in
+// Jira (used by AllocationService.SyncProjectTasks to refresh a single
+// project's tasks on demand instead of triggering a full project sync).
+func (s *SyncService) SyncEpicTasks(ctx context.Context, fonteDadosID uuid.UUID, epicKey string) (int, error) {
+	fonte, err := s.getFonte(ctx, fonteDadosID)
+	if err != nil {
+		return 0, err
+	}
+	client, err := s.buildClient(ctx, fonte)
+	if err != nil {
+		return 0, err
+	}
+
+	if sprintFieldID, err := client.GetSprintFieldID(ctx); err == nil {
+		client.SetSprintFieldID(sprintFieldID)
+	}
+
+	idx := strings.Index(epicKey, "-")
+	if idx < 0 {
+		return 0, fmt.Errorf("invalid epic key %q", epicKey)
+	}
+	projectKey := epicKey[:idx]
+	issues, err := client.GetIssuesByProjects(ctx, []string{projectKey}, nil)
+	if err != nil {
+		return 0, fmt.Errorf("fetching issues: %w", err)
+	}
+
+	memberCache := make(map[string]uuid.UUID)
+	sprintCache := make(map[int]uuid.UUID)
+	projectCache := make(map[string]uuid.UUID)
+	var totals repository.SyncTotals
+	count := 0
+
+	for _, issue := range issues {
+		if issue.Fields.Parent == nil {
+			continue
+		}
+		if issue.Fields.Parent.Key != epicKey {
+			continue
+		}
+		projetoID, err := s.ensureProject(ctx, fonte, issue, projectCache)
+		if err != nil {
+			continue
+		}
+		s.ensureMember(ctx, fonte, issue.Fields.Assignee, issue.Fields.Project.Name, memberCache, &totals)
+		s.ensureMember(ctx, fonte, issue.Fields.Reporter, issue.Fields.Project.Name, memberCache, &totals)
+		if _, err := s.processIssue(ctx, fonte, projetoID, issue, memberCache, sprintCache); err != nil {
+			s.logger.Warn("sync epic task failed", zap.String("key", issue.Key), zap.Error(err))
+			continue
+		}
+		count++
+	}
+
+	return count, nil
+}
+
 func (s *SyncService) syncEmptyBoardSprints(ctx context.Context, client jira.Client, fonte *domain.FonteDados, boardProjectMap map[int]uuid.UUID, sprintCache map[int]uuid.UUID) (int, []error) {
 	dbBoards, err := s.repo.GetDistinctBoardProjects(ctx, fonte.ID)
 	if err == nil {

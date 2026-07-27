@@ -506,6 +506,26 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .review-destaque-form .btn-save { background: #1976d2; color: #fff; }
 .review-destaque-form .btn-cancel { background: #f5f5f5; color: #333; }
 
+.review-analise-section { margin: 24px 0; }
+.review-analise-btn-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+.review-analise-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: none; border-radius: 6px; background: #7C3AED; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.review-analise-btn:hover { background: #6D28D9; }
+.review-analise-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.review-analise-btn-settings { padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 14px; }
+.review-analise-btn-regen { padding: 8px 12px; border: 1px solid #7C3AED; border-radius: 6px; background: #fff; color: #7C3AED; font-size: 12px; font-weight: 600; cursor: pointer; }
+.review-analise-produto { background: #f8f7ff; border: 1px solid #e5e1f5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+.review-analise-produto-header { background: #7C3AED; color: #fff; padding: 10px 16px; font-weight: 700; font-size: 14px; }
+.review-analise-card { padding: 14px 16px; border-bottom: 1px solid #e5e1f5; }
+.review-analise-card:last-child { border-bottom: none; }
+.review-analise-card-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.review-analise-card-body { font-size: 12px; line-height: 1.5; color: #444; }
+.review-analise-card-body ul { margin: 6px 0 0; padding-left: 16px; }
+.review-analise-card-body li { margin-bottom: 4px; }
+.review-analise-badge-meta { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: #F59E0B; color: #fff; }
+.review-analise-badge-compromisso { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: #3B82F6; color: #fff; }
+.review-analise-loading { text-align: center; padding: 24px; color: #7C3AED; font-size: 13px; }
+.review-analise-loading .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #7C3AED; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+
 .review-tasks-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
 .review-tasks-table th { text-align: left; padding: 10px 12px; background: #f5f5f5; border-bottom: 2px solid #e0e0e0; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #555; }
 .review-tasks-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
@@ -536,6 +556,11 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
   .review-add-destaque:hover { border-color: #64b5f6; color: #64b5f6; }
   .review-destaque-form { background: #2a2a2a; border-color: #64b5f6; }
   .review-destaque-form input, .review-destaque-form textarea { background: #1e1e1e; color: #eee; border-color: #444; }
+  .review-analise-btn-settings { background: #2a2a2a; border-color: #444; color: #eee; }
+  .review-analise-btn-regen { background: #2a2a2a; }
+  .review-analise-produto { background: #241f33; border-color: #3d3355; }
+  .review-analise-card { border-bottom-color: #3d3355; }
+  .review-analise-card-body { color: #ccc; }
   .review-tasks-table th { background: #1e1e1e; border-color: #444; color: #aaa; }
   .review-tasks-table td { border-color: #333; }
   .review-tasks-table tr:hover td { background: #333; }
@@ -562,6 +587,11 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 :root[data-theme="dark"] .review-add-destaque:hover { border-color: #64b5f6; color: #64b5f6; }
 :root[data-theme="dark"] .review-destaque-form { background: #2a2a2a; border-color: #64b5f6; }
 :root[data-theme="dark"] .review-destaque-form input, :root[data-theme="dark"] .review-destaque-form textarea { background: #1e1e1e; color: #eee; border-color: #444; }
+:root[data-theme="dark"] .review-analise-btn-settings { background: #2a2a2a; border-color: #444; color: #eee; }
+:root[data-theme="dark"] .review-analise-btn-regen { background: #2a2a2a; }
+:root[data-theme="dark"] .review-analise-produto { background: #241f33; border-color: #3d3355; }
+:root[data-theme="dark"] .review-analise-card { border-bottom-color: #3d3355; }
+:root[data-theme="dark"] .review-analise-card-body { color: #ccc; }
 :root[data-theme="dark"] .review-tasks-table th { background: #1e1e1e; border-color: #444; color: #aaa; }
 :root[data-theme="dark"] .review-tasks-table td { border-color: #333; }
 :root[data-theme="dark"] .review-tasks-table tr:hover td { background: #333; }
@@ -739,6 +769,73 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .fade-in { animation: fadeIn .35s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) { .fade-in, .spinner { animation: none; } .metric-bar-fill, .stacked-segment, .member-bar-fill { transition: none; } }
+
+.alloc-filters { display: flex; gap: 16px; margin-bottom: 20px; align-items: center; }
+.alloc-filters select { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); font-size: 14px; min-width: 200px; }
+.alloc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.alloc-box { background: var(--surface); border-radius: 10px; padding: 16px; cursor: pointer; border: 1px solid var(--border); transition: transform .15s, box-shadow .15s; position: relative; }
+.alloc-box:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+.alloc-box-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.alloc-box-star { color: #f5c518; font-size: 18px; cursor: help; }
+.alloc-box-ticket { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.alloc-box-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloc-box-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.alloc-box-produtos { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.alloc-box-produto { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(13,124,102,.15); color: var(--accent); }
+.alloc-bar-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.alloc-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.alloc-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.alloc-bar-label { font-size: 11px; color: var(--text-secondary); display: flex; justify-content: space-between; }
+.alloc-alert { font-size: 11px; color: var(--warning, #e6a817); margin-bottom: 6px; }
+.alloc-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; display: inline-block; }
+.alloc-badge-planejado { background: rgba(34,197,94,.15); color: #22c55e; }
+.alloc-badge-em_planejamento { background: rgba(234,179,8,.15); color: #eab308; }
+.alloc-badge-nao_planejado { background: rgba(156,163,175,.15); color: #9ca3af; }
+.alloc-empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+.alloc-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.alloc-modal { background: var(--surface); border-radius: 12px; max-width: 900px; width: 95%; max-height: 85vh; overflow-y: auto; padding: 24px; position: relative; }
+.alloc-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.alloc-modal-header h2 { font-size: 16px; margin: 0; color: var(--text-primary); }
+.alloc-modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); padding: 4px 8px; }
+.alloc-modal-close:hover { color: var(--text-primary); }
+.alloc-section { margin-bottom: 24px; }
+.alloc-section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.alloc-people-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.alloc-people-table th { text-align: left; padding: 6px 8px; color: var(--text-secondary); font-weight: 500; border-bottom: 1px solid var(--border); }
+.alloc-people-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+.alloc-task-row { display: grid; grid-template-columns: 100px 1fr auto; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.alloc-task-ticket { font-weight: 600; color: var(--accent); }
+.alloc-task-resumo { color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloc-task-controls { display: flex; gap: 6px; align-items: center; }
+.alloc-task-controls select, .alloc-task-controls input { padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); font-size: 12px; }
+.alloc-task-controls select { min-width: 120px; }
+.alloc-task-controls input[type="number"] { width: 60px; }
+.alloc-task-btn { padding: 4px 10px; border-radius: 4px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-size: 12px; }
+.alloc-task-btn:hover { opacity: .85; }
+.alloc-task-btn:disabled { opacity: .5; cursor: not-allowed; }
+.alloc-sync-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.alloc-sync-btn:hover { background: var(--border); }
+.alloc-sync-btn.loading { opacity: .6; pointer-events: none; }
+.alloc-confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); z-index: 1100; display: flex; align-items: center; justify-content: center; }
+.alloc-confirm { background: var(--surface); border-radius: 10px; padding: 24px; max-width: 420px; width: 90%; }
+.alloc-confirm h3 { margin: 0 0 12px; font-size: 15px; color: var(--text-primary); }
+.alloc-confirm p { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+.alloc-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.alloc-confirm-actions button { padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.alloc-task-readonly { display: grid; grid-template-columns: 100px 1fr 60px 120px 120px; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.alloc-gantt { overflow-x: auto; }
+.alloc-gantt-container { position: relative; min-width: 700px; }
+.alloc-gantt-header { display: grid; grid-template-columns: 120px 1fr; border-bottom: 1px solid var(--border); }
+.alloc-gantt-months { display: grid; grid-template-columns: repeat(12, 1fr); }
+.alloc-gantt-month { font-size: 11px; color: var(--text-secondary); text-align: center; padding: 4px 0; border-left: 1px solid var(--border); }
+.alloc-gantt-row { display: grid; grid-template-columns: 120px 1fr; min-height: 28px; align-items: center; border-bottom: 1px solid rgba(128,128,128,.1); }
+.alloc-gantt-label { font-size: 11px; color: var(--text-primary); padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloc-gantt-timeline { position: relative; height: 20px; }
+.alloc-gantt-bar { position: absolute; height: 14px; top: 3px; border-radius: 3px; cursor: help; min-width: 4px; }
+.alloc-gantt-bar-allocated { background: var(--accent); opacity: .8; }
+.alloc-gantt-bar-unallocated { background: #ef4444; opacity: .7; }
+.alloc-gantt-separator { font-size: 11px; color: var(--text-secondary); padding: 6px; background: rgba(128,128,128,.05); font-weight: 600; }
+.alloc-gantt-tooltip { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--text-primary); z-index: 1200; pointer-events: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
 </style>
 </head>
 <body>
@@ -796,6 +893,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <button class="sidebar-item" data-page="sprints-timeline" title="Sprints Timeline" onclick="navigate('sprints-timeline')">
           <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 5-6"/></svg>
           <span class="sidebar-item-label">Sprints Timeline</span>
+        </button>
+        <button class="sidebar-item" data-page="alocacao" title="Alocação" onclick="navigate('alocacao')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span class="sidebar-item-label">Alocação</span>
         </button>
       </div>
     </div>
@@ -912,6 +1013,24 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <button class="btn-add" onclick="openFonteModal()">+ Nova Fonte</button>
       </div>
       <div id="fontes-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ALOCAÇÃO -->
+    <div class="page" id="page-alocacao">
+      <div class="page-header-row">
+        <h1 class="page-title">Alocação de Projetos</h1>
+      </div>
+      <div class="alloc-filters">
+        <select id="alloc-equipe" onchange="onAllocFilterChange()">
+          <option value="">Selecione a Equipe</option>
+        </select>
+        <select id="alloc-produto" onchange="onAllocFilterChange()">
+          <option value="">Selecione o Produto</option>
+        </select>
+      </div>
+      <div id="alloc-content">
+        <div class="alloc-empty">Selecione equipe e produto para ver os projetos.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1077,6 +1196,17 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="modal-title" id="timeline-detail-title"></div>
     <div id="timeline-detail-content"></div>
     <div class="modal-actions"><button class="btn-cancel" onclick="closeTimelineDetailModal()">Fechar</button></div>
+  </div>
+</div>
+<div id="apikey-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center">
+  <div style="background:#fff;border-radius:10px;padding:24px;max-width:420px;width:90%">
+    <h3 style="margin:0 0 12px;font-size:16px">Configurar API OpenRouter</h3>
+    <p style="font-size:12px;color:#666;margin:0 0 16px">Insira sua chave da API OpenRouter para habilitar análise por IA. Obtenha em openrouter.ai</p>
+    <input id="apikey-input" type="password" placeholder="sk-or-..." style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:12px">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('apikey-modal').style.display='none'" style="padding:8px 16px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:13px">Cancelar</button>
+      <button onclick="saveApiKey()" style="padding:8px 16px;border:none;border-radius:6px;background:#7C3AED;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Salvar</button>
+    </div>
   </div>
 </div>
 <div class="pie-tooltip-card" id="pie-tooltip" style="display:none"></div>
@@ -1602,7 +1732,7 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   document.querySelectorAll('.sidebar-item[data-page]').forEach(i => i.classList.toggle('active', i.dataset.page === page));
-  const reportPages = ['timeline', 'sprints-timeline'];
+  var reportPages = ['timeline', 'sprints-timeline', 'alocacao'];
   const group = document.getElementById('sidebar-group-relatorios');
   if (group && reportPages.includes(page)) { group.classList.add('open'); }
   if (page === 'usuarios') loadUsuarios();
@@ -1610,6 +1740,7 @@ function navigate(page) {
   if (page === 'projetos') loadProjetos();
   if (page === 'sprints') loadSprints();
   if (page === 'sprints-timeline') loadSprintsTimeline();
+  if (page === 'alocacao') loadAlocacao();
 }
 
 function toggleSidebarGroup(name) {
@@ -2459,6 +2590,7 @@ var _reviewEquipeID = '';
 var _reviewProdutoIDs = [];
 var _reviewData = null;
 var _allReviewProdutos = [];
+var _reviewAnaliseData = null;
 
 function loadSprintReview() {
   var container = document.getElementById('sprint-tab-review');
@@ -2573,8 +2705,18 @@ function renderReviewContent(container, data) {
   html += '<div class="review-chart-box"><h4>Planejamento</h4><div id="review-pie-planejamento"></div></div>';
   html += '</div>';
 
-  // Destaques placeholder (loaded separately in Task 5)
+  // Destaques placeholder (loaded separately)
   html += '<div id="review-destaques-container" class="review-destaques"><h3>Destaques</h3><div id="review-destaques-list"></div></div>';
+
+  // AI analysis section
+  html += '<div class="review-analise-section">';
+  html += '<div class="review-analise-btn-bar">';
+  html += '<button id="review-analise-gen-btn" class="review-analise-btn" onclick="generateReviewAnalise()">🤖 Gerar Análise IA</button>';
+  html += '<button class="review-analise-btn-settings" onclick="showApiKeyModal()" title="Configurar API Key">⚙️</button>';
+  html += '<button id="review-analise-regen-btn" class="review-analise-btn-regen" onclick="generateReviewAnalise()" style="display:none">🔄 Regerar</button>';
+  html += '</div>';
+  html += '<div id="review-analise-cards"></div>';
+  html += '</div>';
 
   // Tasks tables grouped by status
   var emAndamentoStatuses = { 'Desenvolvimento': 1, 'Deploy': 1, 'Code Review': 1, 'Teste': 1, 'Validação do Solicitante': 1 };
@@ -2635,6 +2777,11 @@ function renderReviewContent(container, data) {
   // Load destaques
   if (typeof loadReviewDestaques === 'function') {
     loadReviewDestaques();
+  }
+
+  // Load cached AI analysis
+  if (typeof loadReviewAnalise === 'function') {
+    loadReviewAnalise();
   }
 }
 
@@ -2768,6 +2915,15 @@ function buildExportContainer() {
       if (link) html += '<div style="font-size:10px;color:#1976d2">' + esc(link.textContent) + '</div>';
       html += '</div>';
     });
+  }
+
+  // Análise IA (static inline-styled markup, avoids dark-mode class overrides)
+  var analiseExportHTML = buildAnaliseExportHTML(_reviewAnaliseData);
+  if (analiseExportHTML) {
+    html += '<div style="margin:16px 0">';
+    html += '<h3 style="font-size:15px;margin-bottom:8px">Análise IA</h3>';
+    html += analiseExportHTML;
+    html += '</div>';
   }
 
   // Tasks table
@@ -2926,6 +3082,237 @@ function loadReviewDestaques() {
     .catch(function(err) {
       container.innerHTML = '<div style="color:#c00;font-size:12px">Erro ao carregar destaques: ' + esc(err.message) + '</div>';
     });
+}
+
+function reviewAnaliseQueryString() {
+  var qs = 'equipe_id=' + _reviewEquipeID;
+  if (_reviewProdutoIDs.length > 0) qs += '&produtos=' + _reviewProdutoIDs.join(',');
+  return qs;
+}
+
+function showApiKeyModal() {
+  var modal = document.getElementById('apikey-modal');
+  modal.style.display = 'flex';
+  document.getElementById('apikey-input').value = '';
+  document.getElementById('apikey-input').focus();
+}
+
+function saveApiKey() {
+  var key = document.getElementById('apikey-input').value.trim();
+  if (!key) return;
+  api('/config', {
+    method: 'POST',
+    body: JSON.stringify({ chave: 'openrouter_api_key', valor: key })
+  }).then(function() {
+    document.getElementById('apikey-modal').style.display = 'none';
+    generateReviewAnalise();
+  }).catch(function(e) { alert(e.message); });
+}
+
+function generateReviewAnalise() {
+  var container = document.getElementById('review-analise-cards');
+  if (!container || !_reviewEquipeID) return;
+
+  _reviewAnaliseData = null;
+  container.innerHTML = '<div class="review-analise-loading"><span class="spinner"></span>Gerando análise com IA...</div>';
+
+  var btn = document.getElementById('review-analise-gen-btn');
+  if (btn) btn.disabled = true;
+
+  fetch(API + '/sprints/' + window._currentSprintID + '/review/analise?' + reviewAnaliseQueryString(), {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).then(function(r) {
+    if (r.status === 503) {
+      container.innerHTML = '';
+      if (btn) btn.disabled = false;
+      showApiKeyModal();
+      return null;
+    }
+    return r.json().then(function(data) {
+      if (!r.ok) throw new Error((data && data.error) ? data.error : 'Erro ao gerar análise');
+      return data;
+    });
+  }).then(function(data) {
+    if (!data) return;
+    if (btn) btn.disabled = false;
+    renderAnaliseCards(container, data.analise_json);
+    var regenBtn = document.getElementById('review-analise-regen-btn');
+    if (regenBtn) regenBtn.style.display = 'inline-flex';
+  }).catch(function(e) {
+    container.innerHTML = '<div style="color:#D4483B;padding:12px;font-size:13px">Erro: ' + esc(e.message) + '</div>';
+    if (btn) btn.disabled = false;
+  });
+}
+
+function loadReviewAnalise() {
+  var container = document.getElementById('review-analise-cards');
+  if (!container || !_reviewEquipeID) return;
+
+  _reviewAnaliseData = null;
+  fetch(API + '/sprints/' + window._currentSprintID + '/review/analise?' + reviewAnaliseQueryString(), {
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).then(function(r) {
+    if (!r.ok) return null;
+    return r.json();
+  }).then(function(data) {
+    if (!data) return;
+    renderAnaliseCards(container, data.analise_json);
+    var regenBtn = document.getElementById('review-analise-regen-btn');
+    if (regenBtn) regenBtn.style.display = 'inline-flex';
+  }).catch(function() {});
+}
+
+function renderAnaliseCards(container, analiseJSON) {
+  var analise = typeof analiseJSON === 'string' ? JSON.parse(analiseJSON) : analiseJSON;
+  _reviewAnaliseData = analise;
+  var produtos = (analise && analise.analises_por_produto) || [];
+  if (produtos.length === 0) {
+    container.innerHTML = '<div style="color:#666;padding:12px;font-size:13px">Nenhuma análise disponível.</div>';
+    return;
+  }
+
+  var html = '';
+  produtos.forEach(function(p) {
+    html += '<div class="review-analise-produto">';
+    html += '<div class="review-analise-produto-header">' + esc(p.produto || 'Geral') + '</div>';
+
+    if (p.foco_sprint) {
+      html += '<div class="review-analise-card">';
+      html += '<div class="review-analise-card-title">📊 Foco da Sprint</div>';
+      html += '<div class="review-analise-card-body">';
+      html += '<div>' + esc(p.foco_sprint.descricao || '') + '</div>';
+      if (p.foco_sprint.horas_estimadas) html += '<div style="margin-top:4px;font-weight:600">Total estimado: ' + Number(p.foco_sprint.horas_estimadas || 0).toFixed(1) + 'h</div>';
+      html += '</div></div>';
+    }
+
+    if (p.top3_entregas && p.top3_entregas.length) {
+      html += '<div class="review-analise-card">';
+      html += '<div class="review-analise-card-title">🏆 Top 3 Entregas</div>';
+      html += '<div class="review-analise-card-body"><ul>';
+      p.top3_entregas.forEach(function(e, i) {
+        var badge = '';
+        if (e.destaque && e.tipo_demanda === 'Meta') badge = ' <span class="review-analise-badge-meta">Meta ⭐</span>';
+        else if (e.destaque && e.tipo_demanda === 'Compromisso') badge = ' <span class="review-analise-badge-compromisso">Compromisso ⭐</span>';
+        html += '<li><strong>' + (i + 1) + '. ' + esc(e.ticket || '') + '</strong> — ' + esc(e.resumo || '') + badge;
+        if (e.horas_estimadas) html += ' <span style="color:#888">(' + Number(e.horas_estimadas || 0).toFixed(1) + 'h)</span>';
+        html += '</li>';
+      });
+      html += '</ul></div></div>';
+    }
+
+    if (p.analise_incidentes && p.analise_incidentes.total > 0) {
+      html += '<div class="review-analise-card">';
+      html += '<div class="review-analise-card-title">🚨 Incidentes (' + p.analise_incidentes.total + ')</div>';
+      html += '<div class="review-analise-card-body">';
+      if (p.analise_incidentes.resumo) html += '<div>' + esc(p.analise_incidentes.resumo) + '</div>';
+      if (p.analise_incidentes.causa_comum) html += '<div style="margin-top:4px;padding:6px 10px;background:#FEF2F2;border-radius:4px;color:#991B1B;font-size:11px"><strong>Causa comum:</strong> ' + esc(p.analise_incidentes.causa_comum) + '</div>';
+      if (p.analise_incidentes.incidentes && p.analise_incidentes.incidentes.length) {
+        html += '<ul>';
+        p.analise_incidentes.incidentes.forEach(function(inc) {
+          html += '<li>' + esc(inc.ticket || '') + ' — ' + esc(inc.resumo || '');
+          if (inc.horas_estimadas) html += ' <span style="color:#888">(' + Number(inc.horas_estimadas || 0).toFixed(1) + 'h)</span>';
+          html += '</li>';
+        });
+        html += '</ul>';
+      }
+      html += '</div></div>';
+    }
+
+    if (p.nao_planejadas && p.nao_planejadas.total > 0) {
+      html += '<div class="review-analise-card">';
+      html += '<div class="review-analise-card-title">📋 Não Planejadas (excl. bugs/incidentes)</div>';
+      html += '<div class="review-analise-card-body">';
+      html += '<div style="font-weight:600">Total: ' + p.nao_planejadas.total + ' tarefas | ' + Number(p.nao_planejadas.horas_total || 0).toFixed(1) + 'h (' + Number(p.nao_planejadas.percentual_sprint || 0).toFixed(1) + '% da sprint)</div>';
+      if (p.nao_planejadas.resumo) html += '<div style="margin-top:4px">' + esc(p.nao_planejadas.resumo) + '</div>';
+      if (p.nao_planejadas.tarefas && p.nao_planejadas.tarefas.length) {
+        html += '<ul>';
+        p.nao_planejadas.tarefas.forEach(function(t) {
+          html += '<li>' + esc(t.ticket || '') + ' — ' + esc(t.resumo || '');
+          if (t.horas_estimadas) html += ' <span style="color:#888">(' + Number(t.horas_estimadas || 0).toFixed(1) + 'h)</span>';
+          html += '</li>';
+        });
+        html += '</ul>';
+      }
+      html += '</div></div>';
+    }
+
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function buildAnaliseExportHTML(analise) {
+  var produtos = (analise && analise.analises_por_produto) || [];
+  if (produtos.length === 0) return '';
+
+  var html = '';
+  produtos.forEach(function(p) {
+    html += '<div style="background:#f8f7ff;border:1px solid #e5e1f5;border-radius:8px;margin-bottom:12px;overflow:hidden">';
+    html += '<div style="background:#7C3AED;color:#fff;padding:8px 12px;font-weight:700;font-size:12px">' + esc(p.produto || 'Geral') + '</div>';
+
+    if (p.foco_sprint) {
+      html += '<div style="padding:10px 12px;border-bottom:1px solid #e5e1f5">';
+      html += '<div style="font-weight:700;font-size:11px;margin-bottom:4px">Foco da Sprint</div>';
+      html += '<div style="font-size:11px;color:#444">' + esc(p.foco_sprint.descricao || '') + '</div>';
+      if (p.foco_sprint.horas_estimadas) html += '<div style="margin-top:4px;font-weight:600;font-size:11px">Total estimado: ' + Number(p.foco_sprint.horas_estimadas || 0).toFixed(1) + 'h</div>';
+      html += '</div>';
+    }
+
+    if (p.top3_entregas && p.top3_entregas.length) {
+      html += '<div style="padding:10px 12px;border-bottom:1px solid #e5e1f5">';
+      html += '<div style="font-weight:700;font-size:11px;margin-bottom:4px">Top 3 Entregas</div>';
+      html += '<ul style="margin:0;padding-left:16px;font-size:11px;color:#444">';
+      p.top3_entregas.forEach(function(e, i) {
+        var badge = '';
+        if (e.destaque && e.tipo_demanda === 'Meta') badge = ' <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:#F59E0B;color:#fff">Meta</span>';
+        else if (e.destaque && e.tipo_demanda === 'Compromisso') badge = ' <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:#3B82F6;color:#fff">Compromisso</span>';
+        html += '<li style="margin-bottom:3px"><strong>' + (i + 1) + '. ' + esc(e.ticket || '') + '</strong> — ' + esc(e.resumo || '') + badge;
+        if (e.horas_estimadas) html += ' <span style="color:#888">(' + Number(e.horas_estimadas || 0).toFixed(1) + 'h)</span>';
+        html += '</li>';
+      });
+      html += '</ul></div>';
+    }
+
+    if (p.analise_incidentes && p.analise_incidentes.total > 0) {
+      html += '<div style="padding:10px 12px;border-bottom:1px solid #e5e1f5">';
+      html += '<div style="font-weight:700;font-size:11px;margin-bottom:4px">Incidentes (' + p.analise_incidentes.total + ')</div>';
+      if (p.analise_incidentes.resumo) html += '<div style="font-size:11px;color:#444">' + esc(p.analise_incidentes.resumo) + '</div>';
+      if (p.analise_incidentes.causa_comum) html += '<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:4px;color:#991B1B;font-size:10px"><strong>Causa comum:</strong> ' + esc(p.analise_incidentes.causa_comum) + '</div>';
+      if (p.analise_incidentes.incidentes && p.analise_incidentes.incidentes.length) {
+        html += '<ul style="margin:6px 0 0;padding-left:16px;font-size:11px;color:#444">';
+        p.analise_incidentes.incidentes.forEach(function(inc) {
+          html += '<li style="margin-bottom:3px">' + esc(inc.ticket || '') + ' — ' + esc(inc.resumo || '');
+          if (inc.horas_estimadas) html += ' <span style="color:#888">(' + Number(inc.horas_estimadas || 0).toFixed(1) + 'h)</span>';
+          html += '</li>';
+        });
+        html += '</ul>';
+      }
+      html += '</div>';
+    }
+
+    if (p.nao_planejadas && p.nao_planejadas.total > 0) {
+      html += '<div style="padding:10px 12px">';
+      html += '<div style="font-weight:700;font-size:11px;margin-bottom:4px">Não Planejadas (excl. bugs/incidentes)</div>';
+      html += '<div style="font-size:11px;font-weight:600;color:#444">Total: ' + p.nao_planejadas.total + ' tarefas | ' + Number(p.nao_planejadas.horas_total || 0).toFixed(1) + 'h (' + Number(p.nao_planejadas.percentual_sprint || 0).toFixed(1) + '% da sprint)</div>';
+      if (p.nao_planejadas.resumo) html += '<div style="margin-top:4px;font-size:11px;color:#444">' + esc(p.nao_planejadas.resumo) + '</div>';
+      if (p.nao_planejadas.tarefas && p.nao_planejadas.tarefas.length) {
+        html += '<ul style="margin:6px 0 0;padding-left:16px;font-size:11px;color:#444">';
+        p.nao_planejadas.tarefas.forEach(function(t) {
+          html += '<li style="margin-bottom:3px">' + esc(t.ticket || '') + ' — ' + esc(t.resumo || '');
+          if (t.horas_estimadas) html += ' <span style="color:#888">(' + Number(t.horas_estimadas || 0).toFixed(1) + 'h)</span>';
+          html += '</li>';
+        });
+        html += '</ul>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+  });
+
+  return html;
 }
 
 function renderDestaques(container, destaques) {
@@ -5446,6 +5833,419 @@ async function removeSkillFromMembro(membroId, skillId) {
   var el = document.getElementById(id);
   if (el) applyDateMask(el);
 });
+
+// === ALOCAÇÃO ===
+var allocEquipeId = '';
+var allocProdutoId = '';
+
+function loadAlocacao() {
+  var sel = document.getElementById('alloc-equipe');
+  if (sel.options.length <= 1) {
+    api('/equipes').then(function(equipes) {
+      equipes.forEach(function(eq) {
+        var opt = document.createElement('option');
+        opt.value = eq.id;
+        opt.textContent = eq.nome;
+        sel.appendChild(opt);
+      });
+    });
+  }
+}
+
+function onAllocFilterChange() {
+  allocEquipeId = document.getElementById('alloc-equipe').value;
+  allocProdutoId = document.getElementById('alloc-produto').value;
+
+  if (allocEquipeId && !allocProdutoId) {
+    var prodSel = document.getElementById('alloc-produto');
+    prodSel.innerHTML = '<option value="">Selecione o Produto</option>';
+    api('/produtos').then(function(produtos) {
+      produtos.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.nome;
+        prodSel.appendChild(opt);
+      });
+    });
+  }
+
+  if (allocEquipeId && allocProdutoId) {
+    loadProjectAllocations();
+  } else {
+    document.getElementById('alloc-content').innerHTML =
+      '<div class="alloc-empty">Selecione equipe e produto para ver os projetos.</div>';
+  }
+}
+
+function loadProjectAllocations() {
+  var container = document.getElementById('alloc-content');
+  container.innerHTML = '<div class="alloc-empty">Carregando...</div>';
+
+  api('/allocation/projects?equipe_id=' + allocEquipeId + '&produto_id=' + allocProdutoId)
+    .then(function(projects) {
+      if (!projects || projects.length === 0) {
+        container.innerHTML = '<div class="alloc-empty">Nenhum projeto encontrado para esta equipe e produto.</div>';
+        return;
+      }
+      renderAllocationBoxes(projects, container);
+    })
+    .catch(function(err) {
+      container.innerHTML = '<div class="alloc-empty">Erro ao carregar projetos.</div>';
+    });
+}
+
+function getAllocColor(pct) {
+  if (pct >= 71) return '#22c55e';
+  if (pct >= 31) return '#eab308';
+  return '#ef4444';
+}
+
+function renderAllocationBoxes(projects, container) {
+  var html = '<div class="alloc-grid">';
+  projects.forEach(function(p) {
+    var color = getAllocColor(p.pct_planejado);
+    var title = p.apelido ? esc(p.apelido) : esc(p.resumo);
+    var dataLimite = p.data_limite ? new Date(p.data_limite).toLocaleDateString('pt-BR') : '--';
+
+    html += '<div class="alloc-box" onclick="openProjectModal(\'' + p.epic_id + '\')" style="border-left: 4px solid ' + color + '">';
+    html += '<div class="alloc-box-header">';
+    if (p.is_gdptc) {
+      html += '<span class="alloc-box-star" title="Projeto de Portfólio Unificado">★</span>';
+    }
+    html += '<span class="alloc-box-ticket">' + esc(p.numero_ticket) + '</span>';
+    html += '</div>';
+    html += '<div class="alloc-box-title" title="' + escAttr(p.resumo) + '">' + title + '</div>';
+    html += '<div class="alloc-box-meta">Limite: ' + dataLimite + '</div>';
+
+    if (p.produtos && p.produtos.length > 0) {
+      html += '<div class="alloc-box-produtos">';
+      p.produtos.forEach(function(prod) {
+        html += '<span class="alloc-box-produto">' + esc(prod) + '</span>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="alloc-bar-group">';
+    html += '<div class="alloc-bar-label"><span>Estimado</span><span>' + Math.round(p.pct_estimado) + '%</span></div>';
+    html += '<div class="alloc-bar"><div class="alloc-bar-fill" style="width:' + Math.min(p.pct_estimado, 100) + '%;background:' + getAllocColor(p.pct_estimado) + '"></div></div>';
+    html += '<div class="alloc-bar-label"><span>Planejado</span><span>' + Math.round(p.pct_planejado) + '%</span></div>';
+    html += '<div class="alloc-bar"><div class="alloc-bar-fill" style="width:' + Math.min(p.pct_planejado, 100) + '%;background:' + color + '"></div></div>';
+    html += '</div>';
+
+    if (p.tarefas_sem_estimativa > 0) {
+      html += '<div class="alloc-alert">⚠ ' + p.tarefas_sem_estimativa + ' tarefas sem estimativa</div>';
+    }
+
+    var badgeClass = 'alloc-badge-' + p.status;
+    var badgeText = p.status === 'planejado' ? 'Planejado' : p.status === 'em_planejamento' ? 'Em Planejamento' : 'Não Planejado';
+    html += '<span class="alloc-badge ' + badgeClass + '">' + badgeText + '</span>';
+
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// === ALOCAÇÃO — MODAL DE PROJETO ===
+var allocSprints = [];
+var currentAllocEpicId = '';
+
+function openProjectModal(epicId) {
+  currentAllocEpicId = epicId;
+  var overlay = document.createElement('div');
+  overlay.className = 'alloc-modal-overlay';
+  overlay.id = 'alloc-modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) closeAllocModal(); };
+  overlay.innerHTML = '<div class="alloc-modal"><div class="alloc-empty">Carregando...</div></div>';
+  document.body.appendChild(overlay);
+
+  if (allocSprints.length === 0 && allocEquipeId) {
+    api('/allocation/sprints?equipe_id=' + allocEquipeId).then(function(sprints) {
+      allocSprints = sprints || [];
+      fetchAndRenderModal(epicId);
+    });
+  } else {
+    fetchAndRenderModal(epicId);
+  }
+}
+
+function fetchAndRenderModal(epicId) {
+  api('/allocation/projects/' + epicId + '?equipe_id=' + allocEquipeId)
+    .then(function(detail) {
+      renderAllocModal(detail);
+    })
+    .catch(function() {
+      var modal = document.querySelector('.alloc-modal');
+      if (modal) modal.innerHTML = '<div class="alloc-empty">Erro ao carregar projeto.</div>';
+    });
+}
+
+function closeAllocModal() {
+  var overlay = document.getElementById('alloc-modal-overlay');
+  if (overlay) overlay.remove();
+  currentAllocEpicId = '';
+}
+
+function renderAllocModal(detail) {
+  var modal = document.querySelector('.alloc-modal');
+  if (!modal) return;
+
+  var epic = detail.epic;
+  var badgeClass = 'alloc-badge-' + epic.status;
+  var badgeText = epic.status === 'planejado' ? 'Planejado' : epic.status === 'em_planejamento' ? 'Em Planejamento' : 'Não Planejado';
+
+  var html = '<div class="alloc-modal-header">';
+  html += '<h2>' + esc(epic.numero_ticket) + ': ' + esc(epic.apelido || epic.resumo) + ' <span class="alloc-badge ' + badgeClass + '">' + badgeText + '</span></h2>';
+  html += '<div style="display:flex;gap:8px;align-items:center">';
+  html += '<button class="alloc-sync-btn" id="alloc-sync-btn" onclick="syncProjectTasks(\'' + epic.epic_id + '\')"><span id="alloc-sync-icon">🔄</span> Sincronizar Tarefas</button>';
+  html += '<button class="alloc-modal-close" onclick="closeAllocModal()">✕</button>';
+  html += '</div></div>';
+
+  // People section
+  if (detail.pessoas && detail.pessoas.length > 0) {
+    html += '<div class="alloc-section"><div class="alloc-section-title">Equipe Envolvida</div>';
+    html += '<table class="alloc-people-table"><thead><tr><th>Nome</th><th>Horas no Projeto</th><th>% no Projeto</th></tr></thead><tbody>';
+    detail.pessoas.forEach(function(p) {
+      html += '<tr><td>' + esc(p.nome) + '</td><td>' + p.horas_no_projeto.toFixed(1) + 'h</td><td>' + (p.pct_no_projeto || 0).toFixed(0) + '%</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // Unallocated tasks
+  if (detail.nao_alocadas && detail.nao_alocadas.length > 0) {
+    html += '<div class="alloc-section"><div class="alloc-section-title">Tarefas Não Alocadas (' + detail.nao_alocadas.length + ')</div>';
+    detail.nao_alocadas.forEach(function(t) {
+      html += renderAllocTaskEditable(t);
+    });
+    html += '</div>';
+  }
+
+  // Partial tasks
+  if (detail.parciais && detail.parciais.length > 0) {
+    html += '<div class="alloc-section"><div class="alloc-section-title">Estimadas sem Pessoa (' + detail.parciais.length + ')</div>';
+    detail.parciais.forEach(function(t) {
+      html += renderAllocTaskEditable(t);
+    });
+    html += '</div>';
+  }
+
+  // Complete tasks
+  if (detail.completas && detail.completas.length > 0) {
+    html += '<div class="alloc-section"><div class="alloc-section-title">Tarefas Completas (' + detail.completas.length + ')</div>';
+    detail.completas.forEach(function(t) {
+      html += '<div class="alloc-task-readonly">';
+      html += '<span class="alloc-task-ticket">' + esc(t.numero_ticket) + '</span>';
+      html += '<span class="alloc-task-resumo" title="' + escAttr(t.resumo) + '">' + esc(t.resumo) + '</span>';
+      html += '<span>' + (t.estimativa_horas ? t.estimativa_horas.toFixed(1) + 'h' : '--') + '</span>';
+      html += '<span>' + esc(t.sprint_nome || '--') + '</span>';
+      html += '<span>' + esc(t.responsavel_nome || '--') + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Gantt placeholder — will be implemented in Task 7
+  html += '<div class="alloc-section" id="alloc-gantt-section"></div>';
+
+  modal.innerHTML = html;
+
+  // Render gantt after modal is in DOM
+  renderAllocGantt(detail);
+
+  // After setting innerHTML, load members into person selects
+  setTimeout(loadAllocMembers, 0);
+}
+
+function renderAllocGantt(detail) {
+  var section = document.getElementById('alloc-gantt-section');
+  if (!section) return;
+
+  var allTasks = (detail.completas || []).concat(detail.parciais || []);
+  var unallocated = detail.nao_alocadas || [];
+
+  if (allTasks.length === 0 && unallocated.length === 0) {
+    section.innerHTML = '';
+    return;
+  }
+
+  var year = new Date().getFullYear();
+  var yearStart = new Date(year, 0, 1).getTime();
+  var yearEnd = new Date(year, 11, 31).getTime();
+  var yearRange = yearEnd - yearStart;
+
+  var months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  var html = '<div class="alloc-section-title">Timeline do Projeto</div>';
+  html += '<div class="alloc-gantt"><div class="alloc-gantt-container">';
+
+  // Header with months
+  html += '<div class="alloc-gantt-header">';
+  html += '<div style="font-size:11px;color:var(--text-secondary);padding:4px 6px">' + year + '</div>';
+  html += '<div class="alloc-gantt-months">';
+  months.forEach(function(m) { html += '<div class="alloc-gantt-month">' + m + '</div>'; });
+  html += '</div></div>';
+
+  // Allocated tasks
+  allTasks.forEach(function(t) {
+    if (!t.sprint_inicio || !t.sprint_fim) return;
+    var start = new Date(t.sprint_inicio).getTime();
+    var end = new Date(t.sprint_fim).getTime();
+    var left = Math.max(0, (start - yearStart) / yearRange * 100);
+    var width = Math.max(1, (end - start) / yearRange * 100);
+
+    html += '<div class="alloc-gantt-row">';
+    html += '<div class="alloc-gantt-label" title="' + escAttr(t.resumo) + '">' + esc(t.numero_ticket) + '</div>';
+    html += '<div class="alloc-gantt-timeline">';
+    html += '<div class="alloc-gantt-bar alloc-gantt-bar-allocated" style="left:' + left + '%;width:' + width + '%" title="' + escAttr(t.numero_ticket + ' - ' + t.resumo + ' (' + (t.sprint_nome || '') + ')') + '"></div>';
+    html += '</div></div>';
+  });
+
+  // Separator
+  if (unallocated.length > 0) {
+    html += '<div class="alloc-gantt-separator">Não Alocadas</div>';
+    unallocated.forEach(function(t) {
+      html += '<div class="alloc-gantt-row">';
+      html += '<div class="alloc-gantt-label" title="' + escAttr(t.resumo) + '">' + esc(t.numero_ticket) + '</div>';
+      html += '<div class="alloc-gantt-timeline">';
+      html += '<div class="alloc-gantt-bar alloc-gantt-bar-unallocated" style="left:0%;width:100%" title="' + escAttr(t.numero_ticket + ' - ' + t.resumo + ' — Não Alocada') + '"></div>';
+      html += '</div></div>';
+    });
+  }
+
+  html += '</div></div>';
+  section.innerHTML = html;
+}
+
+function renderAllocTaskEditable(t) {
+  var tid = t.tarefa_id;
+  var sprintVal = t.sprint_id || '';
+  var estVal = t.estimativa_horas ? t.estimativa_horas.toFixed(1) : '';
+
+  var html = '<div class="alloc-task-row">';
+  html += '<span class="alloc-task-ticket">' + esc(t.numero_ticket) + '</span>';
+  html += '<span class="alloc-task-resumo" title="' + escAttr(t.resumo) + '">' + esc(t.resumo) + '</span>';
+  html += '<div class="alloc-task-controls">';
+
+  // Sprint select
+  html += '<select id="alloc-sprint-' + tid + '">';
+  html += '<option value="">Sprint</option>';
+  allocSprints.forEach(function(s) {
+    var sel = s.id === sprintVal ? ' selected' : '';
+    html += '<option value="' + s.id + '"' + sel + '>' + esc(s.nome) + '</option>';
+  });
+  html += '</select>';
+
+  // Person select — loaded from equipe members
+  html += '<select id="alloc-person-' + tid + '">';
+  html += '<option value="">Pessoa</option>';
+  html += '</select>';
+
+  // Estimate input
+  html += '<input type="number" id="alloc-est-' + tid + '" placeholder="Horas" step="0.5" min="0.5" value="' + estVal + '">';
+
+  // Allocate button
+  html += '<button class="alloc-task-btn" onclick="allocateTask(\'' + tid + '\')">✓</button>';
+
+  html += '</div></div>';
+  return html;
+}
+
+function loadAllocMembers() {
+  if (!allocEquipeId) return;
+  api('/equipes/' + allocEquipeId + '/membros').then(function(membros) {
+    var selects = document.querySelectorAll('[id^="alloc-person-"]');
+    selects.forEach(function(sel) {
+      if (sel.options.length > 1) return;
+      membros.forEach(function(m) {
+        var opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.nome;
+        sel.appendChild(opt);
+      });
+    });
+  });
+}
+
+function allocateTask(taskId) {
+  var sprintId = document.getElementById('alloc-sprint-' + taskId).value;
+  var personId = document.getElementById('alloc-person-' + taskId).value;
+  var estHours = parseFloat(document.getElementById('alloc-est-' + taskId).value);
+
+  if (!sprintId) { alert('Selecione uma sprint.'); return; }
+  if (!estHours || estHours <= 0) { alert('Informe a estimativa em horas.'); return; }
+
+  doAllocate(taskId, sprintId, personId || null, estHours, false);
+}
+
+function doAllocate(taskId, sprintId, personId, estHours, force) {
+  var body = {
+    sprint_id: sprintId,
+    estimate_hours: estHours,
+    force: !!force,
+    equipe_id: allocEquipeId
+  };
+  if (personId) body.assignee_id = personId;
+
+  // Raw fetch (not the api() helper) because a 409 response carries a JSON
+  // conflict payload that must be inspected instead of being thrown away.
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  fetch(API + '/allocation/tasks/' + taskId + '/allocate', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    return r.json().catch(function() { return null; }).then(function(data) {
+      if (r.status === 401) { logout(); return null; }
+      if (r.status === 409) {
+        showAllocConfirm(taskId, sprintId, personId, estHours, data || {});
+        return null;
+      }
+      if (!r.ok) throw new Error((data && data.error) ? data.error : 'Erro ao alocar tarefa');
+      return data;
+    });
+  }).then(function(result) {
+    if (!result) return;
+    // Refresh modal
+    fetchAndRenderModal(currentAllocEpicId);
+    loadProjectAllocations();
+  }).catch(function(err) {
+    alert('Erro ao alocar tarefa: ' + (err.message || err));
+  });
+}
+
+function showAllocConfirm(taskId, sprintId, personId, estHours, conflict) {
+  var overlay = document.createElement('div');
+  overlay.className = 'alloc-confirm-overlay';
+  overlay.id = 'alloc-confirm-overlay';
+
+  var html = '<div class="alloc-confirm">';
+  html += '<h3>Atenção</h3>';
+  html += '<p>O colaborador <strong>' + esc(conflict.membro_nome || '') + '</strong> já está com <strong>' + Math.round(conflict.pct_atual || 0) + '%</strong> do tempo alocado na <strong>' + esc(conflict.sprint_nome || '') + '</strong>. Deseja continuar mesmo assim?</p>';
+  html += '<div class="alloc-confirm-actions">';
+  html += '<button style="background:var(--border);border:none;color:var(--text-primary)" onclick="document.getElementById(\'alloc-confirm-overlay\').remove()">Cancelar</button>';
+  html += '<button style="background:var(--accent);border:none;color:#fff" onclick="document.getElementById(\'alloc-confirm-overlay\').remove();doAllocate(\'' + taskId + '\',\'' + sprintId + '\',' + (personId ? '\'' + personId + '\'' : 'null') + ',' + estHours + ',true)">Sim, continuar</button>';
+  html += '</div></div>';
+
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
+}
+
+function syncProjectTasks(epicId) {
+  var btn = document.getElementById('alloc-sync-btn');
+  if (btn) btn.classList.add('loading');
+
+  api('/allocation/projects/' + epicId + '/sync', { method: 'POST' })
+    .then(function(result) {
+      if (btn) btn.classList.remove('loading');
+      fetchAndRenderModal(epicId);
+    })
+    .catch(function() {
+      if (btn) btn.classList.remove('loading');
+      alert('Erro ao sincronizar tarefas.');
+    });
+}
 
 // === INIT ===
 if (token) { api('/usuarios').then(() => showApp()).catch(() => logout()); }

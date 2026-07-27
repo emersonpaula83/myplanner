@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -24,17 +25,18 @@ func (r *ReviewRepository) Pool() *pgxpool.Pool {
 }
 
 type ReviewTaskRow struct {
-	ID           uuid.UUID   `json:"id"`
-	NumeroTicket string      `json:"numero_ticket"`
-	Resumo       string      `json:"resumo"`
-	Tipo         string      `json:"tipo"`
-	TipoDemanda  string      `json:"tipo_demanda"`
-	Status       string      `json:"status"`
-	ParentID     *uuid.UUID  `json:"parent_id"`
-	RelatorNome  *string     `json:"relator_nome"`
-	NaoPlanejada bool        `json:"nao_planejada"`
-	Produtos     []string    `json:"produtos"`
-	ProdutoIDs   []uuid.UUID `json:"produto_ids"`
+	ID              uuid.UUID   `json:"id"`
+	NumeroTicket    string      `json:"numero_ticket"`
+	Resumo          string      `json:"resumo"`
+	Tipo            string      `json:"tipo"`
+	TipoDemanda     string      `json:"tipo_demanda"`
+	Status          string      `json:"status"`
+	ParentID        *uuid.UUID  `json:"parent_id"`
+	RelatorNome     *string     `json:"relator_nome"`
+	NaoPlanejada    bool        `json:"nao_planejada"`
+	EstimativaTempo *int        `json:"estimativa_tempo"`
+	Produtos        []string    `json:"produtos"`
+	ProdutoIDs      []uuid.UUID `json:"produto_ids"`
 }
 
 type ReviewPO struct {
@@ -96,6 +98,7 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 		       CASE WHEN t.data_entrada_sprint > s.data_inicio
 		            OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
 		            THEN true ELSE false END AS nao_planejada,
+		       t.estimativa_tempo,
 		       ARRAY_AGG(p.nome ORDER BY p.id) FILTER (WHERE p.nome IS NOT NULL) AS produtos,
 		       ARRAY_AGG(p.id ORDER BY p.id) FILTER (WHERE p.id IS NOT NULL) AS produto_ids
 		FROM tarefas t
@@ -110,7 +113,7 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 		  %s %s
 		GROUP BY t.id, t.numero_ticket, t.resumo, t.tipo, t.tipo_demanda, t.status,
 		         t.parent_id, m.nome, t.data_entrada_sprint, t.data_criacao,
-		         s.data_inicio
+		         s.data_inicio, t.estimativa_tempo
 		ORDER BY t.numero_ticket
 	`, equipeJoin, produtoJoin, equipeWhere, produtoWhere)
 
@@ -125,7 +128,9 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 		var row ReviewTaskRow
 		if err := rows.Scan(
 			&row.ID, &row.NumeroTicket, &row.Resumo, &row.Tipo, &row.TipoDemanda,
-			&row.Status, &row.ParentID, &row.RelatorNome, &row.NaoPlanejada, &row.Produtos, &row.ProdutoIDs,
+			&row.Status, &row.ParentID, &row.RelatorNome, &row.NaoPlanejada,
+			&row.EstimativaTempo,
+			&row.Produtos, &row.ProdutoIDs,
 		); err != nil {
 			return nil, fmt.Errorf("scanning review task: %w", err)
 		}
@@ -276,6 +281,51 @@ func (r *ReviewRepository) DeleteDestaque(ctx context.Context, id uuid.UUID) err
 	}
 	if tag.RowsAffected() == 0 {
 		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+type ReviewAnalise struct {
+	ID          uuid.UUID       `json:"id"`
+	SprintID    uuid.UUID       `json:"sprint_id"`
+	EquipeID    uuid.UUID       `json:"equipe_id"`
+	ProdutoIDs  []uuid.UUID     `json:"produto_ids"`
+	AnaliseJSON json.RawMessage `json:"analise_json"`
+	Modelo      string          `json:"modelo"`
+	CriadoEm    time.Time       `json:"criado_em"`
+}
+
+func (r *ReviewRepository) GetReviewAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*ReviewAnalise, error) {
+	if produtoIDs == nil {
+		produtoIDs = []uuid.UUID{}
+	}
+	var a ReviewAnalise
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, sprint_id, equipe_id, produto_ids, analise_json, modelo, criado_em
+		FROM sprint_review_analises
+		WHERE sprint_id = $1 AND equipe_id = $2 AND produto_ids = $3
+	`, sprintID, equipeID, produtoIDs).Scan(
+		&a.ID, &a.SprintID, &a.EquipeID, &a.ProdutoIDs,
+		&a.AnaliseJSON, &a.Modelo, &a.CriadoEm,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+func (r *ReviewRepository) SaveReviewAnalise(ctx context.Context, a ReviewAnalise) error {
+	if a.ProdutoIDs == nil {
+		a.ProdutoIDs = []uuid.UUID{}
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO sprint_review_analises (sprint_id, equipe_id, produto_ids, analise_json, modelo)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (sprint_id, equipe_id, produto_ids)
+		DO UPDATE SET analise_json = $4, modelo = $5, criado_em = NOW()
+	`, a.SprintID, a.EquipeID, a.ProdutoIDs, a.AnaliseJSON, a.Modelo)
+	if err != nil {
+		return fmt.Errorf("saving review analise: %w", err)
 	}
 	return nil
 }

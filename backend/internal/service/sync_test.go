@@ -56,6 +56,12 @@ func (m *mockJiraClient) AssignIssue(ctx context.Context, issueKey, accountID st
 func (m *mockJiraClient) AddComment(ctx context.Context, issueKey, body string) error {
 	return nil
 }
+func (m *mockJiraClient) MoveToSprint(ctx context.Context, sprintJiraID int, issueKey string) error {
+	return nil
+}
+func (m *mockJiraClient) UpdateTimeEstimate(ctx context.Context, issueKey string, seconds int) error {
+	return nil
+}
 
 func TestParseJiraTime(t *testing.T) {
 	tests := []struct {

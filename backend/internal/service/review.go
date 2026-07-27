@@ -2,21 +2,29 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
 type ReviewService struct {
-	repo   *repository.ReviewRepository
-	logger *zap.Logger
+	repo       *repository.ReviewRepository
+	configRepo *repository.ConfigRepository
+	logger     *zap.Logger
 }
 
-func NewReviewService(repo *repository.ReviewRepository, logger *zap.Logger) *ReviewService {
-	return &ReviewService{repo: repo, logger: logger}
+func NewReviewService(repo *repository.ReviewRepository, configRepo *repository.ConfigRepository, logger *zap.Logger) *ReviewService {
+	return &ReviewService{repo: repo, configRepo: configRepo, logger: logger}
+}
+
+func (s *ReviewService) GetAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error) {
+	return s.repo.GetReviewAnalise(ctx, sprintID, equipeID, produtoIDs)
 }
 
 type ReviewData struct {
@@ -67,14 +75,15 @@ type ReviewGraficoPlanejamento struct {
 }
 
 type ReviewTarefa struct {
-	NumeroTicket string `json:"numero_ticket"`
-	Produto      string `json:"produto"`
-	Resumo       string `json:"resumo"`
-	Tipo         string `json:"tipo"`
-	TipoDemanda  string `json:"tipo_demanda"`
-	Categoria    string `json:"categoria"`
-	Status       string `json:"status"`
-	NaoPlanejada bool   `json:"nao_planejada"`
+	NumeroTicket    string  `json:"numero_ticket"`
+	Produto         string  `json:"produto"`
+	Resumo          string  `json:"resumo"`
+	Tipo            string  `json:"tipo"`
+	TipoDemanda     string  `json:"tipo_demanda"`
+	Categoria       string  `json:"categoria"`
+	Status          string  `json:"status"`
+	NaoPlanejada    bool    `json:"nao_planejada"`
+	EstimativaHoras float64 `json:"estimativa_horas"`
 }
 
 var statusEmAndamento = map[string]bool{
@@ -229,6 +238,12 @@ func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, e
 			Categoria:    taskCategoria,
 			Status:       t.Status,
 			NaoPlanejada: t.NaoPlanejada,
+			EstimativaHoras: func() float64 {
+				if t.EstimativaTempo != nil {
+					return float64(*t.EstimativaTempo) / 3600.0
+				}
+				return 0
+			}(),
 		})
 	}
 
@@ -269,4 +284,143 @@ func (s *ReviewService) UpdateDestaque(ctx context.Context, id uuid.UUID, titulo
 
 func (s *ReviewService) DeleteDestaque(ctx context.Context, id uuid.UUID) error {
 	return s.repo.DeleteDestaque(ctx, id)
+}
+
+type promptTarefa struct {
+	Ticket          string  `json:"ticket"`
+	Resumo          string  `json:"resumo"`
+	Tipo            string  `json:"tipo"`
+	TipoDemanda     string  `json:"tipo_demanda"`
+	Status          string  `json:"status"`
+	Produto         string  `json:"produto"`
+	NaoPlanejada    bool    `json:"nao_planejada"`
+	EstimativaHoras float64 `json:"estimativa_horas"`
+}
+
+func buildReviewAnalisePrompt(tarefas []ReviewTarefa) (string, string) {
+	systemPrompt := `Você é um analista de sprints de desenvolvimento de software.
+Analise os dados da sprint e retorne um JSON com a análise separada por produto.
+
+REGRAS:
+1. Foco da Sprint: identifique onde a maior parte das horas estimadas foi gasta por produto
+2. Top 3 Entregas: as 3 tarefas com maior estimativa por produto. Se tipo_demanda for "Meta" ou "Compromisso", marque destaque=true
+3. Incidentes: avalie todos com tipo "Bug" ou contendo "Incidente". Se houver causa raiz similar entre eles, informe na causa_comum
+4. Não Planejadas: liste tarefas com nao_planejada=true EXCLUINDO bugs e incidentes. Informe horas e percentual
+
+Responda APENAS com JSON válido (sem markdown fences) no formato:
+{
+  "analises_por_produto": [
+    {
+      "produto": "Nome",
+      "foco_sprint": {
+        "descricao": "texto",
+        "categoria_principal": "melhorias|manutencao|novos_projetos|outros",
+        "horas_estimadas": 0
+      },
+      "top3_entregas": [
+        {"ticket": "", "resumo": "", "tipo_demanda": "", "destaque": false, "horas_estimadas": 0}
+      ],
+      "analise_incidentes": {
+        "total": 0,
+        "resumo": "texto",
+        "causa_comum": "texto ou null",
+        "incidentes": [{"ticket": "", "resumo": "", "horas_estimadas": 0}]
+      },
+      "nao_planejadas": {
+        "total": 0,
+        "horas_total": 0,
+        "percentual_sprint": 0,
+        "resumo": "texto",
+        "tarefas": [{"ticket": "", "resumo": "", "produto": "", "horas_estimadas": 0}]
+      }
+    }
+  ]
+}`
+
+	pts := make([]promptTarefa, 0, len(tarefas))
+	for _, t := range tarefas {
+		pts = append(pts, promptTarefa{
+			Ticket:          t.NumeroTicket,
+			Resumo:          t.Resumo,
+			Tipo:            t.Tipo,
+			TipoDemanda:     t.TipoDemanda,
+			Status:          t.Status,
+			Produto:         t.Produto,
+			NaoPlanejada:    t.NaoPlanejada,
+			EstimativaHoras: t.EstimativaHoras,
+		})
+	}
+
+	data, _ := json.Marshal(pts)
+	userPrompt := "DADOS DA SPRINT:\n" + string(data)
+
+	return systemPrompt, userPrompt
+}
+
+func (s *ReviewService) GenerateAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error) {
+	apiKey, err := s.configRepo.GetConfig(ctx, "openrouter_api_key")
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("openrouter API key not configured: %w", err)
+		}
+		return nil, err
+	}
+
+	model := "openai/gpt-oss-20b:free"
+	if m, err := s.configRepo.GetConfig(ctx, "openrouter_model"); err == nil && m != "" {
+		model = m
+	}
+
+	reviewData, err := s.GetReviewData(ctx, sprintID, equipeID, produtoIDs)
+	if err != nil {
+		return nil, fmt.Errorf("getting review data for analysis: %w", err)
+	}
+
+	systemPrompt, userPrompt := buildReviewAnalisePrompt(reviewData.Tarefas)
+
+	client := NewOpenRouterClient(apiKey, model)
+	rawResponse, err := client.ChatCompletion(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		return nil, fmt.Errorf("AI analysis failed: %w", err)
+	}
+
+	// Strip markdown fences and any trailing prose after closing fence
+	cleaned := strings.TrimSpace(rawResponse)
+	if strings.HasPrefix(cleaned, "```") {
+		lines := strings.Split(cleaned, "\n")
+		if len(lines) >= 2 {
+			lines = lines[1:]
+		}
+		for i, l := range lines {
+			if strings.HasPrefix(strings.TrimSpace(l), "```") {
+				lines = lines[:i]
+				break
+			}
+		}
+		cleaned = strings.TrimSpace(strings.Join(lines, "\n"))
+	}
+
+	var parsed json.RawMessage
+	if err := json.Unmarshal([]byte(cleaned), &parsed); err != nil {
+		return nil, fmt.Errorf("AI returned invalid JSON: %w", err)
+	}
+
+	analise := repository.ReviewAnalise{
+		SprintID:    sprintID,
+		EquipeID:    equipeID,
+		ProdutoIDs:  produtoIDs,
+		AnaliseJSON: parsed,
+		Modelo:      model,
+	}
+
+	if err := s.repo.SaveReviewAnalise(ctx, analise); err != nil {
+		return nil, fmt.Errorf("saving analysis: %w", err)
+	}
+
+	saved, err := s.repo.GetReviewAnalise(ctx, sprintID, equipeID, produtoIDs)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving saved analysis: %w", err)
+	}
+
+	return saved, nil
 }

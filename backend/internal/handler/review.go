@@ -22,15 +22,29 @@ type ReviewStore interface {
 	CreateDestaque(ctx context.Context, d repository.ReviewDestaque) (repository.ReviewDestaque, error)
 	UpdateDestaque(ctx context.Context, id uuid.UUID, titulo, descricao string, link *string) (repository.ReviewDestaque, error)
 	DeleteDestaque(ctx context.Context, id uuid.UUID) error
+	GenerateAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error)
+	GetAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error)
+}
+
+type ConfigStore interface {
+	GetConfig(ctx context.Context, chave string) (string, error)
+	SetConfig(ctx context.Context, chave, valor string) error
+	ConfigExists(ctx context.Context, chave string) (bool, error)
+}
+
+var configWhitelist = map[string]bool{
+	"openrouter_api_key": true,
+	"openrouter_model":   true,
 }
 
 type ReviewHandler struct {
-	store  ReviewStore
-	logger *zap.Logger
+	store       ReviewStore
+	configStore ConfigStore
+	logger      *zap.Logger
 }
 
-func NewReviewHandler(store ReviewStore, logger *zap.Logger) *ReviewHandler {
-	return &ReviewHandler{store: store, logger: logger}
+func NewReviewHandler(store ReviewStore, configStore ConfigStore, logger *zap.Logger) *ReviewHandler {
+	return &ReviewHandler{store: store, configStore: configStore, logger: logger}
 }
 
 func (h *ReviewHandler) GetReviewData(w http.ResponseWriter, r *http.Request) {
@@ -222,4 +236,153 @@ func (h *ReviewHandler) DeleteDestaque(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *ReviewHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	chave := chi.URLParam(r, "chave")
+	if !configWhitelist[chave] {
+		respondError(w, http.StatusBadRequest, "config key not allowed")
+		return
+	}
+
+	if chave == "openrouter_api_key" {
+		exists, err := h.configStore.ConfigExists(r.Context(), chave)
+		if err != nil {
+			h.logger.Error("checking config", zap.Error(err))
+			respondError(w, http.StatusInternalServerError, "error checking config")
+			return
+		}
+		respondJSON(w, http.StatusOK, map[string]bool{"exists": exists})
+		return
+	}
+
+	valor, err := h.configStore.GetConfig(r.Context(), chave)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondError(w, http.StatusNotFound, "config not found")
+			return
+		}
+		h.logger.Error("getting config", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "error getting config")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"chave": chave, "valor": valor})
+}
+
+type setConfigRequest struct {
+	Chave string `json:"chave"`
+	Valor string `json:"valor"`
+}
+
+func (h *ReviewHandler) SetConfig(w http.ResponseWriter, r *http.Request) {
+	var req setConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if !configWhitelist[req.Chave] {
+		respondError(w, http.StatusBadRequest, "config key not allowed")
+		return
+	}
+	if req.Valor == "" {
+		respondError(w, http.StatusBadRequest, "valor is required")
+		return
+	}
+
+	if err := h.configStore.SetConfig(r.Context(), req.Chave, req.Valor); err != nil {
+		h.logger.Error("setting config", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "error setting config")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *ReviewHandler) GetReviewAnalise(w http.ResponseWriter, r *http.Request) {
+	sprintID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid sprint id")
+		return
+	}
+
+	equipeStr := r.URL.Query().Get("equipe_id")
+	if equipeStr == "" {
+		respondError(w, http.StatusBadRequest, "equipe_id is required")
+		return
+	}
+	equipeID, err := uuid.Parse(equipeStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid equipe_id")
+		return
+	}
+
+	var produtoIDs []uuid.UUID
+	if produtosStr := r.URL.Query().Get("produtos"); produtosStr != "" {
+		for _, p := range strings.Split(produtosStr, ",") {
+			pid, err := uuid.Parse(strings.TrimSpace(p))
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "invalid produto id: "+p)
+				return
+			}
+			produtoIDs = append(produtoIDs, pid)
+		}
+	}
+
+	analise, err := h.store.GetAnalise(r.Context(), sprintID, equipeID, produtoIDs)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondError(w, http.StatusNotFound, "analysis not found")
+			return
+		}
+		h.logger.Error("getting review analysis", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "error getting analysis")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, analise)
+}
+
+func (h *ReviewHandler) PostReviewAnalise(w http.ResponseWriter, r *http.Request) {
+	sprintID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid sprint id")
+		return
+	}
+
+	equipeStr := r.URL.Query().Get("equipe_id")
+	if equipeStr == "" {
+		respondError(w, http.StatusBadRequest, "equipe_id is required")
+		return
+	}
+	equipeID, err := uuid.Parse(equipeStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid equipe_id")
+		return
+	}
+
+	var produtoIDs []uuid.UUID
+	if produtosStr := r.URL.Query().Get("produtos"); produtosStr != "" {
+		for _, p := range strings.Split(produtosStr, ",") {
+			pid, err := uuid.Parse(strings.TrimSpace(p))
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "invalid produto id: "+p)
+				return
+			}
+			produtoIDs = append(produtoIDs, pid)
+		}
+	}
+
+	analise, err := h.store.GenerateAnalise(r.Context(), sprintID, equipeID, produtoIDs)
+	if err != nil {
+		h.logger.Error("generating review analysis", zap.Error(err))
+		if strings.Contains(err.Error(), "not configured") {
+			respondError(w, http.StatusServiceUnavailable, "OpenRouter API key not configured")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "error generating analysis")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, analise)
 }

@@ -109,7 +109,15 @@ func (s *SprintService) ListByProjeto(ctx context.Context, projetoID uuid.UUID, 
 }
 
 func (s *SprintService) ListSprints(ctx context.Context, equipeID *uuid.UUID, estado *string) ([]repository.SprintListItem, error) {
-	return s.repo.ListSprints(ctx, equipeID, estado, nil)
+	var boardID *int
+	if equipeID != nil {
+		var err error
+		boardID, err = s.repo.GetEquipeBoardID(ctx, *equipeID)
+		if err != nil {
+			return nil, fmt.Errorf("getting equipe board_id: %w", err)
+		}
+	}
+	return s.repo.ListSprints(ctx, equipeID, estado, boardID)
 }
 
 func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*SprintCapacityResult, error) {

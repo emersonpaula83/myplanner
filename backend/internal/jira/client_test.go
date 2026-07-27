@@ -177,3 +177,106 @@ func TestAPIError(t *testing.T) {
 		t.Fatal("expected error for 403 response")
 	}
 }
+
+func TestMoveToSprint(t *testing.T) {
+	var gotPath, gotMethod string
+	var gotBody map[string]any
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	client := NewHTTPClient(ts.URL, "e@e.com", "tok", 100, zap.NewNop())
+	err := client.MoveToSprint(context.Background(), 42, "PROJ-123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", gotMethod)
+	}
+	if gotPath != "/rest/agile/1.0/sprint/42/issue" {
+		t.Errorf("unexpected path: %s", gotPath)
+	}
+	issues, ok := gotBody["issues"].([]any)
+	if !ok || len(issues) != 1 || issues[0] != "PROJ-123" {
+		t.Errorf("unexpected body: %v", gotBody)
+	}
+}
+
+func TestMoveToSprint_Error(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errorMessages":["Sprint does not exist"]}`))
+	}))
+	defer ts.Close()
+
+	client := NewHTTPClient(ts.URL, "e@e.com", "tok", 100, zap.NewNop())
+	err := client.MoveToSprint(context.Background(), 999, "PROJ-123")
+	if err == nil {
+		t.Fatal("expected error for 404")
+	}
+}
+
+func TestUpdateTimeEstimate(t *testing.T) {
+	var gotPath, gotMethod string
+	var gotBody map[string]any
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	client := NewHTTPClient(ts.URL, "e@e.com", "tok", 100, zap.NewNop())
+
+	tests := []struct {
+		seconds  int
+		expected string
+	}{
+		{3600, "1h"},
+		{7200, "2h"},
+		{28800, "1d"},
+		{57600, "2d"},
+		{30600, "1d 0.5h"},
+		{1800, "0.5h"},
+	}
+
+	for _, tt := range tests {
+		err := client.UpdateTimeEstimate(context.Background(), "PROJ-456", tt.seconds)
+		if err != nil {
+			t.Fatalf("unexpected error for %d seconds: %v", tt.seconds, err)
+		}
+		if gotMethod != http.MethodPut {
+			t.Errorf("expected PUT, got %s", gotMethod)
+		}
+		if gotPath != "/rest/api/3/issue/PROJ-456" {
+			t.Errorf("unexpected path: %s", gotPath)
+		}
+		fields, _ := gotBody["fields"].(map[string]any)
+		tt2, _ := fields["timetracking"].(map[string]any)
+		estimate, _ := tt2["originalEstimate"].(string)
+		if estimate != tt.expected {
+			t.Errorf("seconds=%d: expected %q, got %q", tt.seconds, tt.expected, estimate)
+		}
+	}
+}
+
+func TestUpdateTimeEstimate_Error(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"errors":{"timetracking":"invalid"}}`))
+	}))
+	defer ts.Close()
+
+	client := NewHTTPClient(ts.URL, "e@e.com", "tok", 100, zap.NewNop())
+	err := client.UpdateTimeEstimate(context.Background(), "PROJ-456", 3600)
+	if err == nil {
+		t.Fatal("expected error for 400")
+	}
+}
