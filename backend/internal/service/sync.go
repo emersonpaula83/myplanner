@@ -457,8 +457,8 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 		s.ensureMember(ctx, fonte, issue.Fields.Assignee, issue.Fields.Project.Name, memberCache, &totals)
 		s.ensureMember(ctx, fonte, issue.Fields.Reporter, issue.Fields.Project.Name, memberCache, &totals)
 
-		if issue.Fields.Sprint != nil && issue.Fields.Sprint.OriginBoardID > 0 {
-			boardProjectMap[issue.Fields.Sprint.OriginBoardID] = projetoID
+		if issue.Fields.Sprint != nil && issue.Fields.Sprint.GetBoardID() > 0 {
+			boardProjectMap[issue.Fields.Sprint.GetBoardID()] = projetoID
 		}
 
 		tarefaID, err := s.processIssue(ctx, fonte, projetoID, issue, memberCache, sprintCache)
@@ -595,8 +595,8 @@ func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client,
 		s.ensureMember(ctx, fonte, issue.Fields.Assignee, issue.Fields.Project.Name, memberCache, &totals)
 		s.ensureMember(ctx, fonte, issue.Fields.Reporter, issue.Fields.Project.Name, memberCache, &totals)
 
-		if issue.Fields.Sprint != nil && issue.Fields.Sprint.OriginBoardID > 0 {
-			boardProjectMap[issue.Fields.Sprint.OriginBoardID] = projetoID
+		if issue.Fields.Sprint != nil && issue.Fields.Sprint.GetBoardID() > 0 {
+			boardProjectMap[issue.Fields.Sprint.GetBoardID()] = projetoID
 		}
 
 		tarefaID, err := s.processIssue(ctx, fonte, projetoID, issue, memberCache, sprintCache)
@@ -667,7 +667,7 @@ func (s *SyncService) syncEmptyBoardSprints(ctx context.Context, client jira.Cli
 			if bs.State != "" {
 				estado = &bs.State
 			}
-			bid := bs.OriginBoardID
+			bid := bs.GetBoardID()
 			var boardPtr *int
 			if bid > 0 {
 				boardPtr = &bid
@@ -714,8 +714,8 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 				estado = &f.Sprint.State
 			}
 			var boardID *int
-			if f.Sprint.OriginBoardID > 0 {
-				bid := f.Sprint.OriginBoardID
+			if f.Sprint.GetBoardID() > 0 {
+				bid := f.Sprint.GetBoardID()
 				boardID = &bid
 			}
 			spID, err := s.repo.UpsertSprint(ctx, fonte.ID, f.Sprint.ID, f.Sprint.Name, estado,
@@ -747,13 +747,26 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 
 	statusCat := f.Status.StatusCategory.Key
 
+	// DEBUG: dump all custom field keys for first few tickets
+	if issue.Key == "TCDV-3909" || issue.Key == "TCDV-3893" || issue.Key == "TCDV-3914" {
+		cfKeys := make([]string, 0, len(f.CustomFields))
+		for k := range f.CustomFields {
+			cfKeys = append(cfKeys, k)
+		}
+		s.logger.Info("DEBUG custom fields dump",
+			zap.String("ticket", issue.Key),
+			zap.Strings("keys", cfKeys),
+			zap.Any("all_values", f.CustomFields),
+		)
+	}
+
 	var tipoDemanda *string
 	if fonte.CustomFieldMap != nil {
 		var cfMap map[string]string
 		if err := json.Unmarshal(fonte.CustomFieldMap, &cfMap); err == nil {
 			for fieldID, fieldName := range cfMap {
 				if fieldName == "tipo_demanda" {
-					if val, ok := f.CustomFields[fieldID]; ok {
+					if val, ok := f.CustomFields[fieldID]; ok && val != nil {
 						if m, ok := val.(map[string]any); ok {
 							if v, ok := m["value"].(string); ok {
 								tipoDemanda = &v

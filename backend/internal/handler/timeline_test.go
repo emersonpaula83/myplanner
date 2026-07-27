@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 	"go.uber.org/zap"
 )
@@ -55,7 +56,7 @@ func (m *mockTimelineStore) BuscarMembrosComAusencias(_ context.Context, _ []uui
 	return m.membrosTimeline, nil
 }
 
-func (m *mockTimelineStore) AtualizarMetadataProjeto(_ context.Context, _ uuid.UUID, apelido *string, _ *time.Time) error {
+func (m *mockTimelineStore) AtualizarMetadataProjeto(_ context.Context, _ uuid.UUID, apelido *string, _ *time.Time, _ *pgtype.Date) error {
 	m.capturedApelido = apelido
 	return m.updateErr
 }

@@ -1,0 +1,1 @@
+ALTER TABLE tarefas ALTER COLUMN apelido TYPE VARCHAR(15);

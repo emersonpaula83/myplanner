@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
@@ -26,7 +27,7 @@ type TimelineStore interface {
 	BuscarAusenciasMensaisEquipes(ctx context.Context, equipeIDs []uuid.UUID, ano int) ([]domain.AusenciaMensal, error)
 	BuscarFeriadosAno(ctx context.Context, ano int) ([]time.Time, error)
 	BuscarMembrosComAusencias(ctx context.Context, equipeIDs []uuid.UUID, ano int) ([]domain.MembroTimeline, error)
-	AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time) error
+	AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time, dataLimite *pgtype.Date) error
 	BuscarEpicoPorID(ctx context.Context, id uuid.UUID) (*domain.Tarefa, error)
 	ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error)
 }
@@ -197,7 +198,17 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	if err := h.store.AtualizarMetadataProjeto(r.Context(), id, req.Apelido, req.DataInicioExecucao); err != nil {
+	var dataLimite *pgtype.Date
+	if req.DataLimite != nil && *req.DataLimite != "" {
+		t, err := time.Parse("2006-01-02", *req.DataLimite)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "data_limite deve estar no formato YYYY-MM-DD")
+			return
+		}
+		dataLimite = &pgtype.Date{Time: t, Valid: true}
+	}
+
+	if err := h.store.AtualizarMetadataProjeto(r.Context(), id, req.Apelido, req.DataInicioExecucao, dataLimite); err != nil {
 		h.logger.Error("failed to update metadata", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao atualizar metadados")
 		return
@@ -214,10 +225,10 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var dataLimite *string
+	var dlStr *string
 	if atualizado.DataLimite != nil && atualizado.DataLimite.Valid {
 		s := atualizado.DataLimite.Time.Format("2006-01-02")
-		dataLimite = &s
+		dlStr = &s
 	}
 
 	respondJSON(w, http.StatusOK, domain.ProjetoListItem{
@@ -226,7 +237,7 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 		Resumo:             atualizado.Resumo,
 		Apelido:            atualizado.Apelido,
 		DataInicioExecucao: atualizado.DataInicioExecucao,
-		DataLimite:         dataLimite,
+		DataLimite:         dlStr,
 		TipoDemanda:        atualizado.TipoDemanda,
 		Status:             atualizado.Status,
 	})

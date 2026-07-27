@@ -153,11 +153,13 @@ func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams
 		              estimativa_tempo = EXCLUDED.estimativa_tempo, tempo_gasto = EXCLUDED.tempo_gasto,
 		              responsavel_id = EXCLUDED.responsavel_id, relator_id = EXCLUDED.relator_id,
 		              team = EXCLUDED.team, sprint_id = EXCLUDED.sprint_id,
-		              data_limite = EXCLUDED.data_limite, data_resolvido = EXCLUDED.data_resolvido,
+		              data_limite = COALESCE(EXCLUDED.data_limite, tarefas.data_limite),
+		              data_resolvido = EXCLUDED.data_resolvido,
 		              data_atualizado = EXCLUDED.data_atualizado, tipo_demanda = EXCLUDED.tipo_demanda,
 		              data_componente = EXCLUDED.data_componente, status_categoria = EXCLUDED.status_categoria,
-		              parent_id = EXCLUDED.parent_id, apelido = EXCLUDED.apelido,
-		              data_inicio_execucao = EXCLUDED.data_inicio_execucao,
+		              parent_id = EXCLUDED.parent_id,
+		              apelido = COALESCE(EXCLUDED.apelido, tarefas.apelido),
+		              data_inicio_execucao = COALESCE(EXCLUDED.data_inicio_execucao, tarefas.data_inicio_execucao),
 		              data_entrada_sprint = EXCLUDED.data_entrada_sprint,
 		              campos_extras = EXCLUDED.campos_extras, updated_at = NOW()
 		RETURNING id

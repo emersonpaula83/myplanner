@@ -828,7 +828,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <div class="equipe-create-wrap">
           <input class="equipe-create-input" id="equipe-new-name" placeholder="Nova equipe..." />
           <button class="btn-add" onclick="createEquipe()">+ Criar</button>
-          <button class="btn-sm" onclick="openFeriadoModal()" style="margin-left:8px">Cadastrar Feriados</button>
+          <button class="btn-sm" onclick="openFeriadoModal()" style="margin-left:8px;background:var(--accent);color:#fff">Cadastrar Feriados</button>
         </div>
       </div>
       <div id="equipe-content">
@@ -856,8 +856,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       <div class="page-header-row"><h1 class="page-title">Projetos</h1></div>
       <div class="timeline-filters">
         <select class="filter-select" id="projetos-equipe" onchange="loadProjetos()"><option value="">Todas as equipes</option></select>
+        <select class="filter-select" id="projetos-status" onchange="filterProjetos()"><option value="ativos">Ativos</option><option value="encerrados">Cancelados/Encerrados</option><option value="todos">Todos</option></select>
         <input class="filter-select" id="projetos-search" placeholder="Pesquisar projetos..." oninput="filterProjetos()" style="min-width:220px">
-        <button class="btn-sm" onclick="openFeriadoModal()">Cadastrar Feriados</button>
+        <button class="btn-sm" onclick="openFeriadoModal()" style="background:var(--accent);color:#fff">Cadastrar Feriados</button>
       </div>
       <div id="projetos-content"><div class="loading"><div class="spinner"></div></div></div>
     </div>
@@ -1002,6 +1003,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       <input type="hidden" id="projmeta-id">
       <div class="form-group"><label class="form-label">Apelido (max 20 chars, uppercase)</label><input class="form-input" type="text" id="projmeta-apelido" maxlength="20" style="text-transform:uppercase"></div>
       <div class="form-group"><label class="form-label">Data Início Execução</label><input class="form-input" type="text" id="projmeta-data-inicio" placeholder="dd/mm/aaaa" maxlength="10"></div>
+      <div class="form-group"><label class="form-label">Data Limite</label><input class="form-input" type="text" id="projmeta-data-limite" placeholder="dd/mm/aaaa" maxlength="10"></div>
       <div class="modal-actions">
         <button class="btn-cancel" type="button" onclick="closeProjMetaModal()">Cancelar</button>
         <button class="btn-primary" type="submit" style="width:auto">Salvar</button>
@@ -2074,9 +2076,9 @@ async function loadProjetos() {
     if (!epicos || epicos.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-text">Nenhum épico encontrado</div><div class="empty-state-sub">Sincronize dados do JIRA primeiro</div></div>'; return; }
     let rows = '';
     epicos.forEach(p => {
-      const dl = p.data_limite || '—';
+      const dl = p.data_limite ? new Date(p.data_limite + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
       const die = p.data_inicio_execucao ? new Date(p.data_inicio_execucao).toLocaleDateString('pt-BR') : '—';
-      rows += '<tr onclick="openProjMetaModal(\'' + p.id + '\',\'' + esc(p.numero_ticket) + '\',\'' + esc(p.apelido || '') + '\',\'' + (p.data_inicio_execucao ? p.data_inicio_execucao.substring(0,10) : '') + '\')" style="cursor:pointer">' +
+      rows += '<tr onclick="openProjMetaModal(\'' + p.id + '\',\'' + esc(p.numero_ticket) + '\',\'' + esc(p.apelido || '') + '\',\'' + (p.data_inicio_execucao ? p.data_inicio_execucao.substring(0,10) : '') + '\',\'' + esc(p.data_limite || '') + '\')" style="cursor:pointer">' +
         '<td style="font-weight:550;color:var(--accent)">' + esc(p.numero_ticket) + '</td>' +
         '<td style="font-weight:550;color:var(--text-primary)">' + esc(p.apelido || '—') + '</td>' +
         '<td>' + esc(p.resumo || '') + '</td>' +
@@ -2087,23 +2089,33 @@ async function loadProjetos() {
       '</tr>';
     });
     el.innerHTML = '<div class="users-table-wrap fade-in"><table class="users-table"><thead><tr><th>Ticket</th><th>Apelido</th><th>Resumo</th><th>Tipo</th><th>Status</th><th>Início Exec.</th><th>Data Limite</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    filterProjetos();
   } catch (e) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
 }
 
+var _projetosEncerradosRe = /finalizado|cancelado|fechado|done|closed|cancelled|encerrado|conclu[ií]do/i;
 function filterProjetos() {
-  const term = (document.getElementById('projetos-search').value || '').toLowerCase();
-  const rows = document.querySelectorAll('#projetos-content .users-table tbody tr');
-  rows.forEach(row => {
-    const text = row.textContent.toLowerCase();
-    row.style.display = text.includes(term) ? '' : 'none';
+  var term = (document.getElementById('projetos-search').value || '').toLowerCase();
+  var statusFilter = document.getElementById('projetos-status').value;
+  var rows = document.querySelectorAll('#projetos-content .users-table tbody tr');
+  rows.forEach(function(row) {
+    var text = row.textContent.toLowerCase();
+    if (term && !text.includes(term)) { row.style.display = 'none'; return; }
+    if (statusFilter === 'todos') { row.style.display = ''; return; }
+    var cells = row.querySelectorAll('td');
+    var status = cells[4] ? cells[4].textContent : '';
+    var isEncerrado = _projetosEncerradosRe.test(status);
+    if (statusFilter === 'ativos') { row.style.display = isEncerrado ? 'none' : ''; }
+    else { row.style.display = isEncerrado ? '' : 'none'; }
   });
 }
 
-function openProjMetaModal(id, ticket, apelido, dataInicio) {
+function openProjMetaModal(id, ticket, apelido, dataInicio, dataLimite) {
   document.getElementById('projmeta-id').value = id;
   document.getElementById('projmeta-title').textContent = 'Editar — ' + ticket;
   document.getElementById('projmeta-apelido').value = apelido;
   document.getElementById('projmeta-data-inicio').value = fmtDateBR(dataInicio);
+  document.getElementById('projmeta-data-limite').value = fmtDateBR(dataLimite);
   document.getElementById('projmeta-modal').classList.add('open');
 }
 function closeProjMetaModal() { document.getElementById('projmeta-modal').classList.remove('open'); }
@@ -2116,6 +2128,8 @@ async function handleProjMetaSubmit(e) {
   if (apelido) body.apelido = apelido;
   const dataInicioRaw = document.getElementById('projmeta-data-inicio').value;
   if (dataInicioRaw) { var iso = parseDateBR(dataInicioRaw); body.data_inicio_execucao = new Date(iso + 'T12:00:00').toISOString(); }
+  const dataLimiteRaw = document.getElementById('projmeta-data-limite').value;
+  if (dataLimiteRaw) { body.data_limite = parseDateBR(dataLimiteRaw); }
   try {
     await api('/projetos/' + id + '/metadata', { method: 'PUT', body: JSON.stringify(body) });
     closeProjMetaModal();
@@ -3736,11 +3750,17 @@ async function openGerarSprintsForm() {
   var el = document.getElementById('stl-content');
   var prevHTML = el.innerHTML;
   var today = new Date().toISOString().split('T')[0];
+  var equipeBoardId = '';
+  try {
+    var equipes = await api('/equipes');
+    var eq = (equipes || []).find(function(e) { return e.id === equipe; });
+    if (eq && eq.board_id) equipeBoardId = eq.board_id;
+  } catch(e) {}
   el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;max-width:700px">'
     + '<h3 style="margin:0 0 16px">Gerar Sprints</h3>'
     + '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Board ID</label><br>'
-    + '<input id="gen-board" type="number" placeholder="Ex: 42" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:100px">'
+    + '<input id="gen-board" type="number" value="' + equipeBoardId + '" placeholder="Ex: 42" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:100px">'
     + '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">Da URL do board JIRA: /boards/<b>ID</b></div></div>'
     + '<div><label style="font-size:12px;color:var(--text-secondary)">Data Inicial</label><br>'
     + '<input id="gen-start-date" type="text" placeholder="dd/mm/aaaa" maxlength="10" style="padding:6px 10px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:13px;width:160px"></div>'
@@ -3883,7 +3903,7 @@ async function previewGerarSprints() {
 async function executarGerarSprints() {
   var equipe = document.getElementById('stl-equipe').value;
   var boardId = document.getElementById('gen-board').value.trim();
-  var startDate = document.getElementById('gen-start-date').value;
+  var startDate = parseDateBR(document.getElementById('gen-start-date').value);
   var previewEl = document.getElementById('gen-preview');
   previewEl.innerHTML = '<div class="loading"><div class="spinner"></div></div><p style="font-size:13px;color:var(--text-secondary)">Criando sprints no JIRA...</p>';
   try {

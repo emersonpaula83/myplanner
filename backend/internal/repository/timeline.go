@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 )
@@ -136,14 +137,15 @@ func (r *TimelineRepository) BuscarAusenciasMensais(ctx context.Context, equipeI
 	return result, rows.Err()
 }
 
-func (r *TimelineRepository) AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time) error {
+func (r *TimelineRepository) AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time, dataLimite *pgtype.Date) error {
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE tarefas
 		SET apelido = $2,
 		    data_inicio_execucao = $3,
+		    data_limite = COALESCE($4, data_limite),
 		    updated_at = NOW()
 		WHERE id = $1 AND tipo = 'Épico'
-	`, id, apelido, dataInicioExecucao)
+	`, id, apelido, dataInicioExecucao, dataLimite)
 	if err != nil {
 		return fmt.Errorf("updating metadata projeto: %w", err)
 	}

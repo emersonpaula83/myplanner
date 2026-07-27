@@ -25,7 +25,7 @@ cp .env.example .env
 ./dev.sh up
 ```
 
-Acesse `http://localhost:8080`. Login padrao: `admin@myplanner.local` / senha definida em `PASS_APP`.
+Acesse `http://localhost:9091`. Login padrao: `admin@myplanner.local` / senha definida em `PASS_APP`.
 
 ## Comandos
 

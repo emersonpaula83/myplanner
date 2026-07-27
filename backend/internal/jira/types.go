@@ -97,6 +97,14 @@ type JiraSprint struct {
 	EndDate       *string `json:"endDate"`
 	CompleteDate  *string `json:"completeDate"`
 	OriginBoardID int     `json:"originBoardId"`
+	BoardID       int     `json:"boardId"`
+}
+
+func (s *JiraSprint) GetBoardID() int {
+	if s.OriginBoardID > 0 {
+		return s.OriginBoardID
+	}
+	return s.BoardID
 }
 
 type JiraBoard struct {

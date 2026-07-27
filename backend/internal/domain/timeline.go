@@ -74,6 +74,7 @@ type AnaliseResponse struct {
 type MetadataProjetoRequest struct {
 	Apelido            *string    `json:"apelido"`
 	DataInicioExecucao *time.Time `json:"data_inicio_execucao"`
+	DataLimite         *string    `json:"data_limite"`
 }
 
 type AnalisarCapacidadeRequest struct {

@@ -13,6 +13,8 @@ if [ -f "$ROOT/.env" ]; then
     set +a
 fi
 
+PORT="${SERVER_PORT:-9091}"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -24,6 +26,7 @@ warn() { echo -e "${YELLOW}[myplanner]${NC} $1"; }
 err()  { echo -e "${RED}[myplanner]${NC} $1"; }
 
 stop_server() {
+    # 1) Kill by PID file
     if [ -f "$PID_FILE" ]; then
         local pid
         pid=$(cat "$PID_FILE")
@@ -37,12 +40,23 @@ stop_server() {
         fi
         rm -f "$PID_FILE"
     fi
-    # Fallback: kill by port
+    # 2) Fallback: kill any myplanner-dev still listening on $PORT
     local port_pid
-    port_pid=$(lsof -ti:8080 2>/dev/null || true)
+    port_pid=$(lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null || true)
     if [ -n "$port_pid" ]; then
-        kill "$port_pid" 2>/dev/null || true
+        kill $port_pid 2>/dev/null || true
         sleep 1
+        # Force kill survivors
+        for p in $port_pid; do
+            if kill -0 "$p" 2>/dev/null; then
+                kill -9 "$p" 2>/dev/null
+            fi
+        done
+        log "Processos residuais na porta $PORT eliminados"
+    fi
+    # 3) Verify port is free
+    if lsof -ti:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+        err "AVISO: porta $PORT ainda ocupada após stop"
     fi
 }
 
@@ -100,11 +114,12 @@ cmd_start() {
     cmd_ensure_db
     stop_server
     cmd_build
-    log "Iniciando servidor em http://localhost:8080 ..."
-    cd "$BACKEND" && "$BIN" &
+    LOG_FILE="/tmp/myplanner.log"
+    log "Iniciando servidor em http://localhost:$PORT ..."
+    cd "$BACKEND" && "$BIN" >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     sleep 2
-    if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    if curl -sf http://localhost:$PORT/health >/dev/null 2>&1; then
         log "Servidor rodando! PID $(cat "$PID_FILE")"
     else
         err "Servidor não respondeu no /health"
@@ -136,7 +151,7 @@ cmd_status() {
     fi
 
     # Server
-    if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    if curl -sf http://localhost:$PORT/health >/dev/null 2>&1; then
         local pid="?"
         [ -f "$PID_FILE" ] && pid=$(cat "$PID_FILE")
         echo -e "  Backend:     ${GREEN}●${NC} rodando (PID $pid)"
@@ -146,13 +161,13 @@ cmd_status() {
 
     # Sync
     local token
-    token=$(curl -sf http://localhost:8080/api/v1/auth/login \
+    token=$(curl -sf http://localhost:$PORT/api/v1/auth/login \
         -H 'Content-Type: application/json' \
         -d '{"email":"admin@myplanner.local","senha":"Totvs@123"}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || true)
 
     if [ -n "$token" ]; then
         local fontes
-        fontes=$(curl -sf -H "Authorization: Bearer $token" http://localhost:8080/api/v1/fontes 2>/dev/null || echo "[]")
+        fontes=$(curl -sf -H "Authorization: Bearer $token" http://localhost:$PORT/api/v1/fontes 2>/dev/null || echo "[]")
         local count
         count=$(echo "$fontes" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
         echo -e "  Fontes JIRA: ${CYAN}$count${NC} configurada(s)"
@@ -172,17 +187,12 @@ for f in fontes:
 }
 
 cmd_logs() {
-    if [ -f "$PID_FILE" ]; then
-        local pid
-        pid=$(cat "$PID_FILE")
-        local log_file
-        log_file=$(readlink -f "/proc/$pid/fd/1" 2>/dev/null || true)
-        if [ -n "$log_file" ] && [ -f "$log_file" ]; then
-            tail -f "$log_file"
-            return
-        fi
+    local log_file="/tmp/myplanner.log"
+    if [ -f "$log_file" ]; then
+        tail -f "$log_file"
+    else
+        warn "Sem arquivo de log. Inicie com: ./dev.sh start"
     fi
-    warn "Sem arquivo de log encontrado. Inicie com: ./dev.sh start"
 }
 
 cmd_test() {
@@ -223,7 +233,7 @@ cmd_up() {
     cmd_start
     echo ""
     cmd_status
-    log "Acesse: http://localhost:8080"
+    log "Acesse: http://localhost:$PORT"
     log "Login: admin@myplanner.local / Totvs@123"
 }
 

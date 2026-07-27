@@ -449,8 +449,12 @@ func (c *HTTPClient) SetSprintFieldID(id string) {
 	c.sprintFieldID = id
 }
 
-var knownCustomFields = map[string]string{
+var knownCustomFieldsByID = map[string]string{
 	"customfield_12930": "tipo_demanda",
+}
+
+var knownCustomFieldsByName = map[string]string{
+	"tipo de demanda": "tipo_demanda",
 }
 
 func (c *HTTPClient) DiscoverCustomFields(ctx context.Context) (map[string]string, error) {
@@ -459,17 +463,37 @@ func (c *HTTPClient) DiscoverCustomFields(ctx context.Context) (map[string]strin
 		return nil, err
 	}
 	var fields []struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Custom bool   `json:"custom"`
 	}
 	if err := json.Unmarshal(body, &fields); err != nil {
 		return nil, fmt.Errorf("decoding fields: %w", err)
 	}
+	// DEBUG: log all custom fields to find correct tipo_demanda field
+	for _, f := range fields {
+		if f.Custom {
+			nameLower := strings.ToLower(f.Name)
+			if strings.Contains(nameLower, "tipo") || strings.Contains(nameLower, "demanda") || strings.Contains(nameLower, "type") {
+				c.logger.Info("DEBUG candidate field for tipo_demanda", zap.String("id", f.ID), zap.String("name", f.Name))
+			}
+		}
+	}
+
 	result := make(map[string]string)
 	for _, f := range fields {
-		if mapped, ok := knownCustomFields[f.ID]; ok {
+		if mapped, ok := knownCustomFieldsByID[f.ID]; ok {
 			result[f.ID] = mapped
-			c.logger.Info("discovered custom field", zap.String("id", f.ID), zap.String("mapped", mapped), zap.String("jiraName", f.Name))
+			c.logger.Info("discovered custom field by ID", zap.String("id", f.ID), zap.String("mapped", mapped), zap.String("jiraName", f.Name))
+		}
+		if f.Custom {
+			nameLower := strings.ToLower(f.Name)
+			if mapped, ok := knownCustomFieldsByName[nameLower]; ok {
+				if _, already := result[f.ID]; !already {
+					result[f.ID] = mapped
+					c.logger.Info("discovered custom field by name", zap.String("id", f.ID), zap.String("mapped", mapped), zap.String("jiraName", f.Name))
+				}
+			}
 		}
 	}
 	return result, nil

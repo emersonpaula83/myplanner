@@ -79,7 +79,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("DB_USER", "myplanner")
 	viper.SetDefault("DB_NAME", "myplanner")
 	viper.SetDefault("DB_SSLMODE", "disable")
-	viper.SetDefault("SERVER_PORT", "8080")
+	viper.SetDefault("SERVER_PORT", "9091")
 	viper.SetDefault("SERVER_HOST", "0.0.0.0")
 	viper.SetDefault("SYNC_INTERVAL_MINUTES", 30)
 	viper.SetDefault("SYNC_RATE_LIMIT_PER_SEC", 5)
@@ -87,7 +87,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("JWT_EXPIRATION_HOURS", 24)
 	viper.SetDefault("GEMINI_MODEL", "gemini-2.0-flash")
 	viper.SetDefault("ADMIN_EMAIL", "admin@myplanner.local")
-	viper.SetDefault("APP_BASE_URL", "http://localhost:8080")
+	viper.SetDefault("APP_BASE_URL", "http://localhost:9091")
 
 	_ = viper.ReadInConfig()
 
