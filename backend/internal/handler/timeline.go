@@ -29,7 +29,9 @@ type TimelineStore interface {
 	BuscarMembrosComAusencias(ctx context.Context, equipeIDs []uuid.UUID, ano int) ([]domain.MembroTimeline, error)
 	AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time, dataLimite *pgtype.Date) error
 	BuscarEpicoPorID(ctx context.Context, id uuid.UUID) (*domain.Tarefa, error)
-	ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error)
+	ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID, produtoNome *string, removido string) ([]domain.ProjetoListItem, error)
+	SalvarEpicoEquipes(ctx context.Context, epicoID uuid.UUID, equipeIDs []uuid.UUID) error
+	BuscarEpicoEquipes(ctx context.Context, epicoID uuid.UUID) ([]uuid.UUID, error)
 }
 
 type TimelineHandler struct {
@@ -214,6 +216,14 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if req.EquipeIDs != nil {
+		if err := h.store.SalvarEpicoEquipes(r.Context(), id, req.EquipeIDs); err != nil {
+			h.logger.Error("failed to save epico equipes", zap.Error(err))
+			respondError(w, http.StatusInternalServerError, "falha ao salvar equipes do projeto")
+			return
+		}
+	}
+
 	atualizado, err := h.store.BuscarEpicoPorID(r.Context(), id)
 	if err != nil {
 		h.logger.Error("failed to fetch updated epico", zap.Error(err))
@@ -254,8 +264,18 @@ func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
 		equipeID = &id
 	}
 
+	var produtoNome *string
+	if v := r.URL.Query().Get("produto"); v != "" {
+		produtoNome = &v
+	}
+
+	removido := r.URL.Query().Get("removido")
+	if removido == "" {
+		removido = "nao"
+	}
+
 	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
-	epicos, err := h.store.ListarEpicos(r.Context(), equipeID, projetoIDs)
+	epicos, err := h.store.ListarEpicos(r.Context(), equipeID, projetoIDs, produtoNome, removido)
 	if err != nil {
 		h.logger.Error("failed to list epicos", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao listar épicos")
@@ -344,4 +364,23 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 	}
 
 	respondJSON(w, http.StatusOK, domain.AnaliseResponse{Analise: analise})
+}
+
+func (h *TimelineHandler) GetProjetoEquipes(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+
+	equipeIDs, err := h.store.BuscarEpicoEquipes(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to fetch epico equipes", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar equipes do projeto")
+		return
+	}
+	if equipeIDs == nil {
+		equipeIDs = []uuid.UUID{}
+	}
+	respondJSON(w, http.StatusOK, equipeIDs)
 }

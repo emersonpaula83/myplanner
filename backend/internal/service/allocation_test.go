@@ -9,7 +9,7 @@ import (
 
 func TestListProjectAllocations_ComputesMetrics(t *testing.T) {
 	svc := &AllocationService{}
-	_, err := svc.ListProjectAllocations(context.Background(), uuid.New(), uuid.New())
+	_, err := svc.ListProjectAllocations(context.Background(), uuid.New(), uuid.New(), "ativos")
 	if err == nil {
 		t.Fatal("expected error from nil repo, got nil")
 	}

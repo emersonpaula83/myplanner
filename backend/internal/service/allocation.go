@@ -12,36 +12,55 @@ import (
 )
 
 type ProjectAllocation struct {
-	EpicID        uuid.UUID  `json:"epic_id"`
-	NumeroTicket  string     `json:"numero_ticket"`
-	Resumo        string     `json:"resumo"`
-	Apelido       *string    `json:"apelido"`
-	DataLimite    *time.Time `json:"data_limite"`
-	Prioridade    *string    `json:"prioridade"`
-	TipoDemanda   *string    `json:"tipo_demanda"`
-	Produtos      []string   `json:"produtos"`
-	PctEstimado   float64    `json:"pct_estimado"`
-	PctPlanejado  float64    `json:"pct_planejado"`
-	TarefasSemEst int        `json:"tarefas_sem_estimativa"`
-	TotalTarefas  int        `json:"total_tarefas"`
-	IsGDPTC       bool       `json:"is_gdptc"`
-	Status        string     `json:"status"`
+	EpicID            uuid.UUID       `json:"epic_id"`
+	NumeroTicket      string          `json:"numero_ticket"`
+	Resumo            string          `json:"resumo"`
+	Apelido           *string         `json:"apelido"`
+	DataLimite        *time.Time      `json:"data_limite"`
+	Prioridade        *string         `json:"prioridade"`
+	TipoDemanda       *string         `json:"tipo_demanda"`
+	Produtos          []string        `json:"produtos"`
+	PctEstimado       float64         `json:"pct_estimado"`
+	PctPlanejado      float64         `json:"pct_planejado"`
+	TarefasSemEst     int             `json:"tarefas_sem_estimativa"`
+	TotalTarefas      int             `json:"total_tarefas"`
+	IsGDPTC           bool            `json:"is_gdptc"`
+	Status            string          `json:"status"`
+	ResponsavelNome   *string         `json:"responsavel_nome"`
+	ResponsavelAvatar *string         `json:"responsavel_avatar"`
+	ResponsavelCargo  *string         `json:"responsavel_cargo"`
+	Encerrado         bool            `json:"encerrado"`
+	Encerramento      *ProjectClosure `json:"encerramento,omitempty"`
+}
+
+type CloseProjectRequest struct {
+	Descricao        string `json:"descricao"`
+	DataEncerramento string `json:"data_encerramento"`
+}
+
+type ProjectClosure struct {
+	Descricao        string    `json:"descricao"`
+	DataEncerramento time.Time `json:"data_encerramento"`
+	EncerradoPor     string    `json:"encerrado_por"`
 }
 
 type TaskAllocation struct {
-	TarefaID        uuid.UUID  `json:"tarefa_id"`
-	NumeroTicket    string     `json:"numero_ticket"`
-	Resumo          string     `json:"resumo"`
-	Tipo            string     `json:"tipo"`
-	TipoDemanda     *string    `json:"tipo_demanda"`
-	Status          string     `json:"status"`
-	EstimativaHoras *float64   `json:"estimativa_horas"`
-	SprintID        *uuid.UUID `json:"sprint_id"`
-	SprintNome      *string    `json:"sprint_nome"`
-	SprintInicio    *time.Time `json:"sprint_inicio"`
-	SprintFim       *time.Time `json:"sprint_fim"`
-	ResponsavelID   *uuid.UUID `json:"responsavel_id"`
-	ResponsavelNome *string    `json:"responsavel_nome"`
+	TarefaID          uuid.UUID  `json:"tarefa_id"`
+	NumeroTicket      string     `json:"numero_ticket"`
+	Resumo            string     `json:"resumo"`
+	Tipo              string     `json:"tipo"`
+	TipoDemanda       *string    `json:"tipo_demanda"`
+	Status            string     `json:"status"`
+	EstimativaHoras   *float64   `json:"estimativa_horas"`
+	SprintID          *uuid.UUID `json:"sprint_id"`
+	SprintNome        *string    `json:"sprint_nome"`
+	SprintInicio      *time.Time `json:"sprint_inicio"`
+	SprintFim         *time.Time `json:"sprint_fim"`
+	ResponsavelID     *uuid.UUID `json:"responsavel_id"`
+	ResponsavelNome   *string    `json:"responsavel_nome"`
+	ResponsavelAvatar *string    `json:"responsavel_avatar"`
+	StatusCategoria   *string    `json:"status_categoria"`
+	Marcacao          bool       `json:"marcacao"`
 }
 
 type PersonAllocation struct {
@@ -50,6 +69,7 @@ type PersonAllocation struct {
 	HorasNoProjeto float64   `json:"horas_no_projeto"`
 	HorasCapTotal  float64   `json:"horas_cap_total"`
 	PctNoProjeto   float64   `json:"pct_no_projeto"`
+	AvatarURL      string    `json:"avatar_url"`
 }
 
 type ProjectDetail struct {
@@ -124,12 +144,12 @@ func NewAllocationService(
 	}
 }
 
-func (s *AllocationService) ListProjectAllocations(ctx context.Context, equipeID, produtoID uuid.UUID) ([]ProjectAllocation, error) {
+func (s *AllocationService) ListProjectAllocations(ctx context.Context, equipeID uuid.UUID, produtoNomes []string, statusFilter string) ([]ProjectAllocation, error) {
 	if s.repo == nil {
 		return nil, fmt.Errorf("allocation repository not configured")
 	}
 
-	rows, err := s.repo.GetEpicsByEquipeAndProduto(ctx, equipeID, produtoID)
+	rows, err := s.repo.GetEpicsByEquipeAndProduto(ctx, equipeID, produtoNomes, statusFilter)
 	if err != nil {
 		return nil, fmt.Errorf("listing epics: %w", err)
 	}
@@ -143,6 +163,12 @@ func (s *AllocationService) ListProjectAllocations(ctx context.Context, equipeID
 	if err != nil {
 		s.logger.Warn("checking GDPTC ancestors", zap.Error(err))
 		gdptcMap = make(map[uuid.UUID]bool)
+	}
+
+	closedMap, err := s.repo.GetClosedEpicIDs(ctx, epicIDs)
+	if err != nil {
+		s.logger.Warn("checking closed epics", zap.Error(err))
+		closedMap = make(map[uuid.UUID]bool)
 	}
 
 	result := make([]ProjectAllocation, 0, len(rows))
@@ -163,39 +189,48 @@ func (s *AllocationService) ListProjectAllocations(ctx context.Context, equipeID
 			status = "em_planejamento"
 		}
 
-		result = append(result, ProjectAllocation{
-			EpicID:        r.EpicID,
-			NumeroTicket:  r.NumeroTicket,
-			Resumo:        r.Resumo,
-			Apelido:       r.Apelido,
-			DataLimite:    r.DataLimite,
-			Prioridade:    r.Prioridade,
-			TipoDemanda:   r.TipoDemanda,
-			Produtos:      r.Produtos,
-			PctEstimado:   pctEstimado,
-			PctPlanejado:  pctPlanejado,
-			TarefasSemEst: r.TotalFilhas - r.FilhasComEstimativa,
-			TotalTarefas:  r.TotalFilhas,
-			IsGDPTC:       gdptcMap[r.EpicID],
-			Status:        status,
-		})
+		pa := ProjectAllocation{
+			EpicID:            r.EpicID,
+			NumeroTicket:      r.NumeroTicket,
+			Resumo:            r.Resumo,
+			Apelido:           r.Apelido,
+			DataLimite:        r.DataLimite,
+			Prioridade:        r.Prioridade,
+			TipoDemanda:       r.TipoDemanda,
+			Produtos:          r.Produtos,
+			PctEstimado:       pctEstimado,
+			PctPlanejado:      pctPlanejado,
+			TarefasSemEst:     r.TotalFilhas - r.FilhasComEstimativa,
+			TotalTarefas:      r.TotalFilhas,
+			IsGDPTC:           gdptcMap[r.EpicID],
+			Status:            status,
+			ResponsavelNome:   r.ResponsavelNome,
+			ResponsavelAvatar: r.ResponsavelAvatar,
+			ResponsavelCargo:  r.ResponsavelCargo,
+			Encerrado:         closedMap[r.EpicID],
+		}
+
+		if pa.Encerrado {
+			closure, cerr := s.repo.GetProjectClosure(ctx, r.EpicID)
+			if cerr == nil {
+				pa.Encerramento = &ProjectClosure{
+					Descricao:        closure.Descricao,
+					DataEncerramento: closure.DataEncerramento,
+					EncerradoPor:     closure.EncerradoPor,
+				}
+			}
+		}
+
+		result = append(result, pa)
 	}
 
 	return result, nil
 }
 
 func (s *AllocationService) GetProjectDetail(ctx context.Context, epicID, equipeID uuid.UUID) (*ProjectDetail, error) {
-	epics, err := s.repo.GetEpicsByEquipeAndProduto(ctx, equipeID, uuid.Nil)
+	epicRow, err := s.repo.GetEpicByID(ctx, epicID)
 	if err != nil {
 		return nil, fmt.Errorf("getting epic: %w", err)
-	}
-
-	var epicRow *repository.EpicAllocationRow
-	for i := range epics {
-		if epics[i].EpicID == epicID {
-			epicRow = &epics[i]
-			break
-		}
 	}
 
 	tasks, err := s.repo.GetEpicTasks(ctx, epicID)
@@ -210,42 +245,65 @@ func (s *AllocationService) GetProjectDetail(ctx context.Context, epicID, equipe
 
 	gdptcMap, _ := s.repo.CheckGDPTCAncestors(ctx, []uuid.UUID{epicID})
 
-	var epic ProjectAllocation
-	if epicRow != nil {
-		var pctEstimado, pctPlanejado float64
-		if epicRow.TotalFilhas > 0 {
-			pctEstimado = float64(epicRow.FilhasComEstimativa) / float64(epicRow.TotalFilhas) * 100
+	var pctEstimado, pctPlanejado float64
+	if epicRow.TotalFilhas > 0 {
+		pctEstimado = float64(epicRow.FilhasComEstimativa) / float64(epicRow.TotalFilhas) * 100
+	}
+	if epicRow.HorasEstimadas > 0 {
+		pctPlanejado = epicRow.HorasEmSprint / epicRow.HorasEstimadas * 100
+	}
+	status := "nao_planejado"
+	if pctPlanejado >= 100 {
+		status = "planejado"
+		pctPlanejado = 100
+	} else if pctPlanejado > 0 {
+		status = "em_planejamento"
+	}
+
+	epic := ProjectAllocation{
+		EpicID:            epicRow.EpicID,
+		NumeroTicket:      epicRow.NumeroTicket,
+		Resumo:            epicRow.Resumo,
+		Apelido:           epicRow.Apelido,
+		DataLimite:        epicRow.DataLimite,
+		Prioridade:        epicRow.Prioridade,
+		TipoDemanda:       epicRow.TipoDemanda,
+		Produtos:          epicRow.Produtos,
+		PctEstimado:       pctEstimado,
+		PctPlanejado:      pctPlanejado,
+		TarefasSemEst:     epicRow.TotalFilhas - epicRow.FilhasComEstimativa,
+		TotalTarefas:      epicRow.TotalFilhas,
+		IsGDPTC:           gdptcMap[epicID],
+		Status:            status,
+		ResponsavelNome:   epicRow.ResponsavelNome,
+		ResponsavelAvatar: epicRow.ResponsavelAvatar,
+		ResponsavelCargo:  epicRow.ResponsavelCargo,
+	}
+
+	var totalProjectHours float64
+	for _, t := range tasks {
+		if t.EstimativaTempo != nil && *t.EstimativaTempo > 0 {
+			totalProjectHours += float64(*t.EstimativaTempo) / 3600.0
 		}
-		if epicRow.HorasEstimadas > 0 {
-			pctPlanejado = epicRow.HorasEmSprint / epicRow.HorasEstimadas * 100
-		}
-		status := "nao_planejado"
-		if pctPlanejado >= 100 {
-			status = "planejado"
-			pctPlanejado = 100
-		} else if pctPlanejado > 0 {
-			status = "em_planejamento"
-		}
-		epic = ProjectAllocation{
-			EpicID: epicRow.EpicID, NumeroTicket: epicRow.NumeroTicket,
-			Resumo: epicRow.Resumo, Apelido: epicRow.Apelido,
-			DataLimite: epicRow.DataLimite, Prioridade: epicRow.Prioridade,
-			TipoDemanda: epicRow.TipoDemanda, Produtos: epicRow.Produtos,
-			PctEstimado: pctEstimado, PctPlanejado: pctPlanejado,
-			TarefasSemEst: epicRow.TotalFilhas - epicRow.FilhasComEstimativa,
-			TotalTarefas: epicRow.TotalFilhas, IsGDPTC: gdptcMap[epicID],
-			Status: status,
-		}
-	} else {
-		epic = ProjectAllocation{EpicID: epicID, Status: "nao_planejado"}
 	}
 
 	pessoas := make([]PersonAllocation, 0, len(people))
 	for _, p := range people {
+		pctNoProjeto := 0.0
+		if totalProjectHours > 0 {
+			pctNoProjeto = p.HorasNoProjeto / totalProjectHours * 100
+		}
+		avatarURL := ""
+		if p.AvatarURL != nil {
+			avatarURL = *p.AvatarURL
+		}
 		pessoas = append(pessoas, PersonAllocation{
 			MembroID:       p.MembroID,
 			Nome:           p.Nome,
 			HorasNoProjeto: p.HorasNoProjeto,
+			HorasCapTotal:  totalProjectHours,
+			PctNoProjeto:   pctNoProjeto,
+			AvatarURL:      avatarURL,
 		})
 	}
 
@@ -276,18 +334,21 @@ func (s *AllocationService) GetProjectDetail(ctx context.Context, epicID, equipe
 
 func taskRowToAllocation(t repository.TaskAllocationRow) TaskAllocation {
 	ta := TaskAllocation{
-		TarefaID:        t.TarefaID,
-		NumeroTicket:    t.NumeroTicket,
-		Resumo:          t.Resumo,
-		Tipo:            t.Tipo,
-		TipoDemanda:     t.TipoDemanda,
-		Status:          t.Status,
-		SprintID:        t.SprintID,
-		SprintNome:      t.SprintNome,
-		SprintInicio:    t.SprintInicio,
-		SprintFim:       t.SprintFim,
-		ResponsavelID:   t.ResponsavelID,
-		ResponsavelNome: t.ResponsavelNome,
+		TarefaID:          t.TarefaID,
+		NumeroTicket:      t.NumeroTicket,
+		Resumo:            t.Resumo,
+		Tipo:              t.Tipo,
+		TipoDemanda:       t.TipoDemanda,
+		Status:            t.Status,
+		SprintID:          t.SprintID,
+		SprintNome:        t.SprintNome,
+		SprintInicio:      t.SprintInicio,
+		SprintFim:         t.SprintFim,
+		ResponsavelID:     t.ResponsavelID,
+		ResponsavelNome:   t.ResponsavelNome,
+		ResponsavelAvatar: t.ResponsavelAvatar,
+		StatusCategoria:   t.StatusCategoria,
+		Marcacao:          t.Marcacao,
 	}
 	if t.EstimativaTempo != nil && *t.EstimativaTempo > 0 {
 		h := float64(*t.EstimativaTempo) / 3600.0
@@ -472,4 +533,20 @@ func (s *AllocationService) SyncProjectTasks(ctx context.Context, epicID uuid.UU
 		return 0, fmt.Errorf("sync service not configured")
 	}
 	return s.syncSvc.SyncEpicTasks(ctx, fonteDadosID, issueKey)
+}
+
+func (s *AllocationService) CloseProject(ctx context.Context, epicID uuid.UUID, req CloseProjectRequest, encerradoPor string) error {
+	dataEnc, err := time.Parse("2006-01-02", req.DataEncerramento)
+	if err != nil {
+		return fmt.Errorf("invalid date format: %w", err)
+	}
+	return s.repo.CloseProject(ctx, epicID, req.Descricao, dataEnc, encerradoPor)
+}
+
+func (s *AllocationService) ReopenProject(ctx context.Context, epicID uuid.UUID) error {
+	return s.repo.ReopenProject(ctx, epicID)
+}
+
+func (s *AllocationService) GetFilteredProducts(ctx context.Context) ([]repository.ProdutoRow, error) {
+	return s.repo.GetProdutosComProjetosAtivos(ctx)
 }

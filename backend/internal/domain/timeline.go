@@ -65,6 +65,7 @@ type ProjetoListItem struct {
 	DataLimite         *string    `json:"data_limite"`
 	TipoDemanda        *string    `json:"tipo_demanda"`
 	Status             string     `json:"status"`
+	RemovidoEm         *time.Time `json:"removido_em"`
 }
 
 type AnaliseResponse struct {
@@ -72,9 +73,10 @@ type AnaliseResponse struct {
 }
 
 type MetadataProjetoRequest struct {
-	Apelido            *string    `json:"apelido"`
-	DataInicioExecucao *time.Time `json:"data_inicio_execucao"`
-	DataLimite         *string    `json:"data_limite"`
+	Apelido            *string     `json:"apelido"`
+	DataInicioExecucao *time.Time  `json:"data_inicio_execucao"`
+	DataLimite         *string     `json:"data_limite"`
+	EquipeIDs          []uuid.UUID `json:"equipe_ids"`
 }
 
 type AnalisarCapacidadeRequest struct {

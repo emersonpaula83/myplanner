@@ -49,13 +49,15 @@ type UpsertTarefaParams struct {
 	Apelido            *string
 	DataInicioExecucao *time.Time
 	DataEntradaSprint  *time.Time
+	Marcacao           bool
 }
 
 type SyncTotals struct {
-	Projetos int
-	Tarefas  int
-	Membros  int
-	Sprints  int
+	Projetos  int
+	Tarefas   int
+	Membros   int
+	Sprints   int
+	Removidos int
 }
 
 func (r *SyncRepository) UpsertMembro(ctx context.Context, fonteDadosID uuid.UUID, jiraAccountID, nome string, email, avatarURL, team *string) (uuid.UUID, error) {
@@ -144,9 +146,9 @@ func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams
 		                     responsavel_id, relator_id, team, sprint_id, data_criacao, data_limite,
 		                     data_resolvido, data_atualizado, tipo_demanda, data_componente,
 		                     status_categoria, campos_extras, parent_id, apelido, data_inicio_execucao,
-		                     data_entrada_sprint)
+		                     data_entrada_sprint, marcacao)
 		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-		        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+		        $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
 		ON CONFLICT (fonte_dados_id, jira_id)
 		DO UPDATE SET resumo = EXCLUDED.resumo, tipo = EXCLUDED.tipo, status = EXCLUDED.status,
 		              prioridade = EXCLUDED.prioridade, estimativa_pontos = EXCLUDED.estimativa_pontos,
@@ -161,6 +163,7 @@ func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams
 		              apelido = COALESCE(EXCLUDED.apelido, tarefas.apelido),
 		              data_inicio_execucao = COALESCE(EXCLUDED.data_inicio_execucao, tarefas.data_inicio_execucao),
 		              data_entrada_sprint = EXCLUDED.data_entrada_sprint,
+		              marcacao = EXCLUDED.marcacao,
 		              campos_extras = EXCLUDED.campos_extras, updated_at = NOW()
 		RETURNING id
 	`, t.FonteDadosID, t.ProjetoID, t.JiraID, t.NumeroTicket, t.Resumo,
@@ -168,11 +171,45 @@ func (r *SyncRepository) UpsertTarefa(ctx context.Context, t *UpsertTarefaParams
 		t.ResponsavelID, t.RelatorID, t.Team, t.SprintID, t.DataCriacao, t.DataLimite,
 		t.DataResolvido, t.DataAtualizado, t.TipoDemanda, t.DataComponente,
 		t.StatusCategoria, ce, t.ParentID, t.Apelido, t.DataInicioExecucao,
-		t.DataEntradaSprint).Scan(&id)
+		t.DataEntradaSprint, t.Marcacao).Scan(&id)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("upserting tarefa %s: %w", t.NumeroTicket, err)
 	}
 	return id, nil
+}
+
+func (r *SyncRepository) SoftDeleteAbsentTarefas(ctx context.Context, fonteDadosID uuid.UUID, presentJiraIDs []string) (int64, error) {
+	if len(presentJiraIDs) == 0 {
+		return 0, nil
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE tarefas
+		SET removido_em = NOW(), motivo_remocao = 'removido do jira'
+		WHERE fonte_dados_id = $1
+		  AND jira_id != ALL($2)
+		  AND removido_em IS NULL
+	`, fonteDadosID, presentJiraIDs)
+	if err != nil {
+		return 0, fmt.Errorf("soft-deleting absent tarefas: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *SyncRepository) UndeleteReappearedTarefas(ctx context.Context, fonteDadosID uuid.UUID, presentJiraIDs []string) (int64, error) {
+	if len(presentJiraIDs) == 0 {
+		return 0, nil
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE tarefas
+		SET removido_em = NULL, motivo_remocao = NULL
+		WHERE fonte_dados_id = $1
+		  AND jira_id = ANY($2)
+		  AND removido_em IS NOT NULL
+	`, fonteDadosID, presentJiraIDs)
+	if err != nil {
+		return 0, fmt.Errorf("undeleting reappeared tarefas: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (r *SyncRepository) LookupTarefaIDByJiraID(ctx context.Context, fonteDadosID uuid.UUID, jiraID string) (uuid.UUID, error) {

@@ -333,49 +333,129 @@ func (r *TimelineRepository) BuscarAusenciasMensaisEquipes(ctx context.Context, 
 	return result, rows.Err()
 }
 
-func (r *TimelineRepository) ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoListItem, error) {
+func (r *TimelineRepository) SalvarEpicoEquipes(ctx context.Context, epicoID uuid.UUID, equipeIDs []uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM epico_equipes WHERE epico_id = $1`, epicoID); err != nil {
+		return fmt.Errorf("clearing epico equipes: %w", err)
+	}
+
+	for _, eqID := range equipeIDs {
+		if _, err := tx.Exec(ctx, `INSERT INTO epico_equipes (epico_id, equipe_id) VALUES ($1, $2)`, epicoID, eqID); err != nil {
+			return fmt.Errorf("inserting epico equipe: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *TimelineRepository) BuscarEpicoEquipes(ctx context.Context, epicoID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `SELECT equipe_id FROM epico_equipes WHERE epico_id = $1`, epicoID)
+	if err != nil {
+		return nil, fmt.Errorf("querying epico equipes: %w", err)
+	}
+	defer rows.Close()
+
+	var result []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning equipe id: %w", err)
+		}
+		result = append(result, id)
+	}
+	return result, rows.Err()
+}
+
+func (r *TimelineRepository) ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID, produtoNome *string, removido string) ([]domain.ProjetoListItem, error) {
 	var rows pgx.Rows
 	var err error
+
+	var extraConditions string
+	switch removido {
+	case "sim":
+		extraConditions = " AND e.removido_em IS NOT NULL"
+	case "todos":
+		// show all, no filter
+	default:
+		extraConditions = " AND e.removido_em IS NULL"
+	}
+
+	const produtoSubquery = " AND EXISTS (SELECT 1 FROM tarefas c JOIN tarefa_produtos tp ON tp.tarefa_id = c.id JOIN produtos p ON p.id = tp.produto_id WHERE c.parent_id = e.id AND LOWER(p.nome) = LOWER($%d))"
 
 	projetoFilter := ""
 	if equipeID != nil {
 		args := []any{*equipeID}
+		argPos := 2
 		if len(projetoIDs) > 0 {
-			projetoFilter = " AND e.projeto_id = ANY($2)"
+			projetoFilter = fmt.Sprintf(" AND e.projeto_id = ANY($%d)", argPos)
 			args = append(args, projetoIDs)
+			argPos++
+		}
+		produtoFilter := ""
+		if produtoNome != nil {
+			produtoFilter = fmt.Sprintf(produtoSubquery, argPos)
+			args = append(args, *produtoNome)
+			argPos++
 		}
 		rows, err = r.pool.Query(ctx, `
 			SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
-			       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
+			       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status, e.removido_em
 			FROM tarefas e
 			WHERE e.tipo = 'Épico'
-			  AND EXISTS (
-			      SELECT 1 FROM tarefas ch
-			      WHERE ch.parent_id = e.id
-			        AND ch.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)
+			  `+extraConditions+`
+			  AND (
+			      EXISTS (
+			          SELECT 1 FROM tarefas ch
+			          WHERE ch.parent_id = e.id
+			            AND ch.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)
+			      )
+			      OR e.id IN (SELECT epico_id FROM epico_equipes WHERE equipe_id = $1)
 			  )
-		`+projetoFilter+`
+		`+projetoFilter+produtoFilter+`
 			ORDER BY e.resumo
 		`, args...)
 	} else {
 		if len(projetoIDs) > 0 {
+			args := []any{projetoIDs}
+			argPos := 2
 			projetoFilter = " AND e.projeto_id = ANY($1)"
+			produtoFilter := ""
+			if produtoNome != nil {
+				produtoFilter = fmt.Sprintf(produtoSubquery, argPos)
+				args = append(args, *produtoNome)
+				argPos++
+			}
 			rows, err = r.pool.Query(ctx, `
 				SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
-				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
+				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status, e.removido_em
 				FROM tarefas e
 				WHERE e.tipo = 'Épico'
-			`+projetoFilter+`
+				  `+extraConditions+`
+			`+projetoFilter+produtoFilter+`
 				ORDER BY e.resumo
-			`, projetoIDs)
+			`, args...)
 		} else {
+			var args []any
+			argPos := 1
+			produtoFilter := ""
+			if produtoNome != nil {
+				produtoFilter = fmt.Sprintf(produtoSubquery, argPos)
+				args = append(args, *produtoNome)
+				argPos++
+			}
 			rows, err = r.pool.Query(ctx, `
 				SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
-				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status
+				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status, e.removido_em
 				FROM tarefas e
 				WHERE e.tipo = 'Épico'
+				  `+extraConditions+produtoFilter+`
 				ORDER BY e.resumo
-			`)
+			`, args...)
 		}
 	}
 	if err != nil {
@@ -389,7 +469,7 @@ func (r *TimelineRepository) ListarEpicos(ctx context.Context, equipeID *uuid.UU
 		var dataLimite *time.Time
 		if err := rows.Scan(
 			&p.ID, &p.NumeroTicket, &p.Resumo, &p.Apelido,
-			&p.DataInicioExecucao, &dataLimite, &p.TipoDemanda, &p.Status,
+			&p.DataInicioExecucao, &dataLimite, &p.TipoDemanda, &p.Status, &p.RemovidoEm,
 		); err != nil {
 			return nil, fmt.Errorf("scanning epico: %w", err)
 		}

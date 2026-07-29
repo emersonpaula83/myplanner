@@ -1,0 +1,1 @@
+ALTER TABLE tarefas ADD COLUMN marcacao BOOLEAN NOT NULL DEFAULT false;

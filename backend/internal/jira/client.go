@@ -3,6 +3,7 @@ package jira
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,23 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
+
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("jira api error: status %d: %s", e.StatusCode, e.Body)
+}
+
+func IsNotFound(err error) bool {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusNotFound
+	}
+	return false
+}
 
 type Client interface {
 	GetProjects(ctx context.Context) ([]JiraProject, error)
@@ -136,7 +154,7 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body []
 	if resp.StatusCode >= 400 {
 		errBody := string(respBody[:min(len(respBody), 500)])
 		c.logger.Warn("jira api error", zap.Int("status", resp.StatusCode), zap.String("path", path), zap.String("body", errBody))
-		return nil, fmt.Errorf("jira api error: status %d: %s", resp.StatusCode, errBody)
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: errBody}
 	}
 
 	return respBody, nil
@@ -453,10 +471,12 @@ func (c *HTTPClient) SetSprintFieldID(id string) {
 
 var knownCustomFieldsByID = map[string]string{
 	"customfield_12930": "tipo_demanda",
+	"customfield_10021": "flagged",
 }
 
 var knownCustomFieldsByName = map[string]string{
 	"tipo de demanda": "tipo_demanda",
+	"flagged":         "flagged",
 }
 
 func (c *HTTPClient) DiscoverCustomFields(ctx context.Context) (map[string]string, error) {

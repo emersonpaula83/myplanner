@@ -148,6 +148,9 @@ func main() {
 	allocSvc := service.NewAllocationService(allocRepo, sprintService, sprintRepo, fonteDadosRepo, syncService, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	allocHandler := handler.NewAllocationHandler(allocSvc, logger)
 
+	tarefaRepo := repository.NewTarefaRepository(pool)
+	tarefaHandler := handler.NewTarefaHandler(tarefaRepo, logger)
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -207,6 +210,7 @@ func main() {
 			r.Post("/timeline-capacidade/analisar", timelineHandler.AnalisarCapacidade)
 			r.Get("/projetos", timelineHandler.ListProjetos)
 			r.Put("/projetos/{id}/metadata", timelineHandler.UpdateProjetoMetadata)
+			r.Get("/projetos/{id}/equipes", timelineHandler.GetProjetoEquipes)
 
 			r.Get("/membros", membroHandler.List)
 			r.Get("/membros/search", membroHandler.Search)
@@ -281,6 +285,12 @@ func main() {
 			r.Post("/allocation/tasks/{taskId}/allocate", allocHandler.AllocateTask)
 			r.Post("/allocation/projects/{epicId}/sync", allocHandler.SyncProject)
 			r.Get("/allocation/sprints", allocHandler.ListSprints)
+			r.Post("/allocation/projects/{epicId}/close", allocHandler.CloseProject)
+			r.Delete("/allocation/projects/{epicId}/close", allocHandler.ReopenProject)
+			r.Get("/allocation/products", allocHandler.ListFilteredProducts)
+
+			r.Get("/tarefas", tarefaHandler.ListTarefas)
+			r.Delete("/tarefas/{id}", tarefaHandler.DeleteTarefa)
 		})
 	})
 

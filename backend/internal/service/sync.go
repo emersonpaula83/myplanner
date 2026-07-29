@@ -491,6 +491,27 @@ func (s *SyncService) executSync(ctx context.Context, client jira.Client, fonte 
 		}
 	}
 
+	// Collect all jira_ids that came from the Jira response
+	allJiraIDs := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		allJiraIDs = append(allJiraIDs, issue.ID)
+	}
+
+	// Undelete any tarefas that reappeared
+	if undeleted, err := s.repo.UndeleteReappearedTarefas(ctx, fonte.ID, allJiraIDs); err != nil {
+		s.logger.Warn("failed to undelete reappeared tarefas", zap.Error(err))
+	} else if undeleted > 0 {
+		s.logger.Info("reappeared tarefas undeleted", zap.Int64("count", undeleted))
+	}
+
+	// Soft-delete tarefas that were not in the Jira response
+	if softDeleted, err := s.repo.SoftDeleteAbsentTarefas(ctx, fonte.ID, allJiraIDs); err != nil {
+		s.logger.Warn("failed to soft-delete absent tarefas", zap.Error(err))
+	} else if softDeleted > 0 {
+		s.logger.Info("absent tarefas soft-deleted", zap.Int64("count", softDeleted))
+		totals.Removidos = int(softDeleted)
+	}
+
 	totals.Projetos = len(projectCache)
 	totals.Sprints = len(sprintCache)
 	syncErrors = append(syncErrors, s.resolveParents(ctx, fonte, allPendingParents)...)
@@ -641,9 +662,6 @@ func (s *SyncService) executSyncProject(ctx context.Context, client jira.Client,
 	return totals, syncErrors
 }
 
-// SyncEpicTasks syncs only the tasks that are children of a specific epic in
-// Jira (used by AllocationService.SyncProjectTasks to refresh a single
-// project's tasks on demand instead of triggering a full project sync).
 func (s *SyncService) SyncEpicTasks(ctx context.Context, fonteDadosID uuid.UUID, epicKey string) (int, error) {
 	fonte, err := s.getFonte(ctx, fonteDadosID)
 	if err != nil {
@@ -712,6 +730,10 @@ func (s *SyncService) syncEmptyBoardSprints(ctx context.Context, client jira.Cli
 	for boardID, projetoID := range boardProjectMap {
 		boardSprints, err := client.GetBoardSprints(ctx, boardID)
 		if err != nil {
+			if jira.IsNotFound(err) {
+				s.logger.Warn("board not found, skipping sprints", zap.Int("board_id", boardID))
+				continue
+			}
 			errs = append(errs, fmt.Errorf("fetching board %d sprints: %w", boardID, err))
 			continue
 		}
@@ -836,6 +858,24 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 		}
 	}
 
+	var marcacao bool
+	if fonte.CustomFieldMap != nil {
+		var cfMap map[string]string
+		if err := json.Unmarshal(fonte.CustomFieldMap, &cfMap); err == nil {
+			for fieldID, fieldName := range cfMap {
+				if fieldName == "flagged" {
+					if val, ok := f.CustomFields[fieldID]; ok && val != nil {
+						if arr, ok := val.([]any); ok && len(arr) > 0 {
+							marcacao = true
+						} else if b, ok := val.(bool); ok {
+							marcacao = b
+						}
+					}
+				}
+			}
+		}
+	}
+
 	var dataInicioExecucao *time.Time
 	if issue.Changelog != nil {
 		dataInicioExecucao = extractFirstInProgressDate(issue.Changelog)
@@ -875,6 +915,7 @@ func (s *SyncService) processIssue(ctx context.Context, fonte *domain.FonteDados
 		CamposExtras:       json.RawMessage(`{}`),
 		DataInicioExecucao: dataInicioExecucao,
 		DataEntradaSprint:  dataEntradaSprint,
+		Marcacao:           marcacao,
 	}
 
 	return s.repo.UpsertTarefa(ctx, params)

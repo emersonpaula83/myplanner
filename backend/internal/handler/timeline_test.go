@@ -26,6 +26,10 @@ type mockTimelineStore struct {
 	epicoPorID      *domain.Tarefa
 	epicosList      []domain.ProjetoListItem
 	capturedApelido *string
+
+	capturedEquipeIDs []uuid.UUID
+	saveEquipesErr    error
+	equipeIDs         []uuid.UUID
 }
 
 func (m *mockTimelineStore) BuscarEpicosEquipe(_ context.Context, _ uuid.UUID, _ int, _ []uuid.UUID) ([]domain.EpicoEquipe, error) {
@@ -65,8 +69,17 @@ func (m *mockTimelineStore) BuscarEpicoPorID(_ context.Context, _ uuid.UUID) (*d
 	return m.epicoPorID, nil
 }
 
-func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ *uuid.UUID, _ []uuid.UUID) ([]domain.ProjetoListItem, error) {
+func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ *uuid.UUID, _ []uuid.UUID, _ *string, _ string) ([]domain.ProjetoListItem, error) {
 	return m.epicosList, nil
+}
+
+func (m *mockTimelineStore) SalvarEpicoEquipes(_ context.Context, _ uuid.UUID, equipeIDs []uuid.UUID) error {
+	m.capturedEquipeIDs = equipeIDs
+	return m.saveEquipesErr
+}
+
+func (m *mockTimelineStore) BuscarEpicoEquipes(_ context.Context, _ uuid.UUID) ([]uuid.UUID, error) {
+	return m.equipeIDs, nil
 }
 
 type mockAnalyzer struct {

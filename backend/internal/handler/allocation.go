@@ -20,29 +20,29 @@ func NewAllocationHandler(svc *service.AllocationService, logger *zap.Logger) *A
 }
 
 func (h *AllocationHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
+	var equipeID uuid.UUID
 	equipeStr := r.URL.Query().Get("equipe_id")
-	if equipeStr == "" {
-		respondError(w, http.StatusBadRequest, "equipe_id is required")
-		return
+	if equipeStr != "" {
+		id, err := uuid.Parse(equipeStr)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid equipe_id")
+			return
+		}
+		equipeID = id
 	}
-	equipeID, err := uuid.Parse(equipeStr)
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "invalid equipe_id")
+
+	produtoNomes := r.URL.Query()["produto_nome"]
+	if len(produtoNomes) == 0 {
+		respondError(w, http.StatusBadRequest, "produto_nome is required")
 		return
 	}
 
-	produtoStr := r.URL.Query().Get("produto_id")
-	if produtoStr == "" {
-		respondError(w, http.StatusBadRequest, "produto_id is required")
-		return
-	}
-	produtoID, err := uuid.Parse(produtoStr)
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "invalid produto_id")
-		return
+	statusFilter := r.URL.Query().Get("status")
+	if statusFilter == "" {
+		statusFilter = "ativos"
 	}
 
-	result, err := h.svc.ListProjectAllocations(r.Context(), equipeID, produtoID)
+	result, err := h.svc.ListProjectAllocations(r.Context(), equipeID, produtoNomes, statusFilter)
 	if err != nil {
 		h.logger.Error("listing project allocations", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao listar projetos")
@@ -58,15 +58,14 @@ func (h *AllocationHandler) GetProjectDetail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	var equipeID uuid.UUID
 	equipeStr := r.URL.Query().Get("equipe_id")
-	if equipeStr == "" {
-		respondError(w, http.StatusBadRequest, "equipe_id is required")
-		return
-	}
-	equipeID, err := uuid.Parse(equipeStr)
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "invalid equipe_id")
-		return
+	if equipeStr != "" {
+		equipeID, err = uuid.Parse(equipeStr)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid equipe_id")
+			return
+		}
 	}
 
 	result, err := h.svc.GetProjectDetail(r.Context(), epicID, equipeID)
@@ -153,6 +152,60 @@ func (h *AllocationHandler) ListSprints(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		h.logger.Error("listing sprints", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao listar sprints")
+		return
+	}
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *AllocationHandler) CloseProject(w http.ResponseWriter, r *http.Request) {
+	epicID, err := uuid.Parse(chi.URLParam(r, "epicId"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid epicId")
+		return
+	}
+
+	var req service.CloseProjectRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "JSON inválido")
+		return
+	}
+	if req.Descricao == "" {
+		respondError(w, http.StatusBadRequest, "descricao obrigatória")
+		return
+	}
+	if req.DataEncerramento == "" {
+		respondError(w, http.StatusBadRequest, "data_encerramento obrigatória")
+		return
+	}
+
+	if err := h.svc.CloseProject(r.Context(), epicID, req, ""); err != nil {
+		h.logger.Error("closing project", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao encerrar projeto")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"status": "closed"})
+}
+
+func (h *AllocationHandler) ReopenProject(w http.ResponseWriter, r *http.Request) {
+	epicID, err := uuid.Parse(chi.URLParam(r, "epicId"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid epicId")
+		return
+	}
+
+	if err := h.svc.ReopenProject(r.Context(), epicID); err != nil {
+		h.logger.Error("reopening project", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao reabrir projeto")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"status": "reopened"})
+}
+
+func (h *AllocationHandler) ListFilteredProducts(w http.ResponseWriter, r *http.Request) {
+	result, err := h.svc.GetFilteredProducts(r.Context())
+	if err != nil {
+		h.logger.Error("listing filtered products", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao listar produtos")
 		return
 	}
 	respondJSON(w, http.StatusOK, result)
