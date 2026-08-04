@@ -11,12 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/admin"
 	"github.com/emersonpaula83/myplanner/backend/internal/auth"
 	"github.com/emersonpaula83/myplanner/backend/internal/config"
 	"github.com/emersonpaula83/myplanner/backend/internal/handler"
 	"github.com/emersonpaula83/myplanner/backend/internal/jira"
 	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
+	samlpkg "github.com/emersonpaula83/myplanner/backend/internal/saml"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -68,6 +70,18 @@ func main() {
 	fonteDadosRepo := repository.NewFonteDadosRepository(pool)
 	usuarioRepo := repository.NewUsuarioRepository(pool)
 	equipeRepo := repository.NewEquipeRepository(pool)
+
+	var samlAuthHandler *handler.SAMLAuthHandler
+	if cfg.SAML.IDPMetadataURL != "" {
+		samlProvider, err := samlpkg.NewSAMLProvider(cfg.SAML)
+		if err != nil {
+			logger.Fatal("failed to init SAML provider", zap.Error(err))
+		}
+		samlAuthHandler = handler.NewSAMLAuthHandler(samlProvider, usuarioRepo, tokenService, cfg.SAML.FrontendURL, logger)
+		logger.Info("SAML SSO configured", zap.String("entity_id", cfg.SAML.EntityID))
+	} else {
+		logger.Warn("SAML_IDP_METADATA_URL not set, SAML SSO disabled")
+	}
 
 	fonteDadosHandler := handler.NewFonteDadosHandler(fonteDadosRepo, logger)
 	authHandler := handler.NewAuthHandler(usuarioRepo, tokenService, logger)
@@ -130,6 +144,11 @@ func main() {
 	schedulerSvc := service.NewSchedulerService(syncService, scheduleRepo, logger)
 	go schedulerSvc.Start(ctx)
 
+	secretWriter := admin.NewSecretWriter(cfg.AdminSecret, logger)
+	adminStore := admin.NewRepoAdapter(usuarioRepo)
+	adminRotator := admin.NewAdminRotator(adminStore, secretWriter, cfg.Auth.AdminEmail, logger)
+	go adminRotator.Start(ctx)
+
 	sprintGenService := service.NewSprintGenerationService(fonteDadosRepo, equipeRepo, syncRepo, sprintRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	sprintGenHandler := handler.NewSprintGenerationHandler(sprintGenService, logger)
 
@@ -176,12 +195,18 @@ func main() {
 		r.Get("/auth/atlassian/callback", oauthHandler.Callback)
 	}
 
+	if samlAuthHandler != nil {
+		r.Get("/api/v1/auth/saml/login", samlAuthHandler.Login)
+		r.Post("/api/v1/auth/saml/acs", samlAuthHandler.ACS)
+		r.Get("/api/v1/auth/saml/metadata", samlAuthHandler.Metadata)
+	}
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthJWT(tokenService))
-			r.Use(middleware.ProjetoFilter(usuarioRepo))
+			r.Use(middleware.EquipeFilter(usuarioRepo, equipeRepo, cfg.Auth.AdminEmail))
 
 			r.Get("/fontes", fonteDadosHandler.List)
 			r.Post("/fontes", fonteDadosHandler.Create)
@@ -196,6 +221,8 @@ func main() {
 			r.Put("/usuarios/{id}/senha", usuarioHandler.AlterarSenha)
 			r.Get("/usuarios/{id}/projetos", usuarioHandler.ListProjetos)
 			r.Put("/usuarios/{id}/projetos", usuarioHandler.UpdateProjetos)
+			r.Get("/usuarios/{id}/equipes", usuarioHandler.ListEquipes)
+			r.Put("/usuarios/{id}/equipes", usuarioHandler.UpdateEquipes)
 
 			r.Get("/equipes", equipeHandler.List)
 			r.Post("/equipes", equipeHandler.Create)
