@@ -20,7 +20,7 @@ func NewUsuarioRepository(pool *pgxpool.Pool) *UsuarioRepository {
 
 func (r *UsuarioRepository) BuscarPorEmail(ctx context.Context, email string) (*domain.Usuario, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 		FROM usuarios
 		WHERE email = $1 AND ativo = true
 	`, email)
@@ -37,7 +37,7 @@ func (r *UsuarioRepository) BuscarPorEmail(ctx context.Context, email string) (*
 
 func (r *UsuarioRepository) BuscarPorID(ctx context.Context, id uuid.UUID) (*domain.Usuario, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 		FROM usuarios
 		WHERE id = $1
 	`, id)
@@ -54,7 +54,7 @@ func (r *UsuarioRepository) BuscarPorID(ctx context.Context, id uuid.UUID) (*dom
 
 func (r *UsuarioRepository) ListarTodos(ctx context.Context) ([]domain.Usuario, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 		FROM usuarios
 		ORDER BY nome_completo
 	`)
@@ -78,7 +78,7 @@ func (r *UsuarioRepository) Criar(ctx context.Context, req *domain.CriarUsuarioR
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO usuarios (id, nome_completo, apelido, email, senha_hash, cargo)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 	`, uuid.New(), req.NomeCompleto, req.Apelido, req.Email, senhaHash, req.Cargo)
 
 	u, err := scanUsuario(row)
@@ -98,7 +98,7 @@ func (r *UsuarioRepository) Atualizar(ctx context.Context, id uuid.UUID, req *do
 		    ativo = COALESCE($6, ativo),
 		    updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 	`, id, req.NomeCompleto, req.Apelido, req.Email, req.Cargo, req.Ativo)
 
 	u, err := scanUsuario(row)
@@ -213,11 +213,99 @@ func (r *UsuarioRepository) BuscarProjetoIDsPorUsuario(ctx context.Context, usua
 	return ids, rows.Err()
 }
 
+func (r *UsuarioRepository) BuscarOuCriarPorEmail(ctx context.Context, email, nomeCompleto, authProvider string) (*domain.Usuario, error) {
+	row := r.pool.QueryRow(ctx, `
+		INSERT INTO usuarios (id, nome_completo, apelido, email, senha_hash, cargo, auth_provider)
+		VALUES ($1, $2, $3, $4, NULL, 'gerente', $5)
+		ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
+		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
+	`, uuid.New(), nomeCompleto, nomeCompleto, email, authProvider)
+
+	user, err := scanUsuario(row)
+	if err != nil {
+		return nil, fmt.Errorf("upsert usuario via SAML: %w", err)
+	}
+	return &user, nil
+}
+
+type EquipeResumo struct {
+	ID   uuid.UUID `json:"id"`
+	Nome string    `json:"nome"`
+}
+
+func (r *UsuarioRepository) BuscarEquipeIDsPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT equipe_id FROM usuario_equipes WHERE usuario_id = $1
+	`, usuarioID)
+	if err != nil {
+		return nil, fmt.Errorf("querying equipe_ids for usuario %s: %w", usuarioID, err)
+	}
+	defer rows.Close()
+
+	ids := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning equipe_id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r *UsuarioRepository) ListarEquipesPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]EquipeResumo, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT e.id, e.nome
+		FROM equipes e
+		INNER JOIN usuario_equipes ue ON ue.equipe_id = e.id
+		WHERE ue.usuario_id = $1
+		ORDER BY e.nome
+	`, usuarioID)
+	if err != nil {
+		return nil, fmt.Errorf("querying equipes for usuario %s: %w", usuarioID, err)
+	}
+	defer rows.Close()
+
+	result := make([]EquipeResumo, 0)
+	for rows.Next() {
+		var e EquipeResumo
+		if err := rows.Scan(&e.ID, &e.Nome); err != nil {
+			return nil, fmt.Errorf("scanning equipe resumo: %w", err)
+		}
+		result = append(result, e)
+	}
+	return result, rows.Err()
+}
+
+func (r *UsuarioRepository) AtualizarEquipes(ctx context.Context, usuarioID uuid.UUID, equipeIDs []uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, `DELETE FROM usuario_equipes WHERE usuario_id = $1`, usuarioID)
+	if err != nil {
+		return fmt.Errorf("deleting existing equipes: %w", err)
+	}
+
+	for _, eid := range equipeIDs {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO usuario_equipes (usuario_id, equipe_id) VALUES ($1, $2)
+		`, usuarioID, eid)
+		if err != nil {
+			return fmt.Errorf("inserting equipe %s: %w", eid, err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func scanUsuario(row pgx.Row) (domain.Usuario, error) {
 	var u domain.Usuario
 	err := row.Scan(
 		&u.ID, &u.NomeCompleto, &u.Apelido, &u.Email, &u.SenhaHash,
-		&u.Cargo, &u.Ativo, &u.CreatedAt, &u.UpdatedAt,
+		&u.Cargo, &u.Ativo, &u.AuthProvider, &u.CreatedAt, &u.UpdatedAt,
 	)
 	return u, err
 }
@@ -226,7 +314,7 @@ func scanUsuarioRows(rows pgx.Rows) (domain.Usuario, error) {
 	var u domain.Usuario
 	err := rows.Scan(
 		&u.ID, &u.NomeCompleto, &u.Apelido, &u.Email, &u.SenhaHash,
-		&u.Cargo, &u.Ativo, &u.CreatedAt, &u.UpdatedAt,
+		&u.Cargo, &u.Ativo, &u.AuthProvider, &u.CreatedAt, &u.UpdatedAt,
 	)
 	return u, err
 }

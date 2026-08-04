@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -29,6 +30,13 @@ func (h *AllocationHandler) ListProjects(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		equipeID = id
+	}
+
+	if equipeID != uuid.Nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
 	}
 
 	produtoNomes := r.URL.Query()["produto_nome"]
@@ -68,6 +76,13 @@ func (h *AllocationHandler) GetProjectDetail(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	if equipeID != uuid.Nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
+
 	result, err := h.svc.GetProjectDetail(r.Context(), epicID, equipeID)
 	if err != nil {
 		h.logger.Error("getting project detail", zap.Error(err))
@@ -101,6 +116,10 @@ func (h *AllocationHandler) AllocateTask(w http.ResponseWriter, r *http.Request)
 	}
 	if req.EquipeID == uuid.Nil {
 		respondError(w, http.StatusBadRequest, "equipe_id obrigatório")
+		return
+	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{req.EquipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -145,6 +164,11 @@ func (h *AllocationHandler) ListSprints(w http.ResponseWriter, r *http.Request) 
 	equipeID, err := uuid.Parse(equipeStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid equipe_id")
+		return
+	}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 

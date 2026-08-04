@@ -74,6 +74,11 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := middleware.ValidateEquipeAccess(r.Context(), equipeIDs); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
 	anoStr := r.URL.Query().Get("ano")
 	if anoStr == "" {
 		respondError(w, http.StatusBadRequest, "ano é obrigatório")
@@ -84,8 +89,6 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "ano deve ser um número inteiro")
 		return
 	}
-
-	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
 
 	membrosCount, err := h.store.ContarMembrosAtivosEquipes(r.Context(), equipeIDs, ano)
 	if err != nil {
@@ -117,7 +120,7 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 
 	var allEpicos []domain.EpicoEquipe
 	for _, eqID := range equipeIDs {
-		epicos, err := h.store.BuscarEpicosEquipe(r.Context(), eqID, ano, projetoIDs)
+		epicos, err := h.store.BuscarEpicosEquipe(r.Context(), eqID, ano, nil)
 		if err != nil {
 			h.logger.Error("failed to fetch epicos", zap.Error(err))
 			continue
@@ -217,6 +220,10 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 	}
 
 	if req.EquipeIDs != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), req.EquipeIDs); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
 		if err := h.store.SalvarEpicoEquipes(r.Context(), id, req.EquipeIDs); err != nil {
 			h.logger.Error("failed to save epico equipes", zap.Error(err))
 			respondError(w, http.StatusInternalServerError, "falha ao salvar equipes do projeto")
@@ -264,6 +271,13 @@ func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
 		equipeID = &id
 	}
 
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
+
 	var produtoNome *string
 	if v := r.URL.Query().Get("produto"); v != "" {
 		produtoNome = &v
@@ -274,8 +288,7 @@ func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
 		removido = "nao"
 	}
 
-	projetoIDs := middleware.ProjetoIDsFromContext(r.Context())
-	epicos, err := h.store.ListarEpicos(r.Context(), equipeID, projetoIDs, produtoNome, removido)
+	epicos, err := h.store.ListarEpicos(r.Context(), equipeID, nil, produtoNome, removido)
 	if err != nil {
 		h.logger.Error("failed to list epicos", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao listar épicos")
@@ -316,6 +329,11 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 	}
 
 	equipeIDs := []uuid.UUID{equipeID}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), equipeIDs); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
 
 	membrosCount, err := h.store.ContarMembrosAtivosEquipes(r.Context(), equipeIDs, req.Ano)
 	if err != nil {

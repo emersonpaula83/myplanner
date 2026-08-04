@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -37,6 +38,11 @@ func (h *TarefaHandler) ListTarefas(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.EquipeID = &id
+
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{id}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
 	}
 
 	if v := r.URL.Query().Get("produto_nome"); v != "" {

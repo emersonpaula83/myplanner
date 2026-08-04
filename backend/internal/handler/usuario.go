@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -21,12 +22,13 @@ var cargosValidos = map[string]bool{
 }
 
 type UsuarioHandler struct {
-	store  UsuarioStore
-	logger *zap.Logger
+	store      UsuarioStore
+	logger     *zap.Logger
+	adminEmail string
 }
 
-func NewUsuarioHandler(store UsuarioStore, logger *zap.Logger) *UsuarioHandler {
-	return &UsuarioHandler{store: store, logger: logger}
+func NewUsuarioHandler(store UsuarioStore, logger *zap.Logger, adminEmail string) *UsuarioHandler {
+	return &UsuarioHandler{store: store, logger: logger, adminEmail: adminEmail}
 }
 
 func (h *UsuarioHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +187,12 @@ func (h *UsuarioHandler) AlterarSenha(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(usuario.SenhaHash), []byte(req.SenhaAtual)); err != nil {
+	if usuario.SenhaHash == nil {
+		respondError(w, http.StatusUnauthorized, "usuário sem senha local")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*usuario.SenhaHash), []byte(req.SenhaAtual)); err != nil {
 		respondError(w, http.StatusUnauthorized, "senha atual incorreta")
 		return
 	}
@@ -249,6 +256,58 @@ func (h *UsuarioHandler) UpdateProjetos(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondJSON(w, http.StatusOK, map[string]any{"projetos": projetos})
+}
+
+func (h *UsuarioHandler) ListEquipes(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+
+	equipes, err := h.store.ListarEquipesPorUsuario(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to list equipes for usuario", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao listar equipes")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]any{"equipes": equipes})
+}
+
+func (h *UsuarioHandler) UpdateEquipes(w http.ResponseWriter, r *http.Request) {
+	callerEmail := middleware.UserEmailFromContext(r.Context())
+	if callerEmail != h.adminEmail {
+		respondError(w, http.StatusForbidden, "somente admin pode alterar alçada")
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+
+	var req domain.AlcadaEquipesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo da requisição inválido")
+		return
+	}
+
+	if err := h.store.AtualizarEquipes(r.Context(), id, req.EquipeIDs); err != nil {
+		h.logger.Error("failed to update equipes", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao atualizar equipes")
+		return
+	}
+
+	equipes, err := h.store.ListarEquipesPorUsuario(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to list equipes after update", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao listar equipes")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]any{"equipes": equipes})
 }
 
 func isUniqueViolation(err error) bool {

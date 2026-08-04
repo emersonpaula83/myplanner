@@ -39,6 +39,24 @@ func (r *EquipeRepository) ListEquipes(ctx context.Context) ([]domain.Equipe, er
 	return result, rows.Err()
 }
 
+func (r *EquipeRepository) ListarTodosIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `SELECT id FROM equipes ORDER BY nome`)
+	if err != nil {
+		return nil, fmt.Errorf("listing all equipe IDs: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning equipe ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *EquipeRepository) GetEquipeByID(ctx context.Context, id uuid.UUID) (*domain.Equipe, error) {
 	var e domain.Equipe
 	err := r.pool.QueryRow(ctx, `

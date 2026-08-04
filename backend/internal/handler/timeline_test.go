@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"go.uber.org/zap"
 )
 
@@ -105,7 +106,9 @@ func TestListTimeline_MissingEquipe(t *testing.T) {
 
 func TestListTimeline_MissingAno(t *testing.T) {
 	h := NewTimelineHandler(&mockTimelineStore{}, nil, zap.NewNop())
-	req := httptest.NewRequest("GET", "/api/v1/timeline-capacidade?equipe="+uuid.New().String(), nil)
+	testEquipeID := uuid.New()
+	req := httptest.NewRequest("GET", "/api/v1/timeline-capacidade?equipe="+testEquipeID.String(), nil)
+	req = req.WithContext(middleware.ContextWithEquipeIDs(req.Context(), []uuid.UUID{testEquipeID}))
 	w := httptest.NewRecorder()
 
 	h.ListTimeline(w, req)
@@ -137,6 +140,7 @@ func TestListTimeline_Success(t *testing.T) {
 	testEquipeID := uuid.New()
 	h := NewTimelineHandler(store, nil, zap.NewNop())
 	req := httptest.NewRequest("GET", "/api/v1/timeline-capacidade?equipe="+testEquipeID.String()+"&ano=2026", nil)
+	req = req.WithContext(middleware.ContextWithEquipeIDs(req.Context(), []uuid.UUID{testEquipeID}))
 	w := httptest.NewRecorder()
 
 	h.ListTimeline(w, req)

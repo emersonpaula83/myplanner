@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 )
@@ -65,6 +66,11 @@ func (h *ReviewHandler) GetReviewData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
 	var produtoIDs []uuid.UUID
 	if produtosStr := r.URL.Query().Get("produtos"); produtosStr != "" {
 		for _, p := range strings.Split(produtosStr, ",") {
@@ -102,6 +108,11 @@ func (h *ReviewHandler) ListDestaques(w http.ResponseWriter, r *http.Request) {
 	equipeID, err := uuid.Parse(equipeStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid equipe_id")
+		return
+	}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -146,6 +157,10 @@ func (h *ReviewHandler) CreateDestaque(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.EquipeID == uuid.Nil || req.ProdutoID == uuid.Nil {
 		respondError(w, http.StatusBadRequest, "equipe_id and produto_id are required")
+		return
+	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{req.EquipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 	if req.Link != nil && *req.Link != "" && !strings.HasPrefix(*req.Link, "http://") && !strings.HasPrefix(*req.Link, "https://") {
@@ -317,6 +332,11 @@ func (h *ReviewHandler) GetReviewAnalise(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
 	var produtoIDs []uuid.UUID
 	if produtosStr := r.URL.Query().Get("produtos"); produtosStr != "" {
 		for _, p := range strings.Split(produtosStr, ",") {
@@ -358,6 +378,11 @@ func (h *ReviewHandler) PostReviewAnalise(w http.ResponseWriter, r *http.Request
 	equipeID, err := uuid.Parse(equipeStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid equipe_id")
+		return
+	}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 

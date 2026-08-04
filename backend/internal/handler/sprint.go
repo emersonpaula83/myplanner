@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"go.uber.org/zap"
@@ -42,6 +43,12 @@ func (h *SprintHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
 			equipeID = &id
 		}
 	}
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
 
 	projetos, err := h.store.ListProjetosComSprints(r.Context(), equipeID)
 	if err != nil {
@@ -58,6 +65,12 @@ func (h *SprintHandler) ListSprints(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(e)
 		if err == nil {
 			equipeID = &id
+		}
+	}
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
 		}
 	}
 
@@ -111,6 +124,12 @@ func (h *SprintHandler) GetCapacity(w http.ResponseWriter, r *http.Request) {
 			equipeID = &id
 		}
 	}
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
 
 	result, err := h.store.GetCapacity(r.Context(), sprintID, equipeID)
 	if err != nil {
@@ -134,6 +153,12 @@ func (h *SprintHandler) GetUnplanned(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(e)
 		if err == nil {
 			equipeID = &id
+		}
+	}
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
 		}
 	}
 
@@ -167,6 +192,12 @@ func (h *SprintHandler) GetDisclaimerTasks(w http.ResponseWriter, r *http.Reques
 			equipeID = &id
 		}
 	}
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
 
 	result, err := h.store.GetDisclaimerTasks(r.Context(), sprintID, equipeID, taskType)
 	if err != nil {
@@ -192,6 +223,12 @@ func (h *SprintHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
 			equipeID = &id
 		}
 	}
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
 
 	result, err := h.store.GetBurndown(r.Context(), sprintID, equipeID)
 	if err != nil {
@@ -213,6 +250,11 @@ func (h *SprintHandler) GetSprintsTimeline(w http.ResponseWriter, r *http.Reques
 	equipeID, err := uuid.Parse(equipeStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid equipe id")
+		return
+	}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -248,6 +290,11 @@ func (h *SprintHandler) GetTimelineDetail(w http.ResponseWriter, r *http.Request
 	equipeID, err := uuid.Parse(equipeStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid equipe id")
+		return
+	}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 

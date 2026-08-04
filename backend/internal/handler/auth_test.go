@@ -11,19 +11,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/auth"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
 
 type mockUsuarioStore struct {
-	buscarPorEmailFn    func(ctx context.Context, email string) (*domain.Usuario, error)
-	buscarPorIDFn       func(ctx context.Context, id uuid.UUID) (*domain.Usuario, error)
-	listarTodosFn       func(ctx context.Context) ([]domain.Usuario, error)
-	criarFn             func(ctx context.Context, req *domain.CriarUsuarioRequest, senhaHash string) (*domain.Usuario, error)
-	atualizarFn         func(ctx context.Context, id uuid.UUID, req *domain.AtualizarUsuarioRequest) (*domain.Usuario, error)
-	atualizarSenhaFn    func(ctx context.Context, id uuid.UUID, senhaHash string) error
-	listarProjetosFn    func(ctx context.Context, usuarioID uuid.UUID) ([]domain.ProjetoResumo, error)
-	atualizarProjetosFn func(ctx context.Context, usuarioID uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoResumo, error)
-	buscarProjetoIDsFn  func(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error)
+	buscarPorEmailFn        func(ctx context.Context, email string) (*domain.Usuario, error)
+	buscarPorIDFn           func(ctx context.Context, id uuid.UUID) (*domain.Usuario, error)
+	listarTodosFn           func(ctx context.Context) ([]domain.Usuario, error)
+	criarFn                 func(ctx context.Context, req *domain.CriarUsuarioRequest, senhaHash string) (*domain.Usuario, error)
+	atualizarFn             func(ctx context.Context, id uuid.UUID, req *domain.AtualizarUsuarioRequest) (*domain.Usuario, error)
+	atualizarSenhaFn        func(ctx context.Context, id uuid.UUID, senhaHash string) error
+	listarProjetosFn        func(ctx context.Context, usuarioID uuid.UUID) ([]domain.ProjetoResumo, error)
+	atualizarProjetosFn     func(ctx context.Context, usuarioID uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoResumo, error)
+	buscarProjetoIDsFn      func(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error)
+	buscarOuCriarPorEmailFn func(ctx context.Context, email, nomeCompleto, authProvider string) (*domain.Usuario, error)
+	listarEquipesFn         func(ctx context.Context, usuarioID uuid.UUID) ([]repository.EquipeResumo, error)
+	atualizarEquipesFn      func(ctx context.Context, usuarioID uuid.UUID, equipeIDs []uuid.UUID) error
+	buscarEquipeIDsFn       func(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error)
 }
 
 func (m *mockUsuarioStore) BuscarPorEmail(ctx context.Context, email string) (*domain.Usuario, error) {
@@ -56,6 +61,30 @@ func (m *mockUsuarioStore) BuscarProjetoIDsPorUsuario(ctx context.Context, usuar
 func (m *mockUsuarioStore) ValidarProjetosExistem(ctx context.Context, projetoIDs []uuid.UUID) error {
 	return nil
 }
+func (m *mockUsuarioStore) BuscarOuCriarPorEmail(ctx context.Context, email, nomeCompleto, authProvider string) (*domain.Usuario, error) {
+	if m.buscarOuCriarPorEmailFn != nil {
+		return m.buscarOuCriarPorEmailFn(ctx, email, nomeCompleto, authProvider)
+	}
+	return nil, nil
+}
+func (m *mockUsuarioStore) ListarEquipesPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]repository.EquipeResumo, error) {
+	if m.listarEquipesFn != nil {
+		return m.listarEquipesFn(ctx, usuarioID)
+	}
+	return nil, nil
+}
+func (m *mockUsuarioStore) AtualizarEquipes(ctx context.Context, usuarioID uuid.UUID, equipeIDs []uuid.UUID) error {
+	if m.atualizarEquipesFn != nil {
+		return m.atualizarEquipesFn(ctx, usuarioID, equipeIDs)
+	}
+	return nil
+}
+func (m *mockUsuarioStore) BuscarEquipeIDsPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error) {
+	if m.buscarEquipeIDsFn != nil {
+		return m.buscarEquipeIDsFn(ctx, usuarioID)
+	}
+	return nil, nil
+}
 
 func TestLogin_Success(t *testing.T) {
 	userID := uuid.New()
@@ -69,9 +98,10 @@ func TestLogin_Success(t *testing.T) {
 				NomeCompleto: "Administrador",
 				Apelido:      "admin",
 				Email:        email,
-				SenhaHash:    senhaHash,
+				SenhaHash:    &senhaHash,
 				Cargo:        "coordenador",
 				Ativo:        true,
+				AuthProvider: "local",
 			}, nil
 		},
 	}
@@ -108,7 +138,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 	store := &mockUsuarioStore{
 		buscarPorEmailFn: func(_ context.Context, _ string) (*domain.Usuario, error) {
-			return &domain.Usuario{SenhaHash: senhaHash, Ativo: true}, nil
+			return &domain.Usuario{SenhaHash: &senhaHash, Ativo: true, AuthProvider: "local"}, nil
 		},
 	}
 

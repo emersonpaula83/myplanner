@@ -35,9 +35,9 @@ func main() {
 	defer conn.Close(ctx)
 
 	_, err = conn.Exec(ctx, `
-		INSERT INTO usuarios (nome_completo, apelido, email, senha_hash, cargo)
-		VALUES ('Administrador', 'admin', $1, $2, 'coordenador')
-		ON CONFLICT (email) DO UPDATE SET senha_hash = $2
+		INSERT INTO usuarios (nome_completo, apelido, email, senha_hash, cargo, auth_provider)
+		VALUES ('Administrador', 'admin', $1, $2, 'coordenador', 'local')
+		ON CONFLICT (email) DO UPDATE SET senha_hash = $2, auth_provider = 'local'
 	`, cfg.Auth.AdminEmail, string(hash))
 	if err != nil {
 		log.Fatalf("failed to seed admin user: %v", err)

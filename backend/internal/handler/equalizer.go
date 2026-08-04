@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -29,6 +30,10 @@ func (h *EqualizerHandler) GetSuggestions(w http.ResponseWriter, r *http.Request
 	if e := r.URL.Query().Get("equipe"); e != "" {
 		id, err := uuid.Parse(e)
 		if err == nil {
+			if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{id}); err != nil {
+				respondError(w, http.StatusForbidden, err.Error())
+				return
+			}
 			equipeID = &id
 		}
 	}
