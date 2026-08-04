@@ -39,7 +39,7 @@ func (h *AllocationHandler) ListProjects(w http.ResponseWriter, r *http.Request)
 
 	statusFilter := r.URL.Query().Get("status")
 	if statusFilter == "" {
-		statusFilter = "ativos"
+		statusFilter = "em_andamento"
 	}
 
 	result, err := h.svc.ListProjectAllocations(r.Context(), equipeID, produtoNomes, statusFilter)

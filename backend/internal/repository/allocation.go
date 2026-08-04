@@ -31,6 +31,8 @@ type EpicAllocationRow struct {
 	FilhasComEstimativa int
 	HorasEstimadas      float64
 	HorasEmSprint       float64
+	FilhasConcluidas    int
+	FilhasEmAndamento   int
 	ResponsavelID       *uuid.UUID
 	ResponsavelNome     *string
 	ResponsavelAvatar   *string
@@ -93,12 +95,26 @@ type ProdutoRow struct {
 func (r *AllocationRepository) GetEpicsByEquipeAndProduto(ctx context.Context, equipeID uuid.UUID, produtoNomes []string, statusFilter string) ([]EpicAllocationRow, error) {
 	var statusClause string
 	switch statusFilter {
-	case "encerrados":
+	case "desconsiderados":
 		statusClause = " AND EXISTS (SELECT 1 FROM projeto_encerramentos pe WHERE pe.epic_id = e.id)"
+	case "concluidos":
+		statusClause = " AND NOT EXISTS (SELECT 1 FROM projeto_encerramentos pe WHERE pe.epic_id = e.id)" +
+			" AND (SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL) > 0" +
+			" AND (SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL) = " +
+			"(SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL AND (c2.status_categoria = 'done' OR c2.status IN ('Cancelado', 'Rejeitada')))"
+	case "em_atraso":
+		statusClause = " AND NOT EXISTS (SELECT 1 FROM projeto_encerramentos pe WHERE pe.epic_id = e.id)" +
+			" AND e.data_limite IS NOT NULL AND e.data_limite < CURRENT_DATE" +
+			" AND NOT ((SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL) > 0" +
+			" AND (SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL) = " +
+			"(SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL AND (c2.status_categoria = 'done' OR c2.status IN ('Cancelado', 'Rejeitada'))))"
 	case "todos":
 		statusClause = ""
 	default:
-		statusClause = " AND NOT EXISTS (SELECT 1 FROM projeto_encerramentos pe WHERE pe.epic_id = e.id)"
+		statusClause = " AND NOT EXISTS (SELECT 1 FROM projeto_encerramentos pe WHERE pe.epic_id = e.id)" +
+			" AND NOT ((SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL) > 0" +
+			" AND (SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL) = " +
+			"(SELECT COUNT(*) FROM tarefas c2 WHERE c2.parent_id = e.id AND c2.removido_em IS NULL AND (c2.status_categoria = 'done' OR c2.status IN ('Cancelado', 'Rejeitada'))))"
 	}
 
 	query := `
@@ -140,6 +156,8 @@ func (r *AllocationRepository) GetEpicsByEquipeAndProduto(ctx context.Context, e
 				   AND c.removido_em IS NULL),
 				0
 			)::float8 / 3600.0,
+			(SELECT COUNT(*) FROM tarefas c WHERE c.parent_id = e.id AND c.removido_em IS NULL AND (c.status_categoria = 'done' OR c.status IN ('Cancelado', 'Rejeitada')))::int,
+			(SELECT COUNT(*) FROM tarefas c WHERE c.parent_id = e.id AND c.removido_em IS NULL AND c.status_categoria IN ('indeterminate', 'done') AND c.status NOT IN ('Cancelado', 'Rejeitada'))::int,
 			rm.id, rm.nome, rm.avatar_url, rm.cargo
 		FROM tarefas e
 		LEFT JOIN membros rm ON rm.id = e.responsavel_id
@@ -197,6 +215,7 @@ func (r *AllocationRepository) GetEpicsByEquipeAndProduto(ctx context.Context, e
 			&e.DataLimite, &e.Prioridade, &e.TipoDemanda, &e.Produtos,
 			&e.TotalFilhas, &e.FilhasComEstimativa,
 			&e.HorasEstimadas, &e.HorasEmSprint,
+			&e.FilhasConcluidas, &e.FilhasEmAndamento,
 			&e.ResponsavelID, &e.ResponsavelNome, &e.ResponsavelAvatar, &e.ResponsavelCargo,
 		); err != nil {
 			return nil, fmt.Errorf("scanning epic: %w", err)
@@ -242,6 +261,8 @@ func (r *AllocationRepository) GetEpicByID(ctx context.Context, epicID uuid.UUID
 				   AND s.estado IN ('active', 'future')),
 				0
 			)::float8 / 3600.0,
+			(SELECT COUNT(*) FROM tarefas c WHERE c.parent_id = e.id AND c.removido_em IS NULL AND (c.status_categoria = 'done' OR c.status IN ('Cancelado', 'Rejeitada')))::int,
+			(SELECT COUNT(*) FROM tarefas c WHERE c.parent_id = e.id AND c.removido_em IS NULL AND c.status_categoria IN ('indeterminate', 'done') AND c.status NOT IN ('Cancelado', 'Rejeitada'))::int,
 			rm.id, rm.nome, rm.avatar_url, rm.cargo
 		FROM tarefas e
 		LEFT JOIN membros rm ON rm.id = e.responsavel_id
@@ -251,6 +272,7 @@ func (r *AllocationRepository) GetEpicByID(ctx context.Context, epicID uuid.UUID
 		&e.DataLimite, &e.Prioridade, &e.TipoDemanda, &e.Produtos,
 		&e.TotalFilhas, &e.FilhasComEstimativa,
 		&e.HorasEstimadas, &e.HorasEmSprint,
+		&e.FilhasConcluidas, &e.FilhasEmAndamento,
 		&e.ResponsavelID, &e.ResponsavelNome, &e.ResponsavelAvatar, &e.ResponsavelCargo,
 	)
 	if err != nil {

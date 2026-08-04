@@ -25,7 +25,7 @@ cp .env.example .env
 ./dev.sh up
 ```
 
-Acesse `http://localhost:9091`. Login padrao: `admin@myplanner.local` / senha definida em `PASS_APP`.
+Acesse `http://localhost:9091`. Login via Fluig Identity (SSO) ou acesso admin: `admin@myplanner.local` (senha rotacionada diariamente, ver stdout do servidor em dev).
 
 ## Comandos
 
@@ -62,14 +62,16 @@ myplanner/
       migrate/       # Runner de migracoes
       seed/          # Seed de dados iniciais
     internal/
+      admin/         # Rotacao de senha, K8s Secret
       auth/          # JWT token service
-      config/        # Configuracao (viper)
+      config/        # Configuracao (env vars)
       domain/        # Modelos de dominio
       handler/       # HTTP handlers
       jira/          # Cliente Jira (token + OAuth)
-      middleware/    # Auth, filtro de projetos
+      middleware/    # Auth JWT, filtro de alcada por equipe
       repository/    # Acesso a dados (pgx)
-      service/       # Logica de negocio (equalizer, sync)
+      saml/          # SAML 2.0 Service Provider (Fluig Identity)
+      service/       # Logica de negocio (equalizer, sync, alocacao)
     migrations/      # SQL migrations (golang-migrate)
   frontend/
     index.html       # SPA completo (HTML + CSS + JS)
@@ -78,22 +80,66 @@ myplanner/
   Makefile
 ```
 
-## Funcionalidades
+## Modulos
 
-- **Sync Jira** — sincronizacao automatica e manual de projetos, sprints, tarefas e membros. Auto-deteccao de custom fields (tipo de demanda) e preservacao de dados manuais (apelido, data inicio) durante sync via COALESCE
-- **Sprints** — visualizacao de capacidade por membro, tarefas nao planejadas, burndown chart
-- **Sprint Review** — relatorio de review por sprint com estatisticas (GDPTC), destaques, exportacao PDF/imagem, graficos de pizza por tipo de demanda e epico com tooltips clicaveis mostrando tickets, descricao e relator
-- **Timeline** — Gantt de sprints e projetos (epicos) com capacidade mensal. Filtragem por board_id da equipe para evitar vazamento de sprints de outros times. Checkpoints visuais e analise IA
-- **Equipes** — gestao de membros com cargos (dev, QA, scrum master, etc), associacao de produtos, resumo de equipe. Board ID configuravel para isolamento de sprints
-- **Disclaimers** — modal de ressalvas por sprint com graficos de pizza interativos (tipo de demanda, epico), tooltips com detalhes de tarefas
-- **Skills** — catalogo global de skills (tags tecnicas) com associacao N:N a membros, autocomplete e criacao inline
-- **Equalizer** — redistribuicao automatica de tarefas entre membros da sprint, algoritmo greedy com visualizacao before/after e apply via Jira
+### IAM (Identidade e Acesso)
+
+- **SSO via Fluig Identity** — autenticacao SAML 2.0 com Fluig Identity da TOTVS como IdP. Sem login email/senha para usuarios comuns
+- **Admin local** — usuario admin (`admin@myplanner.local`) com login email/senha. Senha rotacionada diariamente e armazenada em K8s Secret
+- **Alcada por equipe** — cada usuario ve somente dados das equipes que o admin liberou. Filtro automatico em todos os modulos (sprints, timeline, alocacao, pessoas). Admin ve tudo
+- **JWT stateless** — apos autenticacao (SAML ou local), sessao mantida via JWT com expiracao de 24h
+
+### Alocacao de Projetos
+
+- **Cards de projetos** — visualizacao por tipo de demanda (Meta, Compromisso, Iniciativa) com barras de progresso (% estimado e % planejado)
+- **Status automatico** — 4 status calculados: Concluido (todas tarefas done/canceladas), Em Andamento (tarefas em progresso), Nao Iniciado (tudo em backlog), Desconsiderado (manual)
+- **Filtros** — Em Andamento, Em Atraso (data limite < hoje), Concluidos, Desconsiderados, Todos. Desconsiderados com opacidade reduzida no filtro Todos
+- **Modal de detalhes** — secoes accordion (Nao Alocadas, Estimadas sem Pessoa, Planejadas, Concluidas) com alocacao de sprint, pessoa e estimativa por tarefa
+- **Gantt do projeto** — timeline visual com barras por tarefa e linha de data limite
+- **Desconsiderar projeto** — fluxo com motivo e data, substituindo antigo "Encerrar"
+
+### Sprint Review
+
+- **Relatorio por sprint** — estatisticas de entrega (GDPTC), destaques, metricas por membro
+- **Graficos interativos** — pizza por tipo de demanda e por epico, com tooltips clicaveis mostrando tickets, descricao e relator
+- **Exportacao** — PDF e imagem do relatorio completo
+- **Analise IA** — analise automatica de capacidade e entregas via Google Gemini
+
+### Sprints e Capacidade
+
+- **Capacidade por membro** — horas disponiveis vs alocadas, percentual de ocupacao
+- **Tarefas nao planejadas** — identificacao de tarefas sem sprint ou estimativa
+- **Burndown chart** — grafico de evolucao da sprint
+
+### Timeline
+
+- **Gantt de sprints** — visualizacao anual com barras de alocacao por sprint. Tooltip com % e horas (alocacao e livre)
+- **Checkpoints** — marcos visuais na timeline com cores e resumos
+- **Filtragem por equipe** — board_id isolado para evitar vazamento entre times
+- **Analise IA** — analise de capacidade mensal via Google Gemini
+
+### Sync Jira
+
+- **Sincronizacao** — automatica (intervalo configuravel) e manual de projetos, sprints, tarefas e membros
+- **Auto-deteccao** — custom fields (tipo de demanda) detectados automaticamente
+- **Preservacao** — dados manuais (apelido, data inicio, data limite) preservados durante sync via COALESCE
+- **Upsert completo** — todos campos atualizados: responsavel, relator, estimativa, sprint, epico pai, tipo, tipo de demanda, status
+
+### Equipes
+
+- **Gestao de membros** — cargos (dev, QA, scrum master, gerente, etc), associacao de produtos
+- **Board ID** — configuravel por equipe para isolamento de sprints do Jira
+- **Resumo** — visao consolidada da equipe
+
+### Outras Funcionalidades
+
+- **Disclaimers** — modal de ressalvas por sprint com graficos de pizza interativos
+- **Skills** — catalogo global de skills tecnicas com associacao N:N a membros
+- **Equalizer** — redistribuicao automatica de tarefas (algoritmo greedy) com visualizacao before/after e apply via Jira
 - **Ausencias** — ferias, licencas, dayoffs com impacto automatico na capacidade
 - **Feriados** — CRUD de feriados nacionais, descontados dos dias uteis
-- **Desligamento** — membros desligados sao excluidos automaticamente dos calculos
-- **Analise IA** — analise de capacidade mensal via Google Gemini (requer `GEMINI_API_KEY`)
-- **Auth** — JWT com controle de acesso por projeto
-- **UX** — favicon e logo SVG, datas no formato brasileiro (dd/mm/aaaa), dark mode completo com exportacao
+- **Desligamento** — membros desligados excluidos automaticamente dos calculos
+- **UX** — favicon e logo SVG, datas formato brasileiro, dark mode completo com exportacao
 
 ## Configuracao
 
@@ -102,15 +148,22 @@ Variaveis de ambiente (`.env`):
 | Variavel | Descricao |
 |----------|-----------|
 | `PASS_DB` | Senha do PostgreSQL |
-| `PASS_APP` | Senha do admin |
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_NAME` | Conexao com banco |
+| `JWT_SECRET` | Chave de assinatura JWT |
 | `JIRA_BASE_URL` | URL da instancia Jira |
 | `JIRA_AUTH_TYPE` | `token` ou `oauth` |
 | `JIRA_USER_EMAIL` | Email do usuario Jira |
 | `JIRA_API_TOKEN` | API token do Jira |
-| `JWT_SECRET` | Chave de assinatura JWT |
+| `SAML_IDP_METADATA_URL` | URL do metadata XML do Fluig Identity |
+| `SAML_ENTITY_ID` | Identificador do SP |
+| `SAML_ACS_URL` | URL do Assertion Consumer Service |
+| `SAML_CERT_FILE` | Path do certificado X.509 do SP |
+| `SAML_KEY_FILE` | Path da chave privada do SP |
+| `SAML_FRONTEND_URL` | URL base do frontend para redirect pos-auth |
 | `GEMINI_API_KEY` | API key Google Gemini (opcional) |
 | `SYNC_INTERVAL_MINUTES` | Intervalo de sync automatico (default: 30) |
+
+Senha do admin rotacionada diariamente. Em K8s, armazenada no Secret `myplanner-admin-password`. Em dev local, logada no stdout.
 
 ## Testes
 

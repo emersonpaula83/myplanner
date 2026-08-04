@@ -78,6 +78,7 @@ type ProjectDetail struct {
 	NaoAlocadas []TaskAllocation   `json:"nao_alocadas"`
 	Parciais    []TaskAllocation   `json:"parciais"`
 	Completas   []TaskAllocation   `json:"completas"`
+	Concluidas  []TaskAllocation   `json:"concluidas"`
 }
 
 type SprintOption struct {
@@ -181,13 +182,11 @@ func (s *AllocationService) ListProjectAllocations(ctx context.Context, equipeID
 			pctPlanejado = r.HorasEmSprint / r.HorasEstimadas * 100
 		}
 
-		status := "nao_planejado"
-		if pctPlanejado >= 100 {
-			status = "planejado"
+		if pctPlanejado > 100 {
 			pctPlanejado = 100
-		} else if pctPlanejado > 0 {
-			status = "em_planejamento"
 		}
+
+		status := computeProjectStatus(closedMap[r.EpicID], r.TotalFilhas, r.FilhasConcluidas, r.FilhasEmAndamento)
 
 		pa := ProjectAllocation{
 			EpicID:            r.EpicID,
@@ -252,13 +251,11 @@ func (s *AllocationService) GetProjectDetail(ctx context.Context, epicID, equipe
 	if epicRow.HorasEstimadas > 0 {
 		pctPlanejado = epicRow.HorasEmSprint / epicRow.HorasEstimadas * 100
 	}
-	status := "nao_planejado"
-	if pctPlanejado >= 100 {
-		status = "planejado"
+	if pctPlanejado > 100 {
 		pctPlanejado = 100
-	} else if pctPlanejado > 0 {
-		status = "em_planejamento"
 	}
+
+	status := computeProjectStatus(false, epicRow.TotalFilhas, epicRow.FilhasConcluidas, epicRow.FilhasEmAndamento)
 
 	epic := ProjectAllocation{
 		EpicID:            epicRow.EpicID,
@@ -307,19 +304,28 @@ func (s *AllocationService) GetProjectDetail(ctx context.Context, epicID, equipe
 		})
 	}
 
-	var naoAlocadas, parciais, completas []TaskAllocation
+	var naoAlocadas, parciais, completas, concluidas []TaskAllocation
 	for _, t := range tasks {
 		ta := taskRowToAllocation(t)
 		hasEstimate := t.EstimativaTempo != nil && *t.EstimativaTempo > 0
 		hasSprint := t.SprintID != nil
 		hasPerson := t.ResponsavelID != nil
+		isDone := t.StatusCategoria != nil && *t.StatusCategoria == "done"
 
 		if !hasEstimate || !hasSprint {
-			naoAlocadas = append(naoAlocadas, ta)
+			if isDone {
+				concluidas = append(concluidas, ta)
+			} else {
+				naoAlocadas = append(naoAlocadas, ta)
+			}
 		} else if !hasPerson {
 			parciais = append(parciais, ta)
 		} else {
-			completas = append(completas, ta)
+			if isDone {
+				concluidas = append(concluidas, ta)
+			} else {
+				completas = append(completas, ta)
+			}
 		}
 	}
 
@@ -329,7 +335,24 @@ func (s *AllocationService) GetProjectDetail(ctx context.Context, epicID, equipe
 		NaoAlocadas: naoAlocadas,
 		Parciais:    parciais,
 		Completas:   completas,
+		Concluidas:  concluidas,
 	}, nil
+}
+
+func computeProjectStatus(encerrado bool, totalFilhas, filhasConcluidas, filhasEmAndamento int) string {
+	if encerrado {
+		return "desconsiderado"
+	}
+	if totalFilhas == 0 {
+		return "nao_iniciado"
+	}
+	if filhasConcluidas >= totalFilhas {
+		return "concluido"
+	}
+	if filhasEmAndamento > 0 {
+		return "em_andamento"
+	}
+	return "nao_iniciado"
 }
 
 func taskRowToAllocation(t repository.TaskAllocationRow) TaskAllocation {
