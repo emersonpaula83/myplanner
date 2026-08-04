@@ -225,6 +225,34 @@ cmd_cleanall() {
     log "Schema zerado! Rode: ./dev.sh migrate"
 }
 
+cmd_get_master_pass() {
+    log "Buscando senha do admin no K8s..."
+    local ns="${ADMIN_SECRET_NAMESPACE:-default}"
+    local secret_name="${ADMIN_SECRET_NAME:-myplanner-admin-password}"
+
+    local password
+    password=$(kubectl get secret "$secret_name" -n "$ns" \
+        -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+
+    if [ -z "$password" ]; then
+        err "Sem acesso ao cluster / aplicação ou falta de credenciais RBAC"
+        return 1
+    fi
+
+    local expires
+    expires=$(kubectl get secret "$secret_name" -n "$ns" \
+        -o jsonpath='{.data.expires_at}' 2>/dev/null | base64 -d 2>/dev/null || true)
+
+    echo ""
+    echo -e "  ${CYAN}Admin Password${NC}"
+    echo -e "  Email:    admin@myplanner.local"
+    echo -e "  Senha:    ${GREEN}$password${NC}"
+    if [ -n "$expires" ]; then
+        echo -e "  Expira:   $expires"
+    fi
+    echo ""
+}
+
 cmd_up() {
     log "Subindo tudo..."
     cmd_db
@@ -261,6 +289,7 @@ cmd_help() {
     echo "  logs      Mostra logs do servidor (tail -f)"
     echo "  clean     Limpa dados (mantém estrutura e fonte_dados)"
     echo "  cleanall  Zera schema completo (precisa migrate depois)"
+    echo "  get-master-pass  Busca senha admin no K8s Secret"
     echo "  help      Mostra esta ajuda"
     echo ""
 }
@@ -280,5 +309,6 @@ case "${1:-help}" in
     logs)    cmd_logs ;;
     clean)   cmd_clean ;;
     cleanall) cmd_cleanall ;;
+    get-master-pass) cmd_get_master_pass ;;
     help|*)  cmd_help ;;
 esac
