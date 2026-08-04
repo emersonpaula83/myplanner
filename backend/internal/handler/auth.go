@@ -67,6 +67,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if usuario.AuthProvider != "local" {
+		respondError(w, http.StatusUnauthorized, "utilize o login via Fluig Identity")
+		return
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(*usuario.SenhaHash), []byte(req.Senha)); err != nil {
 		respondError(w, http.StatusUnauthorized, "credenciais inválidas")
 		return
