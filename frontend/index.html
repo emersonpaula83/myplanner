@@ -903,7 +903,14 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       <span class="login-logo-text">MyPlanner</span>
     </div>
     <div class="login-error" id="login-error"></div>
-    <form id="login-form" onsubmit="return handleLogin(event)">
+
+    <a class="btn-primary" href="/api/v1/auth/saml/login" style="text-decoration:none;margin-bottom:20px;">Entrar com Fluig Identity</a>
+
+    <div style="text-align:center;">
+      <a href="#" id="admin-login-toggle" onclick="toggleAdminLogin();return false;" style="font-size:12px;color:var(--text-secondary);text-decoration:none;">Acesso administrativo</a>
+    </div>
+
+    <form id="login-form" onsubmit="return handleLogin(event)" style="display:none;margin-top:16px;">
       <div class="form-group">
         <label class="form-label">Email</label>
         <input class="form-input" type="email" id="login-email" placeholder="seu@email.com" required>
@@ -1798,6 +1805,28 @@ function fmtDateTimeBR(s) {
 }
 
 // === AUTH ===
+function toggleAdminLogin() {
+  const form = document.getElementById('login-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+function checkAuthHash() {
+  const hash = window.location.hash;
+  if (hash.indexOf('auth_token=') > -1) {
+    const t = decodeURIComponent(hash.split('auth_token=')[1].split('&')[0]);
+    localStorage.setItem('myplanner_token', t);
+    token = t;
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    return true;
+  }
+  if (hash.indexOf('auth_error=') > -1) {
+    const msg = decodeURIComponent(hash.split('auth_error=')[1].split('&')[0]);
+    const el = document.getElementById('login-error');
+    if (el) { el.textContent = msg; el.style.display = 'block'; }
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    return false;
+  }
+  return false;
+}
 async function handleLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('login-btn');
@@ -6863,6 +6892,7 @@ function syncProjectTasks(epicId) {
 }
 
 // === INIT ===
+checkAuthHash();
 if (token) { api('/usuarios').then(() => showApp()).catch(() => logout()); }
 else { document.getElementById('login-page').style.display = 'flex'; }
 </script>
