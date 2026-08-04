@@ -101,6 +101,7 @@ func TestLogin_Success(t *testing.T) {
 				SenhaHash:    &senhaHash,
 				Cargo:        "coordenador",
 				Ativo:        true,
+				AuthProvider: "local",
 			}, nil
 		},
 	}
@@ -137,7 +138,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 	store := &mockUsuarioStore{
 		buscarPorEmailFn: func(_ context.Context, _ string) (*domain.Usuario, error) {
-			return &domain.Usuario{SenhaHash: &senhaHash, Ativo: true}, nil
+			return &domain.Usuario{SenhaHash: &senhaHash, Ativo: true, AuthProvider: "local"}, nil
 		},
 	}
 

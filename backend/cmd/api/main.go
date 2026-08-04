@@ -85,7 +85,7 @@ func main() {
 
 	fonteDadosHandler := handler.NewFonteDadosHandler(fonteDadosRepo, logger)
 	authHandler := handler.NewAuthHandler(usuarioRepo, tokenService, logger)
-	usuarioHandler := handler.NewUsuarioHandler(usuarioRepo, logger)
+	usuarioHandler := handler.NewUsuarioHandler(usuarioRepo, logger, cfg.Auth.AdminEmail)
 	equipeHandler := handler.NewEquipeHandler(equipeRepo, logger)
 
 	timelineRepo := repository.NewTimelineRepository(pool)

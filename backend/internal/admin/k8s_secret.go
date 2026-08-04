@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -71,12 +72,14 @@ func (w *K8sSecretWriter) WritePassword(ctx context.Context, password string, ex
 
 	existing, err := secretsClient.Get(ctx, w.name, metav1.GetOptions{})
 	if err != nil {
-		// Secret doesn't exist yet, create it.
-		if _, err := secretsClient.Create(ctx, secret, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("creating k8s secret: %w", err)
+		if apierrors.IsNotFound(err) {
+			if _, err := secretsClient.Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+				return fmt.Errorf("creating k8s secret: %w", err)
+			}
+			w.logger.Info("k8s secret created", zap.String("name", w.name), zap.String("namespace", w.namespace))
+			return nil
 		}
-		w.logger.Info("k8s secret created", zap.String("name", w.name), zap.String("namespace", w.namespace))
-		return nil
+		return fmt.Errorf("getting k8s secret: %w", err)
 	}
 
 	existing.Data = secret.Data

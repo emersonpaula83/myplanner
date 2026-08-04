@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 )
@@ -88,7 +89,8 @@ func TestGetReviewData(t *testing.T) {
 	req := httptest.NewRequest("GET", "/sprints/"+sprintID.String()+"/review?equipe_id="+equipeID.String(), nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", sprintID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := middleware.ContextWithEquipeIDs(context.WithValue(req.Context(), chi.RouteCtxKey, rctx), []uuid.UUID{equipeID})
+	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
 	h.GetReviewData(w, req)
@@ -147,7 +149,8 @@ func TestCreateDestaque(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("sprintId", sprintID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := middleware.ContextWithEquipeIDs(context.WithValue(req.Context(), chi.RouteCtxKey, rctx), []uuid.UUID{equipeID})
+	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
 	h.CreateDestaque(w, req)
@@ -178,7 +181,8 @@ func TestGetReviewDataProdutosValid(t *testing.T) {
 	req := httptest.NewRequest("GET", url, nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", sprintID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := middleware.ContextWithEquipeIDs(context.WithValue(req.Context(), chi.RouteCtxKey, rctx), []uuid.UUID{equipeID})
+	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
 	h.GetReviewData(w, req)
@@ -200,7 +204,8 @@ func TestGetReviewDataProdutosInvalid(t *testing.T) {
 	req := httptest.NewRequest("GET", url, nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", sprintID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := middleware.ContextWithEquipeIDs(context.WithValue(req.Context(), chi.RouteCtxKey, rctx), []uuid.UUID{equipeID})
+	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
 	h.GetReviewData(w, req)
@@ -279,7 +284,8 @@ func TestListDestaquesSuccess(t *testing.T) {
 	req := httptest.NewRequest("GET", "/sprints/"+sprintID.String()+"/review/destaques?equipe_id="+equipeID.String(), nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("sprintId", sprintID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := middleware.ContextWithEquipeIDs(context.WithValue(req.Context(), chi.RouteCtxKey, rctx), []uuid.UUID{equipeID})
+	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
 	h.ListDestaques(w, req)
@@ -354,7 +360,8 @@ func TestCreateDestaqueInvalidLink(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("sprintId", sprintID.String())
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	ctx := middleware.ContextWithEquipeIDs(context.WithValue(req.Context(), chi.RouteCtxKey, rctx), []uuid.UUID{equipeID})
+	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
 	h.CreateDestaque(w, req)

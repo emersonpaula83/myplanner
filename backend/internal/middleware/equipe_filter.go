@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -56,4 +57,32 @@ func EquipeFilter(fetcher EquipeIDsFetcher, allFetcher AllEquipesFetcher, adminE
 func EquipeIDsFromContext(ctx context.Context) []uuid.UUID {
 	ids, _ := ctx.Value(equipeIDsKey).([]uuid.UUID)
 	return ids
+}
+
+// ContextWithEquipeIDs returns a new context carrying the given equipe IDs,
+// as if injected by EquipeFilter. Intended for tests that exercise handlers
+// calling ValidateEquipeAccess without going through the full middleware chain.
+func ContextWithEquipeIDs(ctx context.Context, ids []uuid.UUID) context.Context {
+	return context.WithValue(ctx, equipeIDsKey, ids)
+}
+
+// ValidateEquipeAccess checks that every requested equipe ID is within the
+// caller's alçada (the set of equipe IDs injected into the context by
+// EquipeFilter). It returns an error if the caller has no alçada configured
+// or if any requested ID is not allowed.
+func ValidateEquipeAccess(ctx context.Context, requestedIDs []uuid.UUID) error {
+	allowed := EquipeIDsFromContext(ctx)
+	if len(allowed) == 0 {
+		return fmt.Errorf("sem alçada configurada")
+	}
+	allowedSet := make(map[uuid.UUID]bool, len(allowed))
+	for _, id := range allowed {
+		allowedSet[id] = true
+	}
+	for _, id := range requestedIDs {
+		if !allowedSet[id] {
+			return fmt.Errorf("acesso negado à equipe %s", id)
+		}
+	}
+	return nil
 }

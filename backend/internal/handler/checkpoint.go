@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
@@ -45,6 +46,13 @@ func (h *CheckpointHandler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		equipeID = &id
+	}
+
+	if equipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
 	}
 
 	ano := time.Now().Year()
@@ -104,6 +112,13 @@ func (h *CheckpointHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		if df.Before(di) {
 			respondError(w, http.StatusBadRequest, "Data fim deve ser posterior à data de início")
+			return
+		}
+	}
+
+	if req.EquipeID != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*req.EquipeID}); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
 			return
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"go.uber.org/zap"
 )
@@ -29,6 +30,11 @@ func (h *SprintGenerationHandler) GetBoards(w http.ResponseWriter, r *http.Reque
 	equipeID, err := uuid.Parse(equipeStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid equipe_id")
+		return
+	}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -58,6 +64,10 @@ func (h *SprintGenerationHandler) Preview(w http.ResponseWriter, r *http.Request
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{req.EquipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
 
 	result, err := h.svc.PreviewSprints(r.Context(), req.EquipeID, req.BoardID, startDate)
 	if err != nil {
@@ -77,6 +87,10 @@ func (h *SprintGenerationHandler) Generate(w http.ResponseWriter, r *http.Reques
 	startDate, err := h.validateRequest(req)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{req.EquipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 

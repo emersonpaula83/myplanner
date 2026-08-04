@@ -27,7 +27,7 @@ func TestUsuarioHandler_List(t *testing.T) {
 		},
 	}
 
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 	req := httptest.NewRequest("GET", "/api/v1/usuarios", nil)
 	rr := httptest.NewRecorder()
 
@@ -61,7 +61,7 @@ func TestUsuarioHandler_Create(t *testing.T) {
 		},
 	}
 
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 	body := `{"nome_completo":"João Silva","apelido":"joao","email":"joao@totvs.com","senha":"MinhaS3nh@","cargo":"gerente"}`
 	req := httptest.NewRequest("POST", "/api/v1/usuarios", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
@@ -75,7 +75,7 @@ func TestUsuarioHandler_Create(t *testing.T) {
 
 func TestUsuarioHandler_Create_InvalidCargo(t *testing.T) {
 	store := &mockUsuarioStore{}
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	body := `{"nome_completo":"João","apelido":"joao","email":"joao@totvs.com","senha":"MinhaS3nh@","cargo":"diretor"}`
 	req := httptest.NewRequest("POST", "/api/v1/usuarios", bytes.NewBufferString(body))
@@ -90,7 +90,7 @@ func TestUsuarioHandler_Create_InvalidCargo(t *testing.T) {
 
 func TestUsuarioHandler_Create_ShortPassword(t *testing.T) {
 	store := &mockUsuarioStore{}
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	body := `{"nome_completo":"João","apelido":"joao","email":"joao@totvs.com","senha":"123","cargo":"gerente"}`
 	req := httptest.NewRequest("POST", "/api/v1/usuarios", bytes.NewBufferString(body))
@@ -118,7 +118,7 @@ func TestUsuarioHandler_GetByID(t *testing.T) {
 		},
 	}
 
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	r := chi.NewRouter()
 	r.Get("/api/v1/usuarios/{id}", h.GetByID)
@@ -143,7 +143,7 @@ func TestUsuarioHandler_AlterarSenha_WrongCurrent(t *testing.T) {
 		},
 	}
 
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	r := chi.NewRouter()
 	r.Put("/api/v1/usuarios/{id}/senha", h.AlterarSenha)
@@ -168,7 +168,7 @@ func TestUsuarioHandler_UpdateProjetos(t *testing.T) {
 		},
 	}
 
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	r := chi.NewRouter()
 	r.Put("/api/v1/usuarios/{id}/projetos", h.UpdateProjetos)
@@ -193,7 +193,7 @@ func TestUsuarioHandler_ListEquipes(t *testing.T) {
 		},
 	}
 
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	r := chi.NewRouter()
 	r.Get("/api/v1/usuarios/{id}/equipes", h.ListEquipes)
@@ -239,7 +239,7 @@ func TestUsuarioHandler_UpdateEquipes_Success(t *testing.T) {
 		},
 	}
 
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	body, _ := json.Marshal(domain.AlcadaEquipesRequest{EquipeIDs: []uuid.UUID{equipeID}})
 	rr, req, ts := newAuthedRequest(t, "PUT", "/api/v1/usuarios/"+uuid.New().String()+"/equipes", "admin@myplanner.local", body)
@@ -258,7 +258,7 @@ func TestUsuarioHandler_UpdateEquipes_Success(t *testing.T) {
 
 func TestUsuarioHandler_UpdateEquipes_Forbidden(t *testing.T) {
 	store := &mockUsuarioStore{}
-	h := NewUsuarioHandler(store, zap.NewNop())
+	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
 	body, _ := json.Marshal(domain.AlcadaEquipesRequest{EquipeIDs: []uuid.UUID{uuid.New()}})
 	rr, req, ts := newAuthedRequest(t, "PUT", "/api/v1/usuarios/"+uuid.New().String()+"/equipes", "naoadmin@myplanner.local", body)

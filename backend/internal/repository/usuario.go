@@ -214,25 +214,18 @@ func (r *UsuarioRepository) BuscarProjetoIDsPorUsuario(ctx context.Context, usua
 }
 
 func (r *UsuarioRepository) BuscarOuCriarPorEmail(ctx context.Context, email, nomeCompleto, authProvider string) (*domain.Usuario, error) {
-	u, err := r.BuscarPorEmail(ctx, email)
-	if err != nil {
-		return nil, err
-	}
-	if u != nil {
-		return u, nil
-	}
-
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO usuarios (id, nome_completo, apelido, email, senha_hash, cargo, auth_provider)
 		VALUES ($1, $2, $3, $4, NULL, 'gerente', $5)
+		ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
 		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 	`, uuid.New(), nomeCompleto, nomeCompleto, email, authProvider)
 
-	newUser, err := scanUsuario(row)
+	user, err := scanUsuario(row)
 	if err != nil {
-		return nil, fmt.Errorf("creating usuario via SAML: %w", err)
+		return nil, fmt.Errorf("upsert usuario via SAML: %w", err)
 	}
-	return &newUser, nil
+	return &user, nil
 }
 
 type EquipeResumo struct {

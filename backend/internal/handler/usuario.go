@@ -22,12 +22,13 @@ var cargosValidos = map[string]bool{
 }
 
 type UsuarioHandler struct {
-	store  UsuarioStore
-	logger *zap.Logger
+	store      UsuarioStore
+	logger     *zap.Logger
+	adminEmail string
 }
 
-func NewUsuarioHandler(store UsuarioStore, logger *zap.Logger) *UsuarioHandler {
-	return &UsuarioHandler{store: store, logger: logger}
+func NewUsuarioHandler(store UsuarioStore, logger *zap.Logger, adminEmail string) *UsuarioHandler {
+	return &UsuarioHandler{store: store, logger: logger, adminEmail: adminEmail}
 }
 
 func (h *UsuarioHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +277,7 @@ func (h *UsuarioHandler) ListEquipes(w http.ResponseWriter, r *http.Request) {
 
 func (h *UsuarioHandler) UpdateEquipes(w http.ResponseWriter, r *http.Request) {
 	callerEmail := middleware.UserEmailFromContext(r.Context())
-	if callerEmail != "admin@myplanner.local" {
+	if callerEmail != h.adminEmail {
 		respondError(w, http.StatusForbidden, "somente admin pode alterar alçada")
 		return
 	}
