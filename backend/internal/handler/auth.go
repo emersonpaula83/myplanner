@@ -62,7 +62,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(usuario.SenhaHash), []byte(req.Senha)); err != nil {
+	if usuario.SenhaHash == nil {
+		respondError(w, http.StatusUnauthorized, "credenciais inválidas")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*usuario.SenhaHash), []byte(req.Senha)); err != nil {
 		respondError(w, http.StatusUnauthorized, "credenciais inválidas")
 		return
 	}

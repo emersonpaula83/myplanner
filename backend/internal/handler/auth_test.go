@@ -69,7 +69,7 @@ func TestLogin_Success(t *testing.T) {
 				NomeCompleto: "Administrador",
 				Apelido:      "admin",
 				Email:        email,
-				SenhaHash:    senhaHash,
+				SenhaHash:    &senhaHash,
 				Cargo:        "coordenador",
 				Ativo:        true,
 			}, nil
@@ -108,7 +108,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 	store := &mockUsuarioStore{
 		buscarPorEmailFn: func(_ context.Context, _ string) (*domain.Usuario, error) {
-			return &domain.Usuario{SenhaHash: senhaHash, Ativo: true}, nil
+			return &domain.Usuario{SenhaHash: &senhaHash, Ativo: true}, nil
 		},
 	}
 

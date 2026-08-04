@@ -130,11 +130,12 @@ func TestUsuarioHandler_GetByID(t *testing.T) {
 }
 
 func TestUsuarioHandler_AlterarSenha_WrongCurrent(t *testing.T) {
+	senhaHash := "$2a$12$YD27E7brWZvrrq0lVpbsouDUIi3UiwgjT6NsiIOQGPzwDBlvC5DYK"
 	store := &mockUsuarioStore{
 		buscarPorIDFn: func(_ context.Context, _ uuid.UUID) (*domain.Usuario, error) {
 			return &domain.Usuario{
 				ID:        uuid.New(),
-				SenhaHash: "$2a$12$YD27E7brWZvrrq0lVpbsouDUIi3UiwgjT6NsiIOQGPzwDBlvC5DYK",
+				SenhaHash: &senhaHash,
 			}, nil
 		},
 	}

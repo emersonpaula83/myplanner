@@ -11,9 +11,10 @@ type Usuario struct {
 	NomeCompleto string    `json:"nome_completo" db:"nome_completo"`
 	Apelido      string    `json:"apelido" db:"apelido"`
 	Email        string    `json:"email" db:"email"`
-	SenhaHash    string    `json:"-" db:"senha_hash"`
+	SenhaHash    *string   `json:"-" db:"senha_hash"`
 	Cargo        string    `json:"cargo" db:"cargo"`
 	Ativo        bool      `json:"ativo" db:"ativo"`
+	AuthProvider string    `json:"auth_provider" db:"auth_provider"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -51,6 +52,10 @@ type AlterarSenhaRequest struct {
 
 type AlcadaProjetosRequest struct {
 	ProjetoIDs []uuid.UUID `json:"projeto_ids"`
+}
+
+type AlcadaEquipesRequest struct {
+	EquipeIDs []uuid.UUID `json:"equipe_ids"`
 }
 
 type ProjetoResumo struct {

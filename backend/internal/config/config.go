@@ -16,6 +16,8 @@ type Config struct {
 	Log            LogConfig
 	Auth           AuthConfig
 	Gemini         GeminiConfig
+	SAML           SAMLConfig
+	AdminSecret    AdminSecretConfig
 }
 
 type DBConfig struct {
@@ -70,6 +72,20 @@ type GeminiConfig struct {
 	Model  string
 }
 
+type SAMLConfig struct {
+	IDPMetadataURL string
+	EntityID       string
+	ACSURL         string
+	CertFile       string
+	KeyFile        string
+	FrontendURL    string
+}
+
+type AdminSecretConfig struct {
+	SecretName      string
+	SecretNamespace string
+}
+
 func Load() (*Config, error) {
 	viper.SetConfigFile(".env")
 	viper.AutomaticEnv()
@@ -88,6 +104,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("GEMINI_MODEL", "gemini-2.0-flash")
 	viper.SetDefault("ADMIN_EMAIL", "admin@myplanner.local")
 	viper.SetDefault("APP_BASE_URL", "http://localhost:9091")
+	viper.SetDefault("ADMIN_SECRET_NAME", "myplanner-admin-password")
+	viper.SetDefault("ADMIN_SECRET_NAMESPACE", "")
 
 	_ = viper.ReadInConfig()
 
@@ -131,6 +149,18 @@ func Load() (*Config, error) {
 		Gemini: GeminiConfig{
 			APIKey: viper.GetString("GEMINI_API_KEY"),
 			Model:  viper.GetString("GEMINI_MODEL"),
+		},
+		SAML: SAMLConfig{
+			IDPMetadataURL: viper.GetString("SAML_IDP_METADATA_URL"),
+			EntityID:       viper.GetString("SAML_ENTITY_ID"),
+			ACSURL:         viper.GetString("SAML_ACS_URL"),
+			CertFile:       viper.GetString("SAML_CERT_FILE"),
+			KeyFile:        viper.GetString("SAML_KEY_FILE"),
+			FrontendURL:    viper.GetString("SAML_FRONTEND_URL"),
+		},
+		AdminSecret: AdminSecretConfig{
+			SecretName:      viper.GetString("ADMIN_SECRET_NAME"),
+			SecretNamespace: viper.GetString("ADMIN_SECRET_NAMESPACE"),
 		},
 	}, nil
 }

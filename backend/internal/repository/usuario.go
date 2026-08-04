@@ -20,7 +20,7 @@ func NewUsuarioRepository(pool *pgxpool.Pool) *UsuarioRepository {
 
 func (r *UsuarioRepository) BuscarPorEmail(ctx context.Context, email string) (*domain.Usuario, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 		FROM usuarios
 		WHERE email = $1 AND ativo = true
 	`, email)
@@ -37,7 +37,7 @@ func (r *UsuarioRepository) BuscarPorEmail(ctx context.Context, email string) (*
 
 func (r *UsuarioRepository) BuscarPorID(ctx context.Context, id uuid.UUID) (*domain.Usuario, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 		FROM usuarios
 		WHERE id = $1
 	`, id)
@@ -54,7 +54,7 @@ func (r *UsuarioRepository) BuscarPorID(ctx context.Context, id uuid.UUID) (*dom
 
 func (r *UsuarioRepository) ListarTodos(ctx context.Context) ([]domain.Usuario, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		SELECT id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 		FROM usuarios
 		ORDER BY nome_completo
 	`)
@@ -78,7 +78,7 @@ func (r *UsuarioRepository) Criar(ctx context.Context, req *domain.CriarUsuarioR
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO usuarios (id, nome_completo, apelido, email, senha_hash, cargo)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 	`, uuid.New(), req.NomeCompleto, req.Apelido, req.Email, senhaHash, req.Cargo)
 
 	u, err := scanUsuario(row)
@@ -98,7 +98,7 @@ func (r *UsuarioRepository) Atualizar(ctx context.Context, id uuid.UUID, req *do
 		    ativo = COALESCE($6, ativo),
 		    updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, created_at, updated_at
+		RETURNING id, nome_completo, apelido, email, senha_hash, cargo, ativo, auth_provider, created_at, updated_at
 	`, id, req.NomeCompleto, req.Apelido, req.Email, req.Cargo, req.Ativo)
 
 	u, err := scanUsuario(row)
@@ -217,7 +217,7 @@ func scanUsuario(row pgx.Row) (domain.Usuario, error) {
 	var u domain.Usuario
 	err := row.Scan(
 		&u.ID, &u.NomeCompleto, &u.Apelido, &u.Email, &u.SenhaHash,
-		&u.Cargo, &u.Ativo, &u.CreatedAt, &u.UpdatedAt,
+		&u.Cargo, &u.Ativo, &u.AuthProvider, &u.CreatedAt, &u.UpdatedAt,
 	)
 	return u, err
 }
@@ -226,7 +226,7 @@ func scanUsuarioRows(rows pgx.Rows) (domain.Usuario, error) {
 	var u domain.Usuario
 	err := rows.Scan(
 		&u.ID, &u.NomeCompleto, &u.Apelido, &u.Email, &u.SenhaHash,
-		&u.Cargo, &u.Ativo, &u.CreatedAt, &u.UpdatedAt,
+		&u.Cargo, &u.Ativo, &u.AuthProvider, &u.CreatedAt, &u.UpdatedAt,
 	)
 	return u, err
 }

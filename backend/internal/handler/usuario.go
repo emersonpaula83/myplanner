@@ -185,7 +185,12 @@ func (h *UsuarioHandler) AlterarSenha(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(usuario.SenhaHash), []byte(req.SenhaAtual)); err != nil {
+	if usuario.SenhaHash == nil {
+		respondError(w, http.StatusUnauthorized, "usuário sem senha local")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*usuario.SenhaHash), []byte(req.SenhaAtual)); err != nil {
 		respondError(w, http.StatusUnauthorized, "senha atual incorreta")
 		return
 	}
