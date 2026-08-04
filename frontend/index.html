@@ -1238,6 +1238,20 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
   </div>
 </div>
 
+<div class="modal-overlay" id="alcada-modal" onclick="if(event.target===this)closeAlcadaModal()">
+  <div class="modal">
+    <div class="modal-title" id="alcada-modal-title">Alçada de Equipes</div>
+    <form id="alcada-form" onsubmit="return handleAlcadaSubmit(event)">
+      <input type="hidden" id="alcada-usuario-id">
+      <div class="form-group"><label class="form-label">Equipes</label><div class="projmeta-equipes" id="alcada-equipes">Carregando...</div></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeAlcadaModal()">Cancelar</button>
+        <button class="btn-primary" type="submit" id="alcada-submit-btn" style="width:auto">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal-overlay" id="projmeta-modal" onclick="if(event.target===this)closeProjMetaModal()">
   <div class="modal">
     <div class="modal-title" id="projmeta-title">Editar Épico</div>
@@ -1764,6 +1778,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 const API = '/api/v1';
 let token = localStorage.getItem('myplanner_token');
 let currentUser = null;
+
+function decodeTokenEmail(t) {
+  try {
+    var payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.email || null;
+  } catch (e) { return null; }
+}
+function isAdmin() {
+  var email = (currentUser && currentUser.email) || (token && decodeTokenEmail(token));
+  return email === 'admin@myplanner.local';
+}
 
 function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
@@ -3855,13 +3880,16 @@ function formatTipoAusencia(tipo) {
 }
 
 // === USUARIOS ===
+let usuariosCache = [];
 async function loadUsuarios() {
   const el = document.getElementById('usuarios-content');
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     const data = await api('/usuarios');
     const users = data?.usuarios || [];
+    usuariosCache = users;
     if (users.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-text">Nenhum usuário cadastrado</div></div>'; return; }
+    const admin = isAdmin();
     let rows = '';
     users.forEach(u => {
       rows += '<tr>' +
@@ -3873,6 +3901,7 @@ async function loadUsuarios() {
         '<td style="white-space:nowrap">' +
           '<button class="btn-sm" onclick="editUsuario(\'' + u.id + '\')">Editar</button> ' +
           '<button class="btn-sm" onclick="openSenhaModal(\'' + u.id + '\')">Senha</button>' +
+          (admin ? ' <button class="btn-sm" onclick="openAlcadaModal(\'' + u.id + '\')">Alçada</button>' : '') +
         '</td></tr>';
     });
     el.innerHTML = '<div class="users-table-wrap fade-in"><table class="users-table"><thead><tr><th>Nome</th><th>Apelido</th><th>Email</th><th>Cargo</th><th>Status</th><th>Ações</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
@@ -3949,6 +3978,60 @@ async function handleSenhaSubmit(e) {
     })});
     closeSenhaModal(); alert('Senha alterada');
   } catch (err) { alert('Erro: ' + err.message); }
+  return false;
+}
+
+// === ALÇADA (equipes por usuário, admin only) ===
+function loadUsuarioEquipes(usuarioId) {
+  return api('/usuarios/' + usuarioId + '/equipes').then(function(data) { return data.equipes || []; });
+}
+function salvarAlcada(usuarioId, equipeIds) {
+  return api('/usuarios/' + usuarioId + '/equipes', {
+    method: 'PUT',
+    body: JSON.stringify({ equipe_ids: equipeIds })
+  });
+}
+
+function openAlcadaModal(usuarioId) {
+  if (!isAdmin()) return;
+  const u = usuariosCache.find(x => x.id === usuarioId);
+  document.getElementById('alcada-usuario-id').value = usuarioId;
+  document.getElementById('alcada-modal-title').textContent = 'Alçada de Equipes' + (u ? ' — ' + u.nome_completo : '');
+  const container = document.getElementById('alcada-equipes');
+  container.innerHTML = 'Carregando...';
+  document.getElementById('alcada-modal').classList.add('open');
+
+  Promise.all([api('/equipes'), loadUsuarioEquipes(usuarioId)]).then(function(results) {
+    const equipes = results[0] || [];
+    const assigned = results[1] || [];
+    const assignedSet = {};
+    assigned.forEach(function(eq) { assignedSet[eq.id] = true; });
+
+    if (equipes.length === 0) { container.innerHTML = '<span style="color:var(--text-muted)">Nenhuma equipe cadastrada</span>'; return; }
+    let html = '';
+    equipes.forEach(function(eq) {
+      const checked = assignedSet[eq.id] ? ' checked' : '';
+      html += '<label><input type="checkbox" name="alcada-eq" value="' + eq.id + '"' + checked + '> ' + esc(eq.nome) + '</label>';
+    });
+    container.innerHTML = html;
+  }).catch(function(err) {
+    container.innerHTML = '<span style="color:var(--red)">Erro: ' + esc(err.message) + '</span>';
+  });
+}
+function closeAlcadaModal() { document.getElementById('alcada-modal').classList.remove('open'); }
+
+function handleAlcadaSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('alcada-usuario-id').value;
+  const btn = document.getElementById('alcada-submit-btn');
+  const checkboxes = document.querySelectorAll('#alcada-equipes input[name="alcada-eq"]:checked');
+  const equipeIds = Array.from(checkboxes).map(function(c) { return c.value; });
+  btn.disabled = true;
+  salvarAlcada(id, equipeIds).then(function() {
+    closeAlcadaModal();
+  }).catch(function(err) {
+    alert('Erro: ' + err.message);
+  }).finally(function() { btn.disabled = false; });
   return false;
 }
 
