@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/auth"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -23,6 +24,10 @@ type UsuarioStore interface {
 	AtualizarProjetos(ctx context.Context, usuarioID uuid.UUID, projetoIDs []uuid.UUID) ([]domain.ProjetoResumo, error)
 	BuscarProjetoIDsPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error)
 	ValidarProjetosExistem(ctx context.Context, projetoIDs []uuid.UUID) error
+	BuscarOuCriarPorEmail(ctx context.Context, email, nomeCompleto, authProvider string) (*domain.Usuario, error)
+	ListarEquipesPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]repository.EquipeResumo, error)
+	AtualizarEquipes(ctx context.Context, usuarioID uuid.UUID, equipeIDs []uuid.UUID) error
+	BuscarEquipeIDsPorUsuario(ctx context.Context, usuarioID uuid.UUID) ([]uuid.UUID, error)
 }
 
 type AuthHandler struct {
