@@ -220,6 +220,10 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 	}
 
 	if req.EquipeIDs != nil {
+		if err := middleware.ValidateEquipeAccess(r.Context(), req.EquipeIDs); err != nil {
+			respondError(w, http.StatusForbidden, err.Error())
+			return
+		}
 		if err := h.store.SalvarEpicoEquipes(r.Context(), id, req.EquipeIDs); err != nil {
 			h.logger.Error("failed to save epico equipes", zap.Error(err))
 			respondError(w, http.StatusInternalServerError, "falha ao salvar equipes do projeto")
@@ -325,6 +329,11 @@ func (h *TimelineHandler) AnalisarCapacidade(w http.ResponseWriter, r *http.Requ
 	}
 
 	equipeIDs := []uuid.UUID{equipeID}
+
+	if err := middleware.ValidateEquipeAccess(r.Context(), equipeIDs); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
 
 	membrosCount, err := h.store.ContarMembrosAtivosEquipes(r.Context(), equipeIDs, req.Ano)
 	if err != nil {
