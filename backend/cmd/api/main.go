@@ -144,10 +144,14 @@ func main() {
 	schedulerSvc := service.NewSchedulerService(syncService, scheduleRepo, logger)
 	go schedulerSvc.Start(ctx)
 
-	secretWriter := admin.NewSecretWriter(cfg.AdminSecret, logger)
-	adminStore := admin.NewRepoAdapter(usuarioRepo)
-	adminRotator := admin.NewAdminRotator(adminStore, secretWriter, cfg.Auth.AdminEmail, logger)
-	go adminRotator.Start(ctx)
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		secretWriter := admin.NewSecretWriter(cfg.AdminSecret, logger)
+		adminStore := admin.NewRepoAdapter(usuarioRepo)
+		adminRotator := admin.NewAdminRotator(adminStore, secretWriter, cfg.Auth.AdminEmail, logger)
+		go adminRotator.Start(ctx)
+	} else {
+		logger.Info("dev mode: admin password rotation disabled, use PASS_APP from .env")
+	}
 
 	sprintGenService := service.NewSprintGenerationService(fonteDadosRepo, equipeRepo, syncRepo, sprintRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	sprintGenHandler := handler.NewSprintGenerationHandler(sprintGenService, logger)

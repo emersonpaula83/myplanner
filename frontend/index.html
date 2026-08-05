@@ -914,7 +914,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     </div>
     <div class="login-error" id="login-error"></div>
 
-    <a class="btn-primary" href="/api/v1/auth/saml/login" style="text-decoration:none;margin-bottom:20px;">Entrar com Fluig Identity</a>
+    <a class="btn-primary" href="#" onclick="loginSAML();return false;" style="text-decoration:none;margin-bottom:20px;">Entrar com Fluig Identity</a>
 
     <div style="text-align:center;">
       <a href="#" id="admin-login-toggle" onclick="toggleAdminLogin();return false;" style="font-size:12px;color:var(--text-secondary);text-decoration:none;">Acesso administrativo</a>
@@ -1842,6 +1842,20 @@ function fmtDateTimeBR(s) {
 }
 
 // === AUTH ===
+async function loginSAML() {
+  try {
+    const res = await fetch('/api/v1/auth/saml/login', { redirect: 'manual' });
+    if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 0) {
+      window.location.href = '/api/v1/auth/saml/login';
+    } else if (res.status === 404) {
+      document.getElementById('login-error').textContent = 'Login via Fluig Identity não está configurado neste ambiente.';
+    } else {
+      document.getElementById('login-error').textContent = 'Erro ao conectar com Fluig Identity. Tente novamente.';
+    }
+  } catch(e) {
+    window.location.href = '/api/v1/auth/saml/login';
+  }
+}
 function toggleAdminLogin() {
   const form = document.getElementById('login-form');
   form.style.display = form.style.display === 'none' ? 'block' : 'none';
