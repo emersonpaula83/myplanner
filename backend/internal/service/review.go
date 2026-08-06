@@ -95,9 +95,26 @@ var statusEmAndamento = map[string]bool{
 }
 
 func (s *ReviewService) GetReviewData(ctx context.Context, sprintID uuid.UUID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*ReviewData, error) {
-	tasks, err := s.repo.GetReviewTasks(ctx, sprintID, &equipeID, produtoIDs)
-	if err != nil {
-		return nil, fmt.Errorf("getting review tasks: %w", err)
+	var tasks []repository.ReviewTaskRow
+	var err error
+
+	estado, _ := s.repo.GetSprintEstado(ctx, sprintID)
+	isClosed := estado != nil && *estado == "closed"
+
+	if isClosed {
+		tasks, err = s.repo.GetSprintSnapshot(ctx, sprintID)
+		if err != nil {
+			tasks = nil
+		}
+	}
+
+	if tasks == nil {
+		tasks, err = s.repo.GetReviewTasks(ctx, sprintID, &equipeID, produtoIDs)
+		if err != nil {
+			return nil, fmt.Errorf("getting review tasks: %w", err)
+		}
+	} else if len(produtoIDs) > 0 {
+		tasks = filterSnapshotTasks(tasks, produtoIDs)
 	}
 
 	// Collect task IDs with parent for GDPTC check (exclude bugs/incidents)
@@ -423,4 +440,26 @@ func (s *ReviewService) GenerateAnalise(ctx context.Context, sprintID, equipeID 
 	}
 
 	return saved, nil
+}
+
+func filterSnapshotTasks(tasks []repository.ReviewTaskRow, produtoIDs []uuid.UUID) []repository.ReviewTaskRow {
+	if len(produtoIDs) == 0 {
+		return tasks
+	}
+
+	produtoSet := make(map[uuid.UUID]bool, len(produtoIDs))
+	for _, pid := range produtoIDs {
+		produtoSet[pid] = true
+	}
+
+	filtered := make([]repository.ReviewTaskRow, 0, len(tasks))
+	for _, t := range tasks {
+		for _, pid := range t.ProdutoIDs {
+			if produtoSet[pid] {
+				filtered = append(filtered, t)
+				break
+			}
+		}
+	}
+	return filtered
 }
