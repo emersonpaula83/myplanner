@@ -2741,7 +2741,7 @@ async function openSprintCapacity(sprintID) {
       html += '<div class="unplanned-disclaimer warn" style="cursor:pointer" onclick="openDisclaimerModal(\'' + sprintID + '\',\'outras\')"><span class="unplanned-disclaimer-icon">⚡</span><div><b>' + pctOutras + '%</b> da capacity dedicado em <b>' + sa.outras_count + '</b> tarefa(s) não planejada(s) (' + sa.outras_horas.toFixed(1) + 'h)</div></div>';
     }
 
-    html += '<div style="margin:12px 0"><button class="btn-sm eq-btn" id="eq-btn-' + sprintID + '" style="font-size:12px;padding:4px 12px;background:var(--accent);color:#fff" onclick="openEqualizer(\'' + sprintID + '\')">⚖️ Equalizador<span class="eq-badge" id="eq-badge-' + sprintID + '">!</span></button></div>';
+    html += '<div style="margin:12px 0"><button class="btn-sm eq-btn" id="eq-btn-' + sprintID + '" style="font-size:12px;padding:4px 12px;background:var(--accent);color:#fff" onclick="openEqualizer(\'' + sprintID + '\')" disabled>🤖 Verificando equalizações de capacity...<span class="eq-badge" id="eq-badge-' + sprintID + '"></span></button></div>';
 
     if (!data.membros || data.membros.length === 0) {
       html += '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Nenhum membro com tarefas nesta sprint</div></div>';
@@ -2784,17 +2784,27 @@ async function openSprintCapacity(sprintID) {
       drawBurndown(document.getElementById('burndown-canvas'), burndown);
     }
 
-    // Background check for equalizer badge
+    // Background AI equalizer check
     (async function() {
       const eqQs = equipe ? '?equipe=' + equipe : '';
+      const btn = document.getElementById('eq-btn-' + sprintID);
       try {
         const eqData = await api('/sprints/' + sprintID + '/equalizer' + eqQs);
-        const badge = document.getElementById('eq-badge-' + sprintID);
-        if (badge && !eqData.nada_a_sugerir) {
-          badge.classList.add('visible');
+        if (btn) {
+          btn.disabled = false;
+          if (!eqData.nada_a_sugerir) {
+            btn.innerHTML = '⚖️ Equalizador <span class="eq-badge visible" id="eq-badge-' + sprintID + '">' + (eqData.sugestoes ? eqData.sugestoes.length : '!') + '</span>';
+          } else {
+            btn.textContent = '⚖️ Equalizador';
+          }
         }
         window._cachedEqualizerData = eqData;
-      } catch(e) {}
+      } catch(e) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '⚖️ Equalizador';
+        }
+      }
     })();
   } catch(e) { el.innerHTML = '<button class="capacity-back-btn" onclick="loadSprints()">← Voltar</button><div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>'; }
 }
@@ -5685,13 +5695,28 @@ function renderEqualizerModal() {
   const data = equalizerData;
 
   if (data.nada_a_sugerir) {
-    content.innerHTML = '<div class="eq-nada"><div class="eq-nada-icon">✅</div><div class="eq-nada-text">Nada a sugerir de transferência de tarefas</div>' +
+    var nadaHtml = '<div class="eq-nada"><div class="eq-nada-icon">✅</div><div class="eq-nada-text">Nada a sugerir de transferência de tarefas</div>' +
       (data.motivo ? '<div class="eq-nada-motivo">' + esc(data.motivo) + '</div>' : '') + '</div>';
+    if (data.analise) {
+      nadaHtml += '<div style="background:var(--bg-secondary);padding:12px 16px;border-radius:8px;margin-top:12px;font-size:13px"><div style="font-weight:600;margin-bottom:4px">🤖 Análise da IA</div><div>' + esc(data.analise) + '</div></div>';
+    }
+    content.innerHTML = nadaHtml;
     actions.style.display = 'none';
     return;
   }
 
   let html = '';
+
+  // AI Analysis header
+  if (data.analise) {
+    html += '<div style="background:var(--bg-secondary);padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;line-height:1.5">';
+    html += '<div style="font-weight:600;margin-bottom:4px">🤖 Análise da IA</div>';
+    html += '<div>' + esc(data.analise) + '</div>';
+    if (data.desvio_padrao_antes > 0) {
+      html += '<div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">Desvio padrão: <b>' + data.desvio_padrao_antes.toFixed(1) + '%</b> → <b style="color:var(--green)">' + data.desvio_padrao_depois.toFixed(1) + '%</b></div>';
+    }
+    html += '</div>';
+  }
 
   // Antes/Depois section
   html += '<div class="eq-section-title">Antes / Depois da Equalização</div>';
@@ -5735,6 +5760,10 @@ function renderEqualizerModal() {
     html += '<div class="eq-sug-member">' + paraAvatar + '<div class="eq-sug-nome">' + esc(sug.para.nome) + '</div>' +
       '<div class="eq-sug-pct"><span style="color:' + paraAntesColor + '">' + sug.para.pct_antes.toFixed(0) + '%</span> → <span style="color:' + paraDepoisColor + '">' + sug.para.pct_depois.toFixed(0) + '%</span></div></div>';
     html += '</div>';
+
+    if (sug.justificativa) {
+      html += '<div style="padding:4px 12px;font-size:12px;color:var(--text-secondary);font-style:italic">💡 ' + esc(sug.justificativa) + '</div>';
+    }
 
     html += '<div class="eq-task-list">';
     sug.tarefas.forEach(function(t, ti) {
