@@ -1814,6 +1814,8 @@ function applyDateMask(input) {
     else if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
     this.value = v;
   });
+  input.setAttribute('maxlength', '10');
+  input.setAttribute('inputmode', 'numeric');
 }
 function fmtDateTimeBR(s) {
   if (!s) return '';
@@ -6112,7 +6114,7 @@ async function removeSkillFromMembro(membroId, skillId) {
 }
 
 // === DATE MASKS ===
-['projmeta-data-inicio','disp-data-inicio','disp-data-fim','feriado-data'].forEach(function(id) {
+['projmeta-data-inicio','projmeta-data-limite','disp-data-inicio','disp-data-fim','feriado-data'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) applyDateMask(el);
 });
