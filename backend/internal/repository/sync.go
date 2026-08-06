@@ -95,8 +95,22 @@ func (r *SyncRepository) UpsertProjeto(ctx context.Context, fonteDadosID uuid.UU
 }
 
 func (r *SyncRepository) UpsertSprint(ctx context.Context, fonteDadosID uuid.UUID, jiraID int, nome string, estado *string, dataInicio, dataFim, dataConclusao *time.Time, boardID *int, projetoID *uuid.UUID) (uuid.UUID, error) {
-	var id uuid.UUID
+	var currentEstado *string
+	var existingID uuid.UUID
 	err := r.pool.QueryRow(ctx, `
+		SELECT id, estado FROM sprints WHERE fonte_dados_id = $1 AND jira_id = $2
+	`, fonteDadosID, jiraID).Scan(&existingID, &currentEstado)
+
+	isClosing := err == nil &&
+		currentEstado != nil && *currentEstado == "active" &&
+		estado != nil && *estado == "closed"
+
+	if isClosing {
+		r.captureSprintSnapshot(ctx, existingID)
+	}
+
+	var id uuid.UUID
+	err = r.pool.QueryRow(ctx, `
 		INSERT INTO sprints (id, fonte_dados_id, jira_id, nome, estado, data_inicio, data_fim, data_conclusao, board_id, projeto_id)
 		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (fonte_dados_id, jira_id)
@@ -110,6 +124,81 @@ func (r *SyncRepository) UpsertSprint(ctx context.Context, fonteDadosID uuid.UUI
 		return uuid.Nil, fmt.Errorf("upserting sprint %d: %w", jiraID, err)
 	}
 	return id, nil
+}
+
+func (r *SyncRepository) captureSprintSnapshot(ctx context.Context, sprintID uuid.UUID) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.id, t.numero_ticket, t.resumo, t.tipo,
+		       COALESCE(t.tipo_demanda,
+		           CASE
+		               WHEN t.tipo IN ('Épico', 'Projeto') THEN 'Meta'
+		               WHEN t.tipo IN ('Spike', 'Implantação', 'Aditivo - Delivery') THEN 'Compromisso'
+		               ELSE 'Iniciativa'
+		           END
+		       ),
+		       t.status,
+		       t.parent_id, m.nome,
+		       CASE WHEN t.data_entrada_sprint > s.data_inicio
+		            OR (t.data_entrada_sprint IS NULL AND t.data_criacao > s.data_inicio)
+		            THEN true ELSE false END AS nao_planejada,
+		       t.estimativa_tempo,
+		       ARRAY_AGG(p.nome ORDER BY p.id) FILTER (WHERE p.nome IS NOT NULL) AS produtos,
+		       ARRAY_AGG(p.id ORDER BY p.id) FILTER (WHERE p.id IS NOT NULL) AS produto_ids
+		FROM tarefas t
+		INNER JOIN sprints s ON s.id = t.sprint_id
+		LEFT JOIN membros m ON m.id = t.relator_id
+		LEFT JOIN tarefa_produtos tp ON tp.tarefa_id = t.id
+		LEFT JOIN produtos p ON p.id = tp.produto_id
+		WHERE t.sprint_id = $1
+		  AND t.status NOT IN ('Cancelado', 'Rejeitada')
+		GROUP BY t.id, t.numero_ticket, t.resumo, t.tipo, t.tipo_demanda, t.status,
+		         t.parent_id, m.nome, t.data_entrada_sprint, t.data_criacao,
+		         s.data_inicio, t.estimativa_tempo
+		ORDER BY t.numero_ticket
+	`, sprintID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	type snapshotTask struct {
+		ID              uuid.UUID   `json:"id"`
+		NumeroTicket    string      `json:"numero_ticket"`
+		Resumo          string      `json:"resumo"`
+		Tipo            string      `json:"tipo"`
+		TipoDemanda     string      `json:"tipo_demanda"`
+		Status          string      `json:"status"`
+		ParentID        *uuid.UUID  `json:"parent_id"`
+		RelatorNome     *string     `json:"relator_nome"`
+		NaoPlanejada    bool        `json:"nao_planejada"`
+		EstimativaTempo *int        `json:"estimativa_tempo"`
+		Produtos        []string    `json:"produtos"`
+		ProdutoIDs      []uuid.UUID `json:"produto_ids"`
+	}
+
+	tasks := make([]snapshotTask, 0)
+	for rows.Next() {
+		var t snapshotTask
+		if err := rows.Scan(
+			&t.ID, &t.NumeroTicket, &t.Resumo, &t.Tipo, &t.TipoDemanda,
+			&t.Status, &t.ParentID, &t.RelatorNome, &t.NaoPlanejada,
+			&t.EstimativaTempo, &t.Produtos, &t.ProdutoIDs,
+		); err != nil {
+			return
+		}
+		tasks = append(tasks, t)
+	}
+
+	data, err := json.Marshal(tasks)
+	if err != nil {
+		return
+	}
+
+	r.pool.Exec(ctx, `
+		INSERT INTO sprint_review_snapshots (sprint_id, snapshot_json)
+		VALUES ($1, $2)
+		ON CONFLICT (sprint_id) DO NOTHING
+	`, sprintID, data)
 }
 
 func (r *SyncRepository) GetDistinctBoardProjects(ctx context.Context, fonteDadosID uuid.UUID) (map[int]uuid.UUID, error) {

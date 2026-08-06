@@ -329,3 +329,27 @@ func (r *ReviewRepository) SaveReviewAnalise(ctx context.Context, a ReviewAnalis
 	}
 	return nil
 }
+
+func (r *ReviewRepository) GetSprintEstado(ctx context.Context, sprintID uuid.UUID) (*string, error) {
+	var estado *string
+	err := r.pool.QueryRow(ctx, `SELECT estado FROM sprints WHERE id = $1`, sprintID).Scan(&estado)
+	if err != nil {
+		return nil, fmt.Errorf("getting sprint estado: %w", err)
+	}
+	return estado, nil
+}
+
+func (r *ReviewRepository) GetSprintSnapshot(ctx context.Context, sprintID uuid.UUID) ([]ReviewTaskRow, error) {
+	var raw json.RawMessage
+	err := r.pool.QueryRow(ctx, `
+		SELECT snapshot_json FROM sprint_review_snapshots WHERE sprint_id = $1
+	`, sprintID).Scan(&raw)
+	if err != nil {
+		return nil, err
+	}
+	var tasks []ReviewTaskRow
+	if err := json.Unmarshal(raw, &tasks); err != nil {
+		return nil, fmt.Errorf("unmarshaling snapshot: %w", err)
+	}
+	return tasks, nil
+}
