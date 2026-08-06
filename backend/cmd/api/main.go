@@ -152,14 +152,15 @@ func main() {
 	sprintGenService := service.NewSprintGenerationService(fonteDadosRepo, equipeRepo, syncRepo, sprintRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	sprintGenHandler := handler.NewSprintGenerationHandler(sprintGenService, logger)
 
-	equalizerSvc := service.NewEqualizerService(sprintService, sprintRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
+	configRepo := repository.NewConfigRepository(pool)
+
+	equalizerSvc := service.NewEqualizerService(sprintService, sprintRepo, fonteDadosRepo, configRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	equalizerHandler := handler.NewEqualizerHandler(equalizerSvc, logger)
 
 	skillRepo := repository.NewSkillRepository(pool)
 	skillHandler := handler.NewSkillHandler(skillRepo, logger)
 
 	reviewRepo := repository.NewReviewRepository(pool)
-	configRepo := repository.NewConfigRepository(pool)
 	reviewService := service.NewReviewService(reviewRepo, configRepo, logger)
 	reviewHandler := handler.NewReviewHandler(reviewService, configRepo, logger)
 
