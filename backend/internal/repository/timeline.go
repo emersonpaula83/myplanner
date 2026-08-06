@@ -371,10 +371,7 @@ func (r *TimelineRepository) BuscarEpicoEquipes(ctx context.Context, epicoID uui
 	return result, rows.Err()
 }
 
-func (r *TimelineRepository) ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID, produtoNome *string, removido string) ([]domain.ProjetoListItem, error) {
-	var rows pgx.Rows
-	var err error
-
+func (r *TimelineRepository) ListarEpicos(ctx context.Context, projetoIDs []uuid.UUID, produtoNome *string, removido string) ([]domain.ProjetoListItem, error) {
 	var extraConditions string
 	switch removido {
 	case "sim":
@@ -387,77 +384,29 @@ func (r *TimelineRepository) ListarEpicos(ctx context.Context, equipeID *uuid.UU
 
 	const produtoSubquery = " AND EXISTS (SELECT 1 FROM tarefas c JOIN tarefa_produtos tp ON tp.tarefa_id = c.id JOIN produtos p ON p.id = tp.produto_id WHERE c.parent_id = e.id AND LOWER(p.nome) = LOWER($%d))"
 
+	var args []any
+	argPos := 1
 	projetoFilter := ""
-	if equipeID != nil {
-		args := []any{*equipeID}
-		argPos := 2
-		if len(projetoIDs) > 0 {
-			projetoFilter = fmt.Sprintf(" AND e.projeto_id = ANY($%d)", argPos)
-			args = append(args, projetoIDs)
-			argPos++
-		}
-		produtoFilter := ""
-		if produtoNome != nil {
-			produtoFilter = fmt.Sprintf(produtoSubquery, argPos)
-			args = append(args, *produtoNome)
-			argPos++
-		}
-		rows, err = r.pool.Query(ctx, `
-			SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
-			       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status, e.removido_em
-			FROM tarefas e
-			WHERE e.tipo = 'Épico'
-			  `+extraConditions+`
-			  AND (
-			      EXISTS (
-			          SELECT 1 FROM tarefas ch
-			          WHERE ch.parent_id = e.id
-			            AND ch.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)
-			      )
-			      OR e.id IN (SELECT epico_id FROM epico_equipes WHERE equipe_id = $1)
-			  )
-		`+projetoFilter+produtoFilter+`
-			ORDER BY e.resumo
-		`, args...)
-	} else {
-		if len(projetoIDs) > 0 {
-			args := []any{projetoIDs}
-			argPos := 2
-			projetoFilter = " AND e.projeto_id = ANY($1)"
-			produtoFilter := ""
-			if produtoNome != nil {
-				produtoFilter = fmt.Sprintf(produtoSubquery, argPos)
-				args = append(args, *produtoNome)
-				argPos++
-			}
-			rows, err = r.pool.Query(ctx, `
-				SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
-				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status, e.removido_em
-				FROM tarefas e
-				WHERE e.tipo = 'Épico'
-				  `+extraConditions+`
-			`+projetoFilter+produtoFilter+`
-				ORDER BY e.resumo
-			`, args...)
-		} else {
-			var args []any
-			argPos := 1
-			produtoFilter := ""
-			if produtoNome != nil {
-				produtoFilter = fmt.Sprintf(produtoSubquery, argPos)
-				args = append(args, *produtoNome)
-				argPos++
-			}
-			rows, err = r.pool.Query(ctx, `
-				SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
-				       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status, e.removido_em
-				FROM tarefas e
-				WHERE e.tipo = 'Épico'
-				  `+extraConditions+produtoFilter+`
-				ORDER BY e.resumo
-			`, args...)
-		}
+	if len(projetoIDs) > 0 {
+		projetoFilter = fmt.Sprintf(" AND e.projeto_id = ANY($%d)", argPos)
+		args = append(args, projetoIDs)
+		argPos++
 	}
+	produtoFilter := ""
+	if produtoNome != nil {
+		produtoFilter = fmt.Sprintf(produtoSubquery, argPos)
+		args = append(args, *produtoNome)
+		argPos++
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT e.id, e.numero_ticket, e.resumo, e.apelido,
+		       e.data_inicio_execucao, e.data_limite, e.tipo_demanda, e.status, e.removido_em
+		FROM tarefas e
+		WHERE e.tipo = 'Épico'
+		  `+extraConditions+projetoFilter+produtoFilter+`
+		ORDER BY e.resumo
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("listing epicos: %w", err)
 	}

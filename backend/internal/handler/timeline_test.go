@@ -70,7 +70,7 @@ func (m *mockTimelineStore) BuscarEpicoPorID(_ context.Context, _ uuid.UUID) (*d
 	return m.epicoPorID, nil
 }
 
-func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ *uuid.UUID, _ []uuid.UUID, _ *string, _ string) ([]domain.ProjetoListItem, error) {
+func (m *mockTimelineStore) ListarEpicos(_ context.Context, _ []uuid.UUID, _ *string, _ string) ([]domain.ProjetoListItem, error) {
 	return m.epicosList, nil
 }
 

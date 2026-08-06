@@ -1032,7 +1032,6 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="page" id="page-projetos">
       <div class="page-header-row"><h1 class="page-title">Projetos</h1></div>
       <div class="timeline-filters" style="flex-wrap:wrap">
-        <select class="filter-select" id="projetos-equipe" onchange="loadProjetos()"><option value="">Todas as equipes</option></select>
         <select class="filter-select" id="projetos-produto" onchange="loadProjetos()"><option value="">Todos os Produtos</option></select>
         <select class="filter-select" id="projetos-removido" onchange="loadProjetos()">
           <option value="nao">Ativos</option>
@@ -1933,7 +1932,6 @@ async function loadEquipes() {
     const equipes = await api('/equipes');
     const fills = [
       {sel: document.getElementById('equipe-select'), def: 'Todos os membros'},
-      {sel: document.getElementById('projetos-equipe'), def: 'Todas as equipes'},
       {sel: document.getElementById('sprints-equipe'), def: 'Todas as equipes'},
       {sel: document.getElementById('stl-equipe'), def: 'Selecione uma equipe'}
     ];
@@ -2390,11 +2388,9 @@ async function loadProjetos() {
     });
   }
 
-  const equipe = document.getElementById('projetos-equipe').value;
   const produto = document.getElementById('projetos-produto').value;
   const removido = document.getElementById('projetos-removido').value;
   var q = '?removido=' + removido;
-  if (equipe) q += '&equipe=' + encodeURIComponent(equipe);
   if (produto) q += '&produto=' + encodeURIComponent(produto);
 
   try {
