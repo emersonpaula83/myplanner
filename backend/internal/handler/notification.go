@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 )
@@ -28,6 +29,10 @@ func (h *NotificationHandler) ListDestinatarios(w http.ResponseWriter, r *http.R
 		respondError(w, http.StatusBadRequest, "equipe id inválido")
 		return
 	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
 	dests, err := h.destRepo.ListByEquipe(r.Context(), equipeID)
 	if err != nil {
 		h.logger.Error("listing destinatarios", zap.Error(err))
@@ -44,6 +49,10 @@ func (h *NotificationHandler) CreateDestinatario(w http.ResponseWriter, r *http.
 	equipeID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "equipe id inválido")
+		return
+	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -75,12 +84,21 @@ func (h *NotificationHandler) CreateDestinatario(w http.ResponseWriter, r *http.
 }
 
 func (h *NotificationHandler) DeleteDestinatario(w http.ResponseWriter, r *http.Request) {
+	equipeID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "equipe id inválido")
+		return
+	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{equipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
+		return
+	}
 	destID, err := uuid.Parse(chi.URLParam(r, "destId"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "destinatario id inválido")
 		return
 	}
-	if err := h.destRepo.Delete(r.Context(), destID); err != nil {
+	if err := h.destRepo.Delete(r.Context(), destID, equipeID); err != nil {
 		h.logger.Error("deleting destinatario", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao remover destinatário")
 		return
@@ -105,6 +123,10 @@ func (h *NotificationHandler) EnviarReview(w http.ResponseWriter, r *http.Reques
 	}
 	if len(body.DestinatarioIDs) == 0 {
 		respondError(w, http.StatusBadRequest, "nenhum destinatário selecionado")
+		return
+	}
+	if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{body.EquipeID}); err != nil {
+		respondError(w, http.StatusForbidden, err.Error())
 		return
 	}
 

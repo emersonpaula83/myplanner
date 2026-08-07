@@ -62,8 +62,8 @@ func (r *DestinatarioRepository) Create(ctx context.Context, equipeID uuid.UUID,
 	return &d, nil
 }
 
-func (r *DestinatarioRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM review_destinatarios WHERE id = $1`, id)
+func (r *DestinatarioRepository) Delete(ctx context.Context, id uuid.UUID, equipeID uuid.UUID) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM review_destinatarios WHERE id = $1 AND equipe_id = $2`, id, equipeID)
 	if err != nil {
 		return fmt.Errorf("deleting destinatario: %w", err)
 	}

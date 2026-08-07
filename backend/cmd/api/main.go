@@ -167,7 +167,7 @@ func main() {
 	destRepo := repository.NewDestinatarioRepository(pool)
 	emailProv := service.NewEmailProvider(configRepo, logger)
 	whatsappProv := service.NewWhatsAppProvider(configRepo, logger)
-	notifSvc := service.NewNotificationService(reviewService, destRepo, emailProv, whatsappProv, logger)
+	notifSvc := service.NewNotificationService(reviewService, destRepo, sprintRepo, emailProv, whatsappProv, logger)
 	notifHandler := handler.NewNotificationHandler(destRepo, notifSvc, logger)
 
 	allocRepo := repository.NewAllocationRepository(pool)

@@ -14,6 +14,7 @@ import (
 type NotificationService struct {
 	reviewSvc    *ReviewService
 	destRepo     *repository.DestinatarioRepository
+	sprintRepo   *repository.SprintRepository
 	emailProv    *EmailProvider
 	whatsappProv *WhatsAppProvider
 	logger       *zap.Logger
@@ -22,6 +23,7 @@ type NotificationService struct {
 func NewNotificationService(
 	reviewSvc *ReviewService,
 	destRepo *repository.DestinatarioRepository,
+	sprintRepo *repository.SprintRepository,
 	emailProv *EmailProvider,
 	whatsappProv *WhatsAppProvider,
 	logger *zap.Logger,
@@ -29,6 +31,7 @@ func NewNotificationService(
 	return &NotificationService{
 		reviewSvc:    reviewSvc,
 		destRepo:     destRepo,
+		sprintRepo:   sprintRepo,
 		emailProv:    emailProv,
 		whatsappProv: whatsappProv,
 		logger:       logger,
@@ -50,6 +53,11 @@ func (s *NotificationService) EnviarReview(ctx context.Context, sprintID, equipe
 	if len(dests) == 0 {
 		return nil, fmt.Errorf("nenhum destinatário encontrado")
 	}
+	for _, d := range dests {
+		if d.EquipeID != equipeID {
+			return nil, fmt.Errorf("destinatário %s não pertence à equipe informada", d.ID)
+		}
+	}
 
 	reviewData, err := s.reviewSvc.GetReviewData(ctx, sprintID, equipeID, nil)
 	if err != nil {
@@ -57,6 +65,9 @@ func (s *NotificationService) EnviarReview(ctx context.Context, sprintID, equipe
 	}
 
 	sprintNome := fmt.Sprintf("Sprint %s", sprintID.String()[:8])
+	if sprint, err := s.sprintRepo.GetByID(ctx, sprintID); err == nil {
+		sprintNome = sprint.Nome
+	}
 
 	var analise string
 	if a, err := s.reviewSvc.GetAnalise(ctx, sprintID, equipeID, nil); err == nil && a != nil {
