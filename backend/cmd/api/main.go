@@ -156,16 +156,23 @@ func main() {
 	sprintGenService := service.NewSprintGenerationService(fonteDadosRepo, equipeRepo, syncRepo, sprintRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	sprintGenHandler := handler.NewSprintGenerationHandler(sprintGenService, logger)
 
-	equalizerSvc := service.NewEqualizerService(sprintService, sprintRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
+	configRepo := repository.NewConfigRepository(pool)
+
+	equalizerSvc := service.NewEqualizerService(sprintService, sprintRepo, fonteDadosRepo, configRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	equalizerHandler := handler.NewEqualizerHandler(equalizerSvc, logger)
 
 	skillRepo := repository.NewSkillRepository(pool)
 	skillHandler := handler.NewSkillHandler(skillRepo, logger)
 
 	reviewRepo := repository.NewReviewRepository(pool)
-	configRepo := repository.NewConfigRepository(pool)
 	reviewService := service.NewReviewService(reviewRepo, configRepo, logger)
 	reviewHandler := handler.NewReviewHandler(reviewService, configRepo, logger)
+
+	destRepo := repository.NewDestinatarioRepository(pool)
+	emailProv := service.NewEmailProvider(configRepo, logger)
+	whatsappProv := service.NewWhatsAppProvider(configRepo, logger)
+	notifSvc := service.NewNotificationService(reviewService, destRepo, sprintRepo, emailProv, whatsappProv, logger)
+	notifHandler := handler.NewNotificationHandler(destRepo, notifSvc, logger)
 
 	allocRepo := repository.NewAllocationRepository(pool)
 	allocSvc := service.NewAllocationService(allocRepo, sprintService, sprintRepo, fonteDadosRepo, syncService, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
@@ -297,6 +304,12 @@ func main() {
 
 			r.Get("/sprints/{id}/review/analise", reviewHandler.GetReviewAnalise)
 			r.Post("/sprints/{id}/review/analise", reviewHandler.PostReviewAnalise)
+
+			r.Get("/equipes/{id}/destinatarios", notifHandler.ListDestinatarios)
+			r.Post("/equipes/{id}/destinatarios", notifHandler.CreateDestinatario)
+			r.Delete("/equipes/{id}/destinatarios/{destId}", notifHandler.DeleteDestinatario)
+
+			r.Post("/sprints/{id}/review/enviar", notifHandler.EnviarReview)
 
 			r.Get("/config/{chave}", reviewHandler.GetConfig)
 			r.Post("/config", reviewHandler.SetConfig)

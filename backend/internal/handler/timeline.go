@@ -29,7 +29,7 @@ type TimelineStore interface {
 	BuscarMembrosComAusencias(ctx context.Context, equipeIDs []uuid.UUID, ano int) ([]domain.MembroTimeline, error)
 	AtualizarMetadataProjeto(ctx context.Context, id uuid.UUID, apelido *string, dataInicioExecucao *time.Time, dataLimite *pgtype.Date) error
 	BuscarEpicoPorID(ctx context.Context, id uuid.UUID) (*domain.Tarefa, error)
-	ListarEpicos(ctx context.Context, equipeID *uuid.UUID, projetoIDs []uuid.UUID, produtoNome *string, removido string) ([]domain.ProjetoListItem, error)
+	ListarEpicos(ctx context.Context, projetoIDs []uuid.UUID, produtoNome *string, removido string) ([]domain.ProjetoListItem, error)
 	SalvarEpicoEquipes(ctx context.Context, epicoID uuid.UUID, equipeIDs []uuid.UUID) error
 	BuscarEpicoEquipes(ctx context.Context, epicoID uuid.UUID) ([]uuid.UUID, error)
 }
@@ -261,23 +261,6 @@ func (h *TimelineHandler) UpdateProjetoMetadata(w http.ResponseWriter, r *http.R
 }
 
 func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
-	var equipeID *uuid.UUID
-	if t := r.URL.Query().Get("equipe"); t != "" {
-		id, err := uuid.Parse(t)
-		if err != nil {
-			respondError(w, http.StatusBadRequest, "equipe id inválido")
-			return
-		}
-		equipeID = &id
-	}
-
-	if equipeID != nil {
-		if err := middleware.ValidateEquipeAccess(r.Context(), []uuid.UUID{*equipeID}); err != nil {
-			respondError(w, http.StatusForbidden, err.Error())
-			return
-		}
-	}
-
 	var produtoNome *string
 	if v := r.URL.Query().Get("produto"); v != "" {
 		produtoNome = &v
@@ -288,7 +271,7 @@ func (h *TimelineHandler) ListProjetos(w http.ResponseWriter, r *http.Request) {
 		removido = "nao"
 	}
 
-	epicos, err := h.store.ListarEpicos(r.Context(), equipeID, nil, produtoNome, removido)
+	epicos, err := h.store.ListarEpicos(r.Context(), nil, produtoNome, removido)
 	if err != nil {
 		h.logger.Error("failed to list epicos", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao listar épicos")

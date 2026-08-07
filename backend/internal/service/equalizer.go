@@ -2,13 +2,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"sort"
+	"math"
+	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/jira"
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -39,6 +41,7 @@ type EqualizerSugestao struct {
 	Tarefas           []EqualizerTarefa `json:"tarefas"`
 	HorasTransferidas float64           `json:"horas_transferidas"`
 	PctTransferido    float64           `json:"pct_transferido"`
+	Justificativa     string            `json:"justificativa"`
 }
 
 type MembroAntesDepois struct {
@@ -56,6 +59,9 @@ type EqualizerResult struct {
 	MembrosAntesDepois []MembroAntesDepois `json:"membros_antes_depois"`
 	NadaASugerir       bool                `json:"nada_a_sugerir"`
 	Motivo             string              `json:"motivo,omitempty"`
+	Analise            string              `json:"analise,omitempty"`
+	DesvioPadraoAntes  float64             `json:"desvio_padrao_antes"`
+	DesvioPadraoDepois float64             `json:"desvio_padrao_depois"`
 }
 
 type TransferRequest struct {
@@ -81,20 +87,20 @@ type ApplyError struct {
 }
 
 // ---------------------------------------------------------------------------
-// Internal state for the greedy algorithm
+// Internal per-member state used while validating AI suggestions
 // ---------------------------------------------------------------------------
 
 type membroRole int
 
 const (
 	roleNeutral  membroRole = iota
-	roleDoador              // overcapacity (> 100%)
-	roleReceptor            // undercapacity (< 70%)
+	roleDoador              // overcapacity (> 100%): can only donate, never receive
+	roleReceptor            // unused by the AI-powered Calculate; kept for backward compatibility
 )
 
 type membroState struct {
 	mc       MembroCapacity
-	horasMov float64     // hours moved: donated OUT for doadores, received IN for receptores
+	horasMov float64 // signed net change in hours: negative when the member is a net donor, positive when a net receiver
 	role     membroRole
 }
 
@@ -106,6 +112,7 @@ type EqualizerService struct {
 	sprintSvc          *SprintService
 	sprintRepo         *repository.SprintRepository
 	fdRepo             *repository.FonteDadosRepository
+	configRepo         *repository.ConfigRepository
 	clientFactory      ClientFactory
 	oauthClientFactory OAuthClientFactory
 	oauthSvc           *jira.OAuthService
@@ -117,6 +124,7 @@ func NewEqualizerService(
 	sprintSvc *SprintService,
 	sprintRepo *repository.SprintRepository,
 	fdRepo *repository.FonteDadosRepository,
+	configRepo *repository.ConfigRepository,
 	clientFactory ClientFactory,
 	oauthClientFactory OAuthClientFactory,
 	oauthSvc *jira.OAuthService,
@@ -127,6 +135,7 @@ func NewEqualizerService(
 		sprintSvc:          sprintSvc,
 		sprintRepo:         sprintRepo,
 		fdRepo:             fdRepo,
+		configRepo:         configRepo,
 		clientFactory:      clientFactory,
 		oauthClientFactory: oauthClientFactory,
 		oauthSvc:           oauthSvc,
@@ -179,7 +188,116 @@ func (s *EqualizerService) buildClient(ctx context.Context, fonteDadosID uuid.UU
 }
 
 // ---------------------------------------------------------------------------
-// Calculate — greedy capacity equalization algorithm
+// AI prompt builder — used by Calculate to ask the LLM for a suggested set
+// of task transfers to equalize member capacity.
+// ---------------------------------------------------------------------------
+
+type aiMembroInput struct {
+	Nome             string  `json:"nome"`
+	PctAlocacao      float64 `json:"pct_alocacao"`
+	HorasDisponiveis float64 `json:"horas_disponiveis"`
+	HorasAlocadas    float64 `json:"horas_alocadas"`
+}
+
+type aiTarefaInput struct {
+	Ticket          string  `json:"ticket"`
+	Resumo          string  `json:"resumo"`
+	Horas           float64 `json:"horas"`
+	Tipo            string  `json:"tipo"`
+	ResponsavelNome string  `json:"responsavel_nome"`
+}
+
+type aiSugestaoOutput struct {
+	DeNome        string `json:"de_nome"`
+	ParaNome      string `json:"para_nome"`
+	TarefaTicket  string `json:"tarefa_ticket"`
+	Justificativa string `json:"justificativa"`
+}
+
+type aiResponse struct {
+	Sugestoes    []aiSugestaoOutput `json:"sugestoes"`
+	Analise      string             `json:"analise"`
+	DesvioAntes  float64            `json:"desvio_antes"`
+	DesvioDepois float64            `json:"desvio_depois"`
+}
+
+func buildEqualizerPrompt(membros []aiMembroInput, tarefas []aiTarefaInput) (string, string) {
+	systemPrompt := `Você é um otimizador de alocação de sprint de desenvolvimento de software.
+Analise a capacidade dos membros e sugira transferências de tarefas para equalizar a carga de trabalho.
+
+REGRAS OBRIGATÓRIAS:
+1. Membros acima de 100% de alocação NUNCA podem receber tarefas, apenas doar
+2. Nenhuma transferência pode levar um membro acima de 100% de alocação
+3. Não sugira transferências que apenas invertem percentuais entre dois membros sem reduzir o desvio padrão geral
+4. Priorize reduzir o desvio padrão global da alocação
+5. Máximo 10 transferências
+6. Cada transferência move UMA tarefa de um membro para outro
+7. Só sugira transferências de tarefas que existem na lista fornecida
+
+Responda APENAS com JSON válido (sem markdown fences) no formato:
+{
+  "sugestoes": [
+    {
+      "de_nome": "Nome Completo Doador",
+      "para_nome": "Nome Completo Receptor",
+      "tarefa_ticket": "PROJ-123",
+      "justificativa": "Texto curto explicando o porquê"
+    }
+  ],
+  "analise": "Resumo de 1-2 frases sobre o estado da sprint e as sugestões",
+  "desvio_antes": 15.2,
+  "desvio_depois": 8.7
+}
+
+Se não houver sugestões viáveis, retorne: {"sugestoes": [], "analise": "motivo", "desvio_antes": X, "desvio_depois": X}`
+
+	type promptData struct {
+		Membros []aiMembroInput `json:"membros"`
+		Tarefas []aiTarefaInput `json:"tarefas"`
+	}
+	data, _ := json.Marshal(promptData{Membros: membros, Tarefas: tarefas})
+	userPrompt := "DADOS DA SPRINT:\n" + string(data)
+
+	return systemPrompt, userPrompt
+}
+
+// calcStdDev returns the population standard deviation of values.
+func calcStdDev(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, v := range values {
+		sum += v
+	}
+	mean := sum / float64(len(values))
+	var variance float64
+	for _, v := range values {
+		diff := v - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(values))
+	return math.Sqrt(variance)
+}
+
+// resetHorasMov returns a fresh copy of states with horasMov zeroed, so a
+// rejected batch of AI suggestions doesn't leak into the before/after report.
+func resetHorasMov(states map[uuid.UUID]*membroState) map[uuid.UUID]*membroState {
+	fresh := make(map[uuid.UUID]*membroState, len(states))
+	for id, st := range states {
+		fresh[id] = &membroState{mc: st.mc, role: st.role}
+	}
+	return fresh
+}
+
+// ---------------------------------------------------------------------------
+// Calculate — AI-powered capacity equalization. Delegates the optimization
+// itself to an LLM (via OpenRouter) but always re-validates every suggestion
+// against the hard rules below before accepting it:
+//  1. Members above 100% allocation can only donate, never receive.
+//  2. No transfer may push the receiver above 100% allocation.
+//  3. A batch of suggestions that doesn't reduce the overall standard
+//     deviation of allocation is rejected outright (no swap-only shuffles).
 // ---------------------------------------------------------------------------
 
 func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*EqualizerResult, error) {
@@ -189,7 +307,11 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 	}
 
 	states := make(map[uuid.UUID]*membroState)
-	var doadores, receptores []uuid.UUID
+	nameToID := make(map[string]uuid.UUID)
+	var activeMembros []aiMembroInput
+	var allTarefas []aiTarefaInput
+	ticketToTarefa := make(map[string]EqualizerTarefa)
+	ticketToOwner := make(map[string]uuid.UUID)
 
 	for _, m := range cap.Membros {
 		if !m.DaEquipe || m.Desligado {
@@ -198,82 +320,35 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 		st := &membroState{mc: m, role: roleNeutral}
 		if m.PercentualAlocacao > 100 {
 			st.role = roleDoador
-			doadores = append(doadores, m.MembroID)
-		} else if m.PercentualAlocacao < 70 {
-			st.role = roleReceptor
-			receptores = append(receptores, m.MembroID)
 		}
 		states[m.MembroID] = st
-	}
+		nameToID[m.Nome] = m.MembroID
 
-	if len(doadores) == 0 {
-		return s.nadaASugerir(cap, states, "Nenhum membro com alocação acima de 100%"), nil
-	}
-	if len(receptores) == 0 {
-		return s.nadaASugerir(cap, states, "Nenhum membro com alocação abaixo de 70%"), nil
-	}
-
-	// Sort doadores by highest allocation first, receptores by lowest first.
-	sort.Slice(doadores, func(i, j int) bool {
-		return states[doadores[i]].mc.PercentualAlocacao > states[doadores[j]].mc.PercentualAlocacao
-	})
-	sort.Slice(receptores, func(i, j int) bool {
-		return states[receptores[i]].mc.PercentualAlocacao < states[receptores[j]].mc.PercentualAlocacao
-	})
-
-	// Use pointers in the slice so mutations via sugestaoMap are reflected
-	// without needing a separate copy-back step.
-	var sugestoes []*EqualizerSugestao
-	sugestaoMap := make(map[string]*EqualizerSugestao)
-
-	for _, dID := range doadores {
-		if len(sugestoes) >= 10 {
-			break
-		}
-		d := states[dID]
-		if d.mc.HorasDisponiveis <= 0 {
+		if m.HorasDisponiveis <= 0 {
 			continue
 		}
 
-		tarefas, err := s.sprintRepo.GetEqualizerTarefas(ctx, sprintID, dID)
+		activeMembros = append(activeMembros, aiMembroInput{
+			Nome:             m.Nome,
+			PctAlocacao:      m.PercentualAlocacao,
+			HorasDisponiveis: m.HorasDisponiveis,
+			HorasAlocadas:    m.HorasAlocadas,
+		})
+
+		tarefas, err := s.sprintRepo.GetEqualizerTarefas(ctx, sprintID, m.MembroID)
 		if err != nil {
 			s.logger.Error("getting equalizer tarefas", zap.Error(err))
 			continue
 		}
-		if len(tarefas) == 0 {
-			continue
-		}
-
 		for _, t := range tarefas {
-			if len(sugestoes) >= 10 {
-				break
-			}
-			pctShift := t.Horas / d.mc.HorasDisponiveis * 100
-			if pctShift < 10 {
-				continue
-			}
-
-			// Find the best receptor: highest remaining capacity, won't
-			// exceed 100% allocation after receiving this task.
-			var bestR uuid.UUID
-			bestDisp := -1.0
-			for _, rID := range receptores {
-				r := states[rID]
-				if r.mc.HorasDisponiveis <= 0 {
-					continue
-				}
-				disp := r.mc.HorasDisponiveis - r.horasMov
-				newPct := (r.mc.HorasAlocadas + r.horasMov + t.Horas) / r.mc.HorasDisponiveis * 100
-				if disp > bestDisp && newPct <= 100 {
-					bestDisp = disp
-					bestR = rID
-				}
-			}
-			if bestR == uuid.Nil {
-				continue
-			}
-
-			et := EqualizerTarefa{
+			allTarefas = append(allTarefas, aiTarefaInput{
+				Ticket:          t.NumeroTicket,
+				Resumo:          t.Resumo,
+				Horas:           t.Horas,
+				Tipo:            t.Tipo,
+				ResponsavelNome: m.Nome,
+			})
+			ticketToTarefa[t.NumeroTicket] = EqualizerTarefa{
 				ID:           t.ID,
 				NumeroTicket: t.NumeroTicket,
 				Resumo:       t.Resumo,
@@ -281,28 +356,176 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 				Tipo:         t.Tipo,
 				Prioridade:   t.Prioridade,
 			}
-
-			key := dID.String() + "->" + bestR.String()
-			if existing, ok := sugestaoMap[key]; ok {
-				existing.Tarefas = append(existing.Tarefas, et)
-				existing.HorasTransferidas += t.Horas
-			} else {
-				sug := &EqualizerSugestao{
-					De:   EqualizerMembro{MembroID: dID, Nome: d.mc.Nome, AvatarURL: d.mc.AvatarURL},
-					Para: EqualizerMembro{MembroID: bestR, Nome: states[bestR].mc.Nome, AvatarURL: states[bestR].mc.AvatarURL},
-					Tarefas: []EqualizerTarefa{et},
-					HorasTransferidas: t.Horas,
-				}
-				sugestaoMap[key] = sug
-				sugestoes = append(sugestoes, sug)
-			}
-			d.horasMov += t.Horas
-			states[bestR].horasMov += t.Horas
+			ticketToOwner[t.NumeroTicket] = m.MembroID
 		}
 	}
 
+	if len(activeMembros) < 2 {
+		return s.nadaASugerir(cap, states, "Menos de 2 membros ativos na equipe"), nil
+	}
+	if len(allTarefas) == 0 {
+		return s.nadaASugerir(cap, states, "Nenhuma tarefa movível encontrada"), nil
+	}
+
+	// Standard deviation of allocation before any transfers.
+	var pcts []float64
+	for _, m := range activeMembros {
+		pcts = append(pcts, m.PctAlocacao)
+	}
+	stdDevAntes := math.Round(calcStdDev(pcts)*10) / 10
+
+	// AI is not configured: nothing to suggest, but still report the metric.
+	apiKey, err := s.configRepo.GetConfig(ctx, "openrouter_api_key")
+	if err != nil || apiKey == "" {
+		s.logger.Warn("openrouter API key not configured, no equalizer suggestions")
+		result := s.nadaASugerir(cap, states, "Serviço de IA não configurado")
+		result.DesvioPadraoAntes = stdDevAntes
+		result.DesvioPadraoDepois = stdDevAntes
+		return result, nil
+	}
+	model := "openai/gpt-oss-20b:free"
+	if m, err := s.configRepo.GetConfig(ctx, "openrouter_model"); err == nil && m != "" {
+		model = m
+	}
+
+	systemPrompt, userPrompt := buildEqualizerPrompt(activeMembros, allTarefas)
+	client := NewOpenRouterClient(apiKey, model)
+	rawResponse, err := client.ChatCompletion(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		s.logger.Error("AI equalizer call failed", zap.Error(err))
+		result := s.nadaASugerir(cap, states, "Serviço de IA indisponível")
+		result.DesvioPadraoAntes = stdDevAntes
+		result.DesvioPadraoDepois = stdDevAntes
+		return result, nil
+	}
+
+	// Strip markdown fences, same pattern used by ReviewService.GenerateAnalise.
+	cleaned := strings.TrimSpace(rawResponse)
+	if strings.HasPrefix(cleaned, "```") {
+		lines := strings.Split(cleaned, "\n")
+		if len(lines) >= 2 {
+			lines = lines[1:]
+		}
+		for i, l := range lines {
+			if strings.HasPrefix(strings.TrimSpace(l), "```") {
+				lines = lines[:i]
+				break
+			}
+		}
+		cleaned = strings.TrimSpace(strings.Join(lines, "\n"))
+	}
+
+	var aiResp aiResponse
+	if err := json.Unmarshal([]byte(cleaned), &aiResp); err != nil {
+		s.logger.Error("AI returned invalid JSON", zap.Error(err), zap.String("raw", cleaned))
+		result := s.nadaASugerir(cap, states, "Resposta da IA inválida")
+		result.DesvioPadraoAntes = stdDevAntes
+		result.DesvioPadraoDepois = stdDevAntes
+		return result, nil
+	}
+
+	if len(aiResp.Sugestoes) == 0 {
+		result := s.nadaASugerir(cap, states, firstNonEmpty(aiResp.Analise, "IA não encontrou sugestões viáveis"))
+		result.Analise = aiResp.Analise
+		result.DesvioPadraoAntes = stdDevAntes
+		result.DesvioPadraoDepois = stdDevAntes
+		return result, nil
+	}
+
+	// Validate every AI suggestion against the hard rules. Suggestions that
+	// fail validation are silently dropped rather than failing the request.
+	sugestaoMap := make(map[string]*EqualizerSugestao)
+	var sugestoes []*EqualizerSugestao
+	usedTickets := make(map[string]bool)
+
+	for _, aiSug := range aiResp.Sugestoes {
+		if len(sugestoes) >= 10 {
+			break
+		}
+
+		deID, deOk := nameToID[aiSug.DeNome]
+		paraID, paraOk := nameToID[aiSug.ParaNome]
+		tarefa, tarefaOk := ticketToTarefa[aiSug.TarefaTicket]
+		if !deOk || !paraOk || !tarefaOk || deID == paraID {
+			continue
+		}
+
+		// The task must genuinely belong to the claimed donor, and can only
+		// be transferred once even if the AI mentions it twice.
+		if owner, ok := ticketToOwner[aiSug.TarefaTicket]; !ok || owner != deID {
+			continue
+		}
+		if usedTickets[aiSug.TarefaTicket] {
+			continue
+		}
+
+		deSt := states[deID]
+		paraSt := states[paraID]
+
+		// Hard rule 1: a member above 100% allocation can never receive.
+		if paraSt.mc.PercentualAlocacao > 100 {
+			continue
+		}
+
+		// Hard rule 2: the transfer cannot push the receiver above 100%.
+		newParaPct := (paraSt.mc.HorasAlocadas + paraSt.horasMov + tarefa.Horas) / paraSt.mc.HorasDisponiveis * 100
+		if newParaPct > 100 {
+			continue
+		}
+
+		usedTickets[aiSug.TarefaTicket] = true
+
+		key := deID.String() + "->" + paraID.String()
+		if existing, ok := sugestaoMap[key]; ok {
+			existing.Tarefas = append(existing.Tarefas, tarefa)
+			existing.HorasTransferidas += tarefa.Horas
+			if aiSug.Justificativa != "" {
+				existing.Justificativa += "; " + aiSug.Justificativa
+			}
+		} else {
+			sug := &EqualizerSugestao{
+				De:                EqualizerMembro{MembroID: deID, Nome: deSt.mc.Nome, AvatarURL: deSt.mc.AvatarURL},
+				Para:              EqualizerMembro{MembroID: paraID, Nome: paraSt.mc.Nome, AvatarURL: paraSt.mc.AvatarURL},
+				Tarefas:           []EqualizerTarefa{tarefa},
+				HorasTransferidas: tarefa.Horas,
+				Justificativa:     aiSug.Justificativa,
+			}
+			sugestaoMap[key] = sug
+			sugestoes = append(sugestoes, sug)
+		}
+		// horasMov is a signed net delta: donor loses hours, receiver gains them.
+		deSt.horasMov -= tarefa.Horas
+		paraSt.horasMov += tarefa.Horas
+	}
+
 	if len(sugestoes) == 0 {
-		return s.nadaASugerir(cap, states, "Nenhuma transferência viável atinge o limiar mínimo de 10%"), nil
+		result := s.nadaASugerir(cap, states, "Nenhuma sugestão da IA passou na validação das regras de negócio")
+		result.Analise = aiResp.Analise
+		result.DesvioPadraoAntes = stdDevAntes
+		result.DesvioPadraoDepois = stdDevAntes
+		return result, nil
+	}
+
+	// Standard deviation after applying the validated suggestions.
+	var newPcts []float64
+	for _, m := range activeMembros {
+		st := states[nameToID[m.Nome]]
+		newPct := m.PctAlocacao
+		if st.mc.HorasDisponiveis > 0 {
+			newPct = (st.mc.HorasAlocadas + st.horasMov) / st.mc.HorasDisponiveis * 100
+		}
+		newPcts = append(newPcts, newPct)
+	}
+	stdDevDepois := math.Round(calcStdDev(newPcts)*10) / 10
+
+	// Hard rule 3: reject the whole batch if it doesn't actually reduce the
+	// overall standard deviation (i.e. it's just shuffling percentages).
+	if stdDevDepois >= stdDevAntes {
+		result := s.nadaASugerir(cap, resetHorasMov(states), "Sugestões da IA não reduzem o desvio padrão de alocação da equipe")
+		result.Analise = aiResp.Analise
+		result.DesvioPadraoAntes = stdDevAntes
+		result.DesvioPadraoDepois = stdDevAntes
+		return result, nil
 	}
 
 	// Calculate before/after percentages on each suggestion.
@@ -310,13 +533,12 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 		d := states[sug.De.MembroID]
 		r := states[sug.Para.MembroID]
 		sug.De.PctAntes = d.mc.PercentualAlocacao
-		sug.De.PctDepois = (d.mc.HorasAlocadas - d.horasMov) / d.mc.HorasDisponiveis * 100
+		sug.De.PctDepois = (d.mc.HorasAlocadas + d.horasMov) / d.mc.HorasDisponiveis * 100
 		sug.Para.PctAntes = r.mc.PercentualAlocacao
 		sug.Para.PctDepois = (r.mc.HorasAlocadas + r.horasMov) / r.mc.HorasDisponiveis * 100
 		sug.PctTransferido = sug.HorasTransferidas / d.mc.HorasDisponiveis * 100
 	}
 
-	// Dereference pointers into value slice for the result.
 	resultSugestoes := make([]EqualizerSugestao, len(sugestoes))
 	for i, sp := range sugestoes {
 		resultSugestoes[i] = *sp
@@ -328,7 +550,18 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 		Sugestoes:          resultSugestoes,
 		MembrosAntesDepois: membrosAD,
 		NadaASugerir:       false,
+		Analise:            aiResp.Analise,
+		DesvioPadraoAntes:  stdDevAntes,
+		DesvioPadraoDepois: stdDevDepois,
 	}, nil
+}
+
+// firstNonEmpty returns a if non-empty, otherwise b.
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +579,8 @@ func (s *EqualizerService) nadaASugerir(cap *SprintCapacityResult, states map[uu
 
 // ---------------------------------------------------------------------------
 // buildMembrosAntesDepois — builds a before/after snapshot for every active
-// team member, using the explicit role to decide the direction of horasMov.
+// team member, applying each member's signed net horasMov delta (negative
+// for donors, positive for receivers) on top of their current allocation.
 // ---------------------------------------------------------------------------
 
 func (s *EqualizerService) buildMembrosAntesDepois(cap *SprintCapacityResult, states map[uuid.UUID]*membroState) []MembroAntesDepois {
@@ -358,10 +592,8 @@ func (s *EqualizerService) buildMembrosAntesDepois(cap *SprintCapacityResult, st
 		st := states[m.MembroID]
 
 		horasDepois := m.HorasAlocadas
-		switch st.role {
-		case roleDoador:
-			horasDepois = m.HorasAlocadas - st.horasMov
-		case roleReceptor:
+		if st != nil {
+			// horasMov is a signed net delta (negative = donated, positive = received).
 			horasDepois = m.HorasAlocadas + st.horasMov
 		}
 
