@@ -44,6 +44,10 @@ func (p *EmailProvider) Send(ctx context.Context, to string, subject string, htm
 		from = user
 	}
 
+	to = sanitizeHeaderValue(to)
+	subject = sanitizeHeaderValue(subject)
+	from = sanitizeHeaderValue(from)
+
 	msg := "From: " + from + "\r\n" +
 		"To: " + to + "\r\n" +
 		"Subject: " + subject + "\r\n" +
@@ -54,6 +58,13 @@ func (p *EmailProvider) Send(ctx context.Context, to string, subject string, htm
 	auth := smtp.PlainAuth("", user, password, host)
 	addr := host + ":" + port
 	return smtp.SendMail(addr, auth, user, []string{to}, []byte(msg))
+}
+
+// sanitizeHeaderValue strips CR/LF characters to prevent SMTP header injection.
+func sanitizeHeaderValue(v string) string {
+	v = strings.ReplaceAll(v, "\r", "")
+	v = strings.ReplaceAll(v, "\n", "")
+	return v
 }
 
 type emailTemplateData struct {
@@ -150,6 +161,13 @@ func generatePieChartSVG(slices []pieSlice, title string) string {
 		return ""
 	}
 
+	nonZeroSlices := 0
+	for _, s := range slices {
+		if s.Value > 0 {
+			nonZeroSlices++
+		}
+	}
+
 	cx, cy, r := 80.0, 80.0, 70.0
 	var svg strings.Builder
 	svg.WriteString(fmt.Sprintf(`<svg width="180" height="200" xmlns="http://www.w3.org/2000/svg">
@@ -170,8 +188,10 @@ func generatePieChartSVG(slices []pieSlice, title string) string {
 		x2 := cx + r*math.Cos(endAngle*math.Pi/180)
 		y2 := cy + r*math.Sin(endAngle*math.Pi/180) + 20
 
-		if len(slices) == 1 {
-			svg.WriteString(fmt.Sprintf(`<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>`, cx, cy+20, r, s.Color))
+		if nonZeroSlices == 1 {
+			if s.Value > 0 {
+				svg.WriteString(fmt.Sprintf(`<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>`, cx, cy+20, r, s.Color))
+			}
 		} else {
 			svg.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 %d,1 %.1f,%.1f Z" fill="%s"/>`,
 				cx, cy+20, x1, y1, r, r, largeArc, x2, y2, s.Color))
@@ -204,17 +224,6 @@ func generatePlanejamentoSVG(plan ReviewGraficoPlanejamento) string {
 		{Label: "Não Plan. (Outras)", Value: plan.NaoPlanejadasOutras, Color: "#f97316"},
 	}
 	return generatePieChartSVG(slices, "Planejamento")
-}
-
-func statusColor(status string) string {
-	switch status {
-	case "Concluído":
-		return "#16a34a"
-	case "Desenvolvimento", "Deploy", "Code Review", "Teste", "Validação do Solicitante":
-		return "#2563eb"
-	default:
-		return "#94a3b8"
-	}
 }
 
 const reviewEmailTemplate = `<table width="600" cellpadding="0" cellspacing="0" style="margin:0 auto;font-family:Arial,Helvetica,sans-serif;border:1px solid #e2e8f0">
