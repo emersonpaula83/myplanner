@@ -1335,6 +1335,14 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="modal-actions"><button class="btn-cancel" onclick="closeTimelineDetailModal()">Fechar</button></div>
   </div>
 </div>
+
+<div class="modal-overlay" id="enviar-review-modal" onclick="if(event.target===this)closeEnviarReviewModal()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title">📧 Enviar Relatório da Sprint Review</div>
+    <div id="enviar-review-body"></div>
+    <div class="modal-actions"><button class="btn-cancel" type="button" onclick="closeEnviarReviewModal()">Fechar</button></div>
+  </div>
+</div>
 <div id="apikey-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center">
   <div style="background:#fff;border-radius:10px;padding:24px;max-width:420px;width:90%">
     <h3 style="margin:0 0 12px;font-size:16px">Configurar API OpenRouter</h3>
@@ -3004,6 +3012,7 @@ function renderReviewContent(container, data) {
   html += '<div class="review-export-bar">';
   html += '<button class="btn-pdf" onclick="exportReviewPDF()">Exportar PDF</button>';
   html += '<button class="btn-img" onclick="exportReviewImage()">Exportar Imagem</button>';
+  html += ' <button class="btn-sm" style="font-size:12px;padding:4px 12px;background:var(--accent);color:#fff" onclick="openEnviarReview(\'' + window._currentSprintID + '\',\'' + _reviewEquipeID + '\')">📧 Enviar Relatório</button>';
   html += '</div>';
 
   container.innerHTML = html;
@@ -3271,6 +3280,139 @@ function exportReviewPDF() {
   }).catch(function(err) {
     alert('Erro ao exportar PDF: ' + err.message);
     div.remove();
+  });
+}
+
+function closeEnviarReviewModal() {
+  document.getElementById('enviar-review-modal').classList.remove('open');
+}
+
+function openEnviarReview(sprintId, equipeId) {
+  document.getElementById('enviar-review-modal').classList.add('open');
+  var body = document.getElementById('enviar-review-body');
+  body.innerHTML = '<div style="text-align:center;padding:24px">Carregando...</div>';
+  window._enviarReviewSprintId = sprintId;
+  window._enviarReviewEquipeId = equipeId;
+  api('/equipes/' + equipeId + '/destinatarios').then(function(data) {
+    renderEnviarModal(data, sprintId, equipeId);
+  }).catch(function(e) {
+    body.innerHTML = '<div style="color:red;padding:16px">Erro ao carregar destinatários: ' + esc(e.message || e) + '</div>';
+  });
+}
+
+function renderEnviarModal(dests, sprintId, equipeId) {
+  var body = document.getElementById('enviar-review-body');
+  var whatsappDests = dests.filter(function(d) { return d.tipo === 'whatsapp'; });
+  var emailDests = dests.filter(function(d) { return d.tipo === 'email'; });
+
+  var html = '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border)">';
+  html += '<button class="btn-sm" id="tab-whatsapp" style="padding:8px 20px;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;background:transparent;font-weight:bold;cursor:pointer" onclick="switchEnviarTab(\'whatsapp\')">📱 WhatsApp</button>';
+  html += '<button class="btn-sm" id="tab-email" style="padding:8px 20px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;cursor:pointer" onclick="switchEnviarTab(\'email\')">📧 E-mails</button>';
+  html += '</div>';
+
+  html += '<div id="enviar-tab-whatsapp">';
+  html += renderDestinatariosList(whatsappDests, 'whatsapp', equipeId);
+  html += '<div style="display:flex;gap:8px;margin-top:12px">';
+  html += '<input type="text" id="dest-whatsapp-nome" placeholder="Nome" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:4px">';
+  html += '<input type="text" id="dest-whatsapp-valor" placeholder="5511999999999" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:4px" inputmode="numeric">';
+  html += '<button class="btn-sm" style="padding:6px 12px;background:var(--accent);color:#fff" onclick="addDestinatario(\'' + equipeId + '\',\'whatsapp\')">+ Add</button>';
+  html += '</div></div>';
+
+  html += '<div id="enviar-tab-email" style="display:none">';
+  html += renderDestinatariosList(emailDests, 'email', equipeId);
+  html += '<div style="display:flex;gap:8px;margin-top:12px">';
+  html += '<input type="text" id="dest-email-nome" placeholder="Nome" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:4px">';
+  html += '<input type="email" id="dest-email-valor" placeholder="email@exemplo.com" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:4px">';
+  html += '<button class="btn-sm" style="padding:6px 12px;background:var(--accent);color:#fff" onclick="addDestinatario(\'' + equipeId + '\',\'email\')">+ Add</button>';
+  html += '</div></div>';
+
+  html += '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">';
+  html += '<button class="btn-sm" id="btn-enviar-review" style="width:100%;padding:10px;background:var(--accent);color:#fff;font-size:14px;font-weight:bold" onclick="enviarReview(\'' + sprintId + '\',\'' + equipeId + '\')">Enviar para Selecionados</button>';
+  html += '</div>';
+  html += '<div id="enviar-review-status" style="margin-top:12px"></div>';
+
+  body.innerHTML = html;
+}
+
+function renderDestinatariosList(dests, tipo, equipeId) {
+  if (dests.length === 0) return '<div style="color:var(--text-secondary);padding:12px;text-align:center;font-size:13px">Nenhum contato cadastrado</div>';
+  var html = '<div style="max-height:200px;overflow-y:auto">';
+  dests.forEach(function(d) {
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border)">';
+    html += '<input type="checkbox" class="dest-check" data-id="' + d.id + '" data-tipo="' + d.tipo + '" checked>';
+    html += '<span style="flex:1;font-size:13px">' + esc(d.nome || '') + ' — <b>' + esc(d.valor) + '</b></span>';
+    html += '<button style="border:none;background:transparent;cursor:pointer;color:#ef4444;font-size:16px" onclick="removeDestinatario(\'' + equipeId + '\',\'' + d.id + '\')">❌</button>';
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function switchEnviarTab(tab) {
+  document.getElementById('enviar-tab-whatsapp').style.display = tab === 'whatsapp' ? 'block' : 'none';
+  document.getElementById('enviar-tab-email').style.display = tab === 'email' ? 'block' : 'none';
+  document.getElementById('tab-whatsapp').style.borderBottomColor = tab === 'whatsapp' ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-whatsapp').style.fontWeight = tab === 'whatsapp' ? 'bold' : 'normal';
+  document.getElementById('tab-email').style.borderBottomColor = tab === 'email' ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-email').style.fontWeight = tab === 'email' ? 'bold' : 'normal';
+}
+
+function addDestinatario(equipeId, tipo) {
+  var nome = document.getElementById('dest-' + tipo + '-nome').value.trim();
+  var valor = document.getElementById('dest-' + tipo + '-valor').value.trim();
+  if (!valor) { alert('Informe o ' + (tipo === 'email' ? 'e-mail' : 'número')); return; }
+  api('/equipes/' + equipeId + '/destinatarios', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ tipo: tipo, valor: valor, nome: nome || null })
+  }).then(function() {
+    openEnviarReview(window._enviarReviewSprintId, equipeId);
+  }).catch(function(e) {
+    alert('Erro: ' + (e.message || e));
+  });
+}
+
+function removeDestinatario(equipeId, destId) {
+  if (!confirm('Remover este contato?')) return;
+  api('/equipes/' + equipeId + '/destinatarios/' + destId, { method: 'DELETE' }).then(function() {
+    openEnviarReview(window._enviarReviewSprintId, equipeId);
+  }).catch(function(e) {
+    alert('Erro: ' + (e.message || e));
+  });
+}
+
+function enviarReview(sprintId, equipeId) {
+  var checks = document.querySelectorAll('.dest-check:checked');
+  var ids = [];
+  checks.forEach(function(c) { ids.push(c.dataset.id); });
+  if (ids.length === 0) { alert('Selecione ao menos um destinatário'); return; }
+
+  var btn = document.getElementById('btn-enviar-review');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  var statusDiv = document.getElementById('enviar-review-status');
+  statusDiv.innerHTML = '<div style="text-align:center;padding:8px">Enviando relatório...</div>';
+
+  api('/sprints/' + sprintId + '/review/enviar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ equipe_id: equipeId, destinatario_ids: ids })
+  }).then(function(resp) {
+    var html = '';
+    resp.resultados.forEach(function(r) {
+      if (r.status === 'enviado') {
+        html += '<div style="padding:4px 0;color:#16a34a;font-size:13px">✅ ' + esc(r.tipo) + ' — Enviado</div>';
+      } else {
+        html += '<div style="padding:4px 0;color:#ef4444;font-size:13px">❌ ' + esc(r.tipo) + ' — Erro: ' + esc(r.erro) + '</div>';
+      }
+    });
+    statusDiv.innerHTML = html;
+    btn.disabled = false;
+    btn.textContent = 'Enviar para Selecionados';
+  }).catch(function(e) {
+    statusDiv.innerHTML = '<div style="color:red;font-size:13px">Erro: ' + esc(e.message || e) + '</div>';
+    btn.disabled = false;
+    btn.textContent = 'Enviar para Selecionados';
   });
 }
 
