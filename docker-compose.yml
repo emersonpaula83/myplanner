@@ -14,5 +14,16 @@ services:
       timeout: 3s
       retries: 5
 
+  evolution:
+    image: atendai/evolution-api:latest
+    network_mode: host
+    environment:
+      - SERVER_PORT=8085
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-myplanner-evo-key}
+    volumes:
+      - evolution_data:/evolution/instances
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  evolution_data:
