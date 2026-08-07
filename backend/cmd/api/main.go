@@ -164,6 +164,12 @@ func main() {
 	reviewService := service.NewReviewService(reviewRepo, configRepo, logger)
 	reviewHandler := handler.NewReviewHandler(reviewService, configRepo, logger)
 
+	destRepo := repository.NewDestinatarioRepository(pool)
+	emailProv := service.NewEmailProvider(configRepo, logger)
+	whatsappProv := service.NewWhatsAppProvider(configRepo, logger)
+	notifSvc := service.NewNotificationService(reviewService, destRepo, emailProv, whatsappProv, logger)
+	notifHandler := handler.NewNotificationHandler(destRepo, notifSvc, logger)
+
 	allocRepo := repository.NewAllocationRepository(pool)
 	allocSvc := service.NewAllocationService(allocRepo, sprintService, sprintRepo, fonteDadosRepo, syncService, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	allocHandler := handler.NewAllocationHandler(allocSvc, logger)
@@ -294,6 +300,12 @@ func main() {
 
 			r.Get("/sprints/{id}/review/analise", reviewHandler.GetReviewAnalise)
 			r.Post("/sprints/{id}/review/analise", reviewHandler.PostReviewAnalise)
+
+			r.Get("/equipes/{id}/destinatarios", notifHandler.ListDestinatarios)
+			r.Post("/equipes/{id}/destinatarios", notifHandler.CreateDestinatario)
+			r.Delete("/equipes/{id}/destinatarios/{destId}", notifHandler.DeleteDestinatario)
+
+			r.Post("/sprints/{id}/review/enviar", notifHandler.EnviarReview)
 
 			r.Get("/config/{chave}", reviewHandler.GetConfig)
 			r.Post("/config", reviewHandler.SetConfig)

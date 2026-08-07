@@ -36,6 +36,14 @@ type ConfigStore interface {
 var configWhitelist = map[string]bool{
 	"openrouter_api_key": true,
 	"openrouter_model":   true,
+	"smtp_host":          true,
+	"smtp_port":          true,
+	"smtp_user":          true,
+	"smtp_password":      true,
+	"smtp_from":          true,
+	"evolution_api_url":  true,
+	"evolution_api_key":  true,
+	"evolution_instance": true,
 }
 
 type ReviewHandler struct {
