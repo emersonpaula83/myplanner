@@ -73,7 +73,8 @@
 }
 :root[data-theme="light"] {
   --bg: #F7F7F5; --surface: #FFFFFF; --surface-raised: #FFFFFF;
-  --sidebar-bg: #1C1D20; --border: #E4E5E9; --border-subtle: #EDEDEF;
+  --sidebar-bg: #F0F0F2; --sidebar-icon: #6B6D76; --sidebar-active: #0D7C66;
+  --border: #E4E5E9; --border-subtle: #EDEDEF;
   --text-primary: #1C1D20; --text-secondary: #6B6D76; --text-tertiary: #9496A1;
   --shadow-card: 0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.06);
   --shadow-card-hover: 0 4px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
@@ -460,6 +461,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 :root[data-theme="dark"] .unplanned-disclaimer.warn { background: #ff6f0018; border-left-color: #ffb74d; color: #ffcc80; }
 :root[data-theme="dark"] .unplanned-disclaimer.danger { background: #d32f2f18; border-left-color: #ef5350; color: #ef9a9a; }
 :root[data-theme="dark"] .unplanned-badge { background: #e6510020; color: #ffab40; }
+:root[data-theme="light"] .unplanned-disclaimer { background: #e3f2fd; border-left-color: #2196F3; color: #1565c0; }
+:root[data-theme="light"] .unplanned-disclaimer.warn { background: #fff8e1; border-left-color: #ffa000; color: #e65100; }
+:root[data-theme="light"] .unplanned-disclaimer.danger { background: #ffebee; border-left-color: #d32f2f; color: #b71c1c; }
+:root[data-theme="light"] .unplanned-badge { background: #fff3e0; color: #e65100; }
 .sprint-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; }
 .sprint-tab { padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
 .sprint-tab:hover { color: #1976d2; }
@@ -597,6 +602,29 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 :root[data-theme="dark"] .review-tasks-table tr:hover td { background: #333; }
 :root[data-theme="dark"] .review-produto-chip { background: #333; color: #ccc; border-color: #555; }
 :root[data-theme="dark"] .review-produto-chip.selected { background: #1565c0; color: #fff; border-color: #1565c0; }
+:root[data-theme="light"] .sidebar { border-right-color: var(--border); }
+:root[data-theme="light"] .sidebar-item:hover, :root[data-theme="light"] .sidebar-group-header:hover { background: rgba(0,0,0,.06); }
+:root[data-theme="light"] .sidebar-toggle:hover { background: rgba(0,0,0,.06); }
+:root[data-theme="light"] .sprint-tabs { border-bottom-color: #e0e0e0; }
+:root[data-theme="light"] .sprint-tab { color: #666; }
+:root[data-theme="light"] .sprint-tab:hover, :root[data-theme="light"] .sprint-tab.active { color: #1976d2; }
+:root[data-theme="light"] .sprint-tab.active { border-bottom-color: #1976d2; }
+:root[data-theme="light"] .review-selectors select { background: #fff; color: #333; border-color: #e0e0e0; }
+:root[data-theme="light"] .review-stat-card { background: #fff; border-color: #e0e0e0; }
+:root[data-theme="light"] .review-stat-card .stat-pct { color: #1976d2; }
+:root[data-theme="light"] .review-stat-card .stat-label { color: #666; }
+:root[data-theme="light"] .review-chart-box { background: #fff; border-color: #e0e0e0; }
+:root[data-theme="light"] .review-chart-box h4 { color: #333; }
+:root[data-theme="light"] .review-produto-destaques { background: #fafafa; border-color: #e0e0e0; }
+:root[data-theme="light"] .review-produto-destaques h4 { color: #333; }
+:root[data-theme="light"] .review-destaque-item { background: #fff; border-color: #e0e0e0; }
+:root[data-theme="light"] .review-destaque-item .destaque-desc { color: #555; }
+:root[data-theme="light"] .review-analise-produto { background: #f5f3ff; border-color: #e0d4f5; }
+:root[data-theme="light"] .review-analise-card-body { color: #444; }
+:root[data-theme="light"] .review-tasks-table th { background: #f5f5f5; border-color: #e0e0e0; color: #666; }
+:root[data-theme="light"] .review-tasks-table td { border-color: #eee; }
+:root[data-theme="light"] .review-produto-chip { background: #f5f5f5; color: #555; border-color: #ddd; }
+:root[data-theme="light"] .review-produto-chip.selected { background: #1976d2; color: #fff; border-color: #1976d2; }
 .pie-modal { max-width: 780px; }
 .pie-modal-content { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
 .pie-modal-content.single { justify-content: center; }
@@ -902,6 +930,18 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .projmeta-equipes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .projmeta-equipes label { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-primary); cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); }
 .projmeta-equipes label:has(input:checked) { background: rgba(13,124,102,.15); border-color: var(--accent); }
+.tl-team-section { margin-bottom: 16px; }
+.tl-team-section h4 { margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+.tl-team-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.tl-member-chip { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 8px; background: var(--surface-raised); border: 1px solid var(--border-subtle); font-size: 13px; }
+.tl-member-chip .tl-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.tl-member-chip .tl-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: var(--border); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.tl-member-chip .tl-avatar-unassigned { width: 32px; height: 32px; border-radius: 50%; background: var(--chip-bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tl-member-chip .tl-avatar-unassigned svg { width: 18px; height: 18px; stroke: var(--text-tertiary); fill: none; stroke-width: 1.5; }
+.tl-pct-badge { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tl-pct-badge.green { background: #16a34a18; color: #16a34a; }
+.tl-pct-badge.amber { background: #C78D2E18; color: #C78D2E; }
+.tl-pct-badge.red { background: #D4483B18; color: #D4483B; }
 </style>
 </head>
 <body>
@@ -995,6 +1035,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       <span class="sidebar-item-label">Fontes de Dados</span>
     </button>
     <div class="sidebar-spacer"></div>
+    <button class="sidebar-item" id="theme-toggle" title="Tema: Automático" onclick="cycleTheme()">
+      <svg viewBox="0 0 24 24" id="theme-icon"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <span class="sidebar-item-label">Tema</span>
+    </button>
     <button class="sidebar-item" title="Sair" onclick="logout()">
       <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       <span class="sidebar-item-label">Sair</span>
@@ -1353,6 +1397,50 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="modal-title">📧 Enviar Relatório da Sprint Review</div>
     <div id="enviar-review-body"></div>
     <div class="modal-actions"><button class="btn-cancel" type="button" onclick="closeEnviarReviewModal()">Fechar</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="msg-settings-modal" onclick="if(event.target===this)closeMsgSettings()" style="z-index:10000">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">⚙️ Configurações de Envio</div>
+    <div style="margin-bottom:16px">
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px">
+        <button class="btn-sm" id="msg-cfg-tab-whatsapp" style="padding:8px 20px;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;background:transparent;font-weight:bold;cursor:pointer" onclick="switchMsgCfgTab('whatsapp')">📱 WhatsApp</button>
+        <button class="btn-sm" id="msg-cfg-tab-email" style="padding:8px 20px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;cursor:pointer" onclick="switchMsgCfgTab('email')">📧 E-mail</button>
+      </div>
+      <div id="msg-cfg-whatsapp">
+        <p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px">Configuração da Evolution API para envio via WhatsApp.</p>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">URL da API</label>
+        <input id="cfg-evolution_api_url" type="text" placeholder="https://api.evolution.exemplo.com" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">API Key</label>
+        <input id="cfg-evolution_api_key" type="password" placeholder="••••••••" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Nome da Instância</label>
+        <input id="cfg-evolution_instance" type="text" placeholder="minha-instancia" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+        <div id="msg-cfg-whatsapp-status" style="font-size:12px;margin-bottom:8px"></div>
+        <button onclick="saveMsgConfig('whatsapp')" style="padding:8px 16px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600">Salvar WhatsApp</button>
+      </div>
+      <div id="msg-cfg-email" style="display:none">
+        <p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px">Configuração SMTP para envio de e-mails.</p>
+        <div style="display:flex;gap:8px">
+          <div style="flex:3">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Host SMTP</label>
+            <input id="cfg-smtp_host" type="text" placeholder="smtp.gmail.com" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Porta</label>
+            <input id="cfg-smtp_port" type="text" placeholder="587" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+          </div>
+        </div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Usuário</label>
+        <input id="cfg-smtp_user" type="text" placeholder="user@gmail.com" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Senha</label>
+        <input id="cfg-smtp_password" type="password" placeholder="••••••••" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">E-mail Remetente (opcional)</label>
+        <input id="cfg-smtp_from" type="text" placeholder="noreply@empresa.com" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;margin-bottom:10px;background:var(--card-bg);color:var(--text)">
+        <div id="msg-cfg-email-status" style="font-size:12px;margin-bottom:8px"></div>
+        <button onclick="saveMsgConfig('email')" style="padding:8px 16px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600">Salvar E-mail</button>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn-cancel" type="button" onclick="closeMsgSettings()">Fechar</button></div>
   </div>
 </div>
 <div id="apikey-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center">
@@ -1797,6 +1885,36 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 const API = '/api/v1';
 let token = localStorage.getItem('myplanner_token');
 let currentUser = null;
+
+var THEME_CYCLE = ['auto', 'dark', 'light'];
+var THEME_ICONS = {
+  auto: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/><path d="M16 12a4 4 0 0 1-4 4" stroke-dasharray="3 2"/>',
+  dark: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  light: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
+};
+var THEME_LABELS = { auto: 'Automático', dark: 'Escuro', light: 'Claro' };
+
+function applyTheme(mode) {
+  if (mode === 'auto') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', mode);
+  }
+  var btn = document.getElementById('theme-toggle');
+  var icon = document.getElementById('theme-icon');
+  if (btn) btn.title = 'Tema: ' + THEME_LABELS[mode];
+  if (icon) icon.innerHTML = THEME_ICONS[mode];
+}
+
+function cycleTheme() {
+  var current = localStorage.getItem('myplanner_theme') || 'auto';
+  var idx = THEME_CYCLE.indexOf(current);
+  var next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
+  localStorage.setItem('myplanner_theme', next);
+  applyTheme(next);
+}
+
+applyTheme(localStorage.getItem('myplanner_theme') || 'auto');
 
 function decodeTokenEmail(t) {
   try {
@@ -3331,9 +3449,10 @@ function renderEnviarModal(dests, sprintId, equipeId) {
   var whatsappDests = dests.filter(function(d) { return d.tipo === 'whatsapp'; });
   var emailDests = dests.filter(function(d) { return d.tipo === 'email'; });
 
-  var html = '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border)">';
+  var html = '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);align-items:center">';
   html += '<button class="btn-sm" id="tab-whatsapp" style="padding:8px 20px;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;background:transparent;font-weight:bold;cursor:pointer" onclick="switchEnviarTab(\'whatsapp\')">📱 WhatsApp</button>';
   html += '<button class="btn-sm" id="tab-email" style="padding:8px 20px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;cursor:pointer" onclick="switchEnviarTab(\'email\')">📧 E-mails</button>';
+  html += '<button style="margin-left:auto;border:none;background:transparent;cursor:pointer;font-size:18px;padding:4px 8px;margin-bottom:-2px" onclick="openMsgSettings()" title="Configurações de Envio">⚙️</button>';
   html += '</div>';
 
   html += '<div id="enviar-tab-whatsapp">';
@@ -3429,7 +3548,12 @@ function enviarReview(sprintId, equipeId) {
       if (r.status === 'enviado') {
         html += '<div style="padding:4px 0;color:#16a34a;font-size:13px">✅ ' + esc(r.tipo) + ' — Enviado</div>';
       } else {
-        html += '<div style="padding:4px 0;color:#ef4444;font-size:13px">❌ ' + esc(r.tipo) + ' — Erro: ' + esc(r.erro) + '</div>';
+        var erroMsg = r.erro;
+        if (erroMsg && erroMsg.indexOf('not configured') !== -1) {
+          var label = r.tipo === 'email' ? 'E-mail (SMTP)' : 'WhatsApp (Evolution API)';
+          erroMsg = label + ' não configurado. Clique em ⚙️ para configurar.';
+        }
+        html += '<div style="padding:4px 0;color:#ef4444;font-size:13px">❌ ' + esc(r.tipo) + ' — ' + esc(erroMsg) + '</div>';
       }
     });
     statusDiv.innerHTML = html;
@@ -3439,6 +3563,75 @@ function enviarReview(sprintId, equipeId) {
     statusDiv.innerHTML = '<div style="color:red;font-size:13px">Erro: ' + esc(e.message || e) + '</div>';
     btn.disabled = false;
     btn.textContent = 'Enviar para Selecionados';
+  });
+}
+
+function openMsgSettings() {
+  document.getElementById('msg-settings-modal').classList.add('open');
+  switchMsgCfgTab('whatsapp');
+  loadMsgConfigValues();
+}
+
+function closeMsgSettings() {
+  document.getElementById('msg-settings-modal').classList.remove('open');
+}
+
+function switchMsgCfgTab(tab) {
+  document.getElementById('msg-cfg-whatsapp').style.display = tab === 'whatsapp' ? 'block' : 'none';
+  document.getElementById('msg-cfg-email').style.display = tab === 'email' ? 'block' : 'none';
+  document.getElementById('msg-cfg-tab-whatsapp').style.borderBottomColor = tab === 'whatsapp' ? 'var(--accent)' : 'transparent';
+  document.getElementById('msg-cfg-tab-whatsapp').style.fontWeight = tab === 'whatsapp' ? 'bold' : 'normal';
+  document.getElementById('msg-cfg-tab-email').style.borderBottomColor = tab === 'email' ? 'var(--accent)' : 'transparent';
+  document.getElementById('msg-cfg-tab-email').style.fontWeight = tab === 'email' ? 'bold' : 'normal';
+}
+
+function loadMsgConfigValues() {
+  var textKeys = ['evolution_api_url', 'evolution_instance', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_from'];
+  var secretKeys = ['evolution_api_key', 'smtp_password'];
+  textKeys.forEach(function(k) {
+    var el = document.getElementById('cfg-' + k);
+    if (el) el.value = '';
+    api('/config/' + k).then(function(d) {
+      if (el && d.valor) el.value = d.valor;
+    }).catch(function() {});
+  });
+  secretKeys.forEach(function(k) {
+    var el = document.getElementById('cfg-' + k);
+    if (el) {
+      el.value = '';
+      el.placeholder = '••••••••';
+    }
+    api('/config/' + k).then(function(d) {
+      if (el && d.exists) el.placeholder = '••••••• (configurado)';
+    }).catch(function() {});
+  });
+}
+
+function saveMsgConfig(tipo) {
+  var keys = tipo === 'whatsapp'
+    ? ['evolution_api_url', 'evolution_api_key', 'evolution_instance']
+    : ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_from'];
+  var statusEl = document.getElementById('msg-cfg-' + tipo + '-status');
+  var promises = [];
+  keys.forEach(function(k) {
+    var val = document.getElementById('cfg-' + k).value.trim();
+    if (!val) return;
+    promises.push(api('/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ chave: k, valor: val })
+    }));
+  });
+  if (promises.length === 0) {
+    statusEl.innerHTML = '<span style="color:var(--text-secondary)">Nenhum campo preenchido.</span>';
+    return;
+  }
+  statusEl.innerHTML = '<span style="color:var(--text-secondary)">Salvando...</span>';
+  Promise.all(promises).then(function() {
+    statusEl.innerHTML = '<span style="color:#16a34a">✅ Configurações salvas!</span>';
+    setTimeout(function() { statusEl.innerHTML = ''; }, 3000);
+  }).catch(function(e) {
+    statusEl.innerHTML = '<span style="color:#ef4444">Erro: ' + esc(e.message || e) + '</span>';
   });
 }
 
@@ -5780,11 +5973,36 @@ async function openTimelineDetailModal(sprintId) {
   if (!equipe) { content.innerHTML = '<div class="pie-no-data">Nenhuma equipe selecionada</div>'; return; }
 
   try {
-    var data = await api('/sprints/' + sprintId + '/timeline-detail?equipe=' + equipe);
+    var [data, cap] = await Promise.all([
+      api('/sprints/' + sprintId + '/timeline-detail?equipe=' + equipe),
+      api('/sprints/' + sprintId + '/capacity?equipe=' + equipe).catch(function() { return null; })
+    ]);
 
     titleEl.textContent = data.sprint_nome + ' (' + fmtDateBR(data.data_inicio) + ' — ' + fmtDateBR(data.data_fim) + ')';
 
     var html = '';
+
+    if (cap && cap.membros && cap.membros.length > 0) {
+      html += '<div class="tl-team-section"><h4>Equipe</h4><div class="tl-team-grid">';
+      var somaHorasMembros = 0;
+      cap.membros.forEach(function(m) {
+        if (!m.da_equipe || m.desligado) return;
+        somaHorasMembros += (m.horas_alocadas || 0) + (m.horas_executadas || 0);
+        var avatar = m.avatar_url
+          ? '<img class="tl-avatar" src="' + escAttr(m.avatar_url) + '">'
+          : '<span class="tl-avatar-placeholder">' + (m.nome || '?').charAt(0).toUpperCase() + '</span>';
+        var pct = m.percentual_alocacao || 0;
+        var cls = pct > 100 ? 'red' : pct > 80 ? 'amber' : 'green';
+        html += '<div class="tl-member-chip">' + avatar + '<span>' + esc(m.nome) + '</span><span class="tl-pct-badge ' + cls + '">' + pct + '%</span></div>';
+      });
+      var horasTotalAloc = (cap.horas_alocadas || 0) + (cap.horas_executadas || 0);
+      var horasNaoAtrib = horasTotalAloc - somaHorasMembros;
+      if (horasNaoAtrib > 0.1 && cap.horas_total_sprint > 0) {
+        var pctNA = Math.round((horasNaoAtrib / cap.horas_total_sprint) * 1000) / 10;
+        html += '<div class="tl-member-chip"><span class="tl-avatar-unassigned"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg></span><span>Não Atribuído</span><span class="tl-pct-badge amber">' + pctNA + '%</span></div>';
+      }
+      html += '</div></div>';
+    }
 
     if (data.ausentes && data.ausentes.length > 0) {
       var parts = data.ausentes.map(function(a) {
@@ -5835,12 +6053,11 @@ function showPieTooltip(tarefas) {
   closePieTooltip();
   var tip = document.getElementById('pie-tooltip');
   var html = '<button class="pie-tooltip-close" onclick="closePieTooltip()">&times;</button>';
-  html += '<table><thead><tr><th>Ticket</th><th>Descrição</th><th>Relator</th></tr></thead><tbody>';
+  html += '<table><thead><tr><th>Ticket</th><th>Descrição</th></tr></thead><tbody>';
   tarefas.forEach(function(t) {
     var resumo = t.resumo || '';
     if (resumo.length > 60) resumo = resumo.substring(0, 57) + '...';
-    var relator = t.relator_nome || '—';
-    html += '<tr><td>' + esc(t.numero_ticket) + '</td><td class="resumo-col">' + esc(resumo) + '</td><td>' + esc(relator) + '</td></tr>';
+    html += '<tr><td>' + esc(t.numero_ticket) + '</td><td class="resumo-col">' + esc(resumo) + '</td></tr>';
   });
   html += '</tbody></table>';
   tip.innerHTML = html;

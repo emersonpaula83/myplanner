@@ -905,7 +905,6 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 			if m.DataDesligamento != nil && !m.DataDesligamento.After(*sp.DataFim) {
 				continue
 			}
-			headcount++
 
 			diasAusencia := 0
 			for _, a := range ausencias {
@@ -928,6 +927,9 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 			diasDisp := diasUteis - diasAusencia
 			if diasDisp < 0 {
 				diasDisp = 0
+			}
+			if diasDisp > 0 {
+				headcount++
 			}
 			horasCapacidade += float64(diasDisp) * horasPorDia
 		}

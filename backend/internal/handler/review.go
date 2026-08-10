@@ -268,7 +268,7 @@ func (h *ReviewHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if chave == "openrouter_api_key" {
+	if chave == "openrouter_api_key" || chave == "smtp_password" || chave == "evolution_api_key" {
 		exists, err := h.configStore.ConfigExists(r.Context(), chave)
 		if err != nil {
 			h.logger.Error("checking config", zap.Error(err))
