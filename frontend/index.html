@@ -4224,7 +4224,7 @@ function renderCapacityCard(m, idx) {
       g.tarefas.forEach(t => {
         const statusClass = (t.status || '').toLowerCase().includes('done') || (t.status || '').toLowerCase().includes('conclu') ? 'done' : (t.status || '').toLowerCase().includes('progress') || (t.status || '').toLowerCase().includes('andamento') ? 'inprogress' : 'todo';
         html += '<div class="capacity-tarefa-row">';
-        html += '<span class="capacity-tarefa-ticket">' + esc(t.numero_ticket) + '</span>';
+        html += '<span class="capacity-tarefa-ticket">' + jiraTicketLink(t.numero_ticket) + '</span>';
         html += '<span class="capacity-tarefa-resumo" title="' + esc(t.resumo) + '">' + esc(t.resumo) + '</span>';
         html += '<span class="capacity-tarefa-tipo">' + esc(t.tipo) + '</span>';
         html += '<span class="capacity-tarefa-status ' + statusClass + '">' + esc(t.status) + '</span>';
@@ -6166,7 +6166,7 @@ function renderEqualizerModal() {
     sug.tarefas.forEach(function(t, ti) {
       html += '<label class="eq-task-row">' +
         '<input type="checkbox" class="eq-task-check" data-sug="' + si + '" data-task="' + ti + '" checked onchange="updateEqualizerCount()">' +
-        '<span class="eq-task-key">' + esc(t.numero_ticket) + '</span>' +
+        '<span class="eq-task-key">' + jiraTicketLink(t.numero_ticket) + '</span>' +
         '<span class="eq-task-resumo">' + esc(t.resumo) + '</span>' +
         '<span class="eq-task-badge">' + esc(t.tipo) + '</span>' +
         '<span class="eq-task-horas">' + t.horas.toFixed(1) + 'h</span>' +
@@ -6641,7 +6641,7 @@ function renderTarefasTable(result, container) {
 
   result.items.forEach(function(t) {
     html += '<tr>';
-    html += '<td><strong>' + esc(t.numero_ticket) + '</strong></td>';
+    html += '<td><strong>' + jiraTicketLink(t.numero_ticket) + '</strong></td>';
     html += '<td class="tarefas-resumo-cell" title="' + escAttr(t.resumo) + '">' + esc(t.resumo) + '</td>';
     html += '<td>' + esc(t.tipo) + '</td>';
     html += '<td>' + esc(t.status) + '</td>';
