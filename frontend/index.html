@@ -1942,6 +1942,11 @@ function api(path, opts = {}) {
 
 function formatDate(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function jiraTicketLink(numero) {
+  if (!numero) return '';
+  if (!window._jiraBaseUrl) return esc(numero);
+  return '<a href="' + esc(window._jiraBaseUrl) + '/browse/' + esc(numero) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">' + esc(numero) + '</a>';
+}
 function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function fmtDateBR(s) { if (!s) return ''; var p = s.split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : s; }
 function parseDateBR(s) { if (!s) return ''; var p = s.split('/'); return p.length === 3 ? p[2] + '-' + p[1] + '-' + p[0] : s; }
@@ -2745,6 +2750,12 @@ async function openSprintCapacity(sprintID) {
     let syncStatus = null;
     if (fonteDadosId) {
       syncStatus = await api('/sync/status?fonte_dados_id=' + fonteDadosId).catch(() => null);
+      if (!window._jiraBaseUrl) {
+        try {
+          const fonte = await api('/fontes/' + fonteDadosId);
+          if (fonte && fonte.base_url) window._jiraBaseUrl = fonte.base_url.replace(/\/+$/, '');
+        } catch(e) {}
+      }
     }
     window._currentSprintID = sprintID;
     window._currentSprintNome = data.sprint ? data.sprint.nome : '';
