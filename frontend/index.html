@@ -2795,7 +2795,14 @@ async function openSprintCapacity(sprintID) {
       });
       if (matched.length > 0) {
         const corBox = matched[0].cor || '#2196F3';
-        html += '<div style="background:' + corBox + '18;border-left:4px solid ' + corBox + ';border-radius:6px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:' + corBox + ';line-height:1.5">';
+        const corTexto = (() => {
+          const m = corBox.match(/^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i);
+          if (!m) return corBox;
+          let [r,g,b] = [parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16)];
+          r = Math.round(r * 0.55); g = Math.round(g * 0.55); b = Math.round(b * 0.55);
+          return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+        })();
+        html += '<div style="background:' + corBox + '18;border-left:4px solid ' + corBox + ';border-radius:6px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:' + corTexto + ';line-height:1.5">';
         html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:help;position:relative" onmouseenter="this.querySelector(\'.legend-tip\').style.display=\'block\'" onmouseleave="this.querySelector(\'.legend-tip\').style.display=\'none\'"><span style="font-size:18px">📌</span><span style="font-size:14px;font-weight:700;letter-spacing:.3px">Lembretes da Sprint</span><div class="legend-tip" style="display:none;position:absolute;top:100%;left:0;background:var(--tooltip-bg);color:var(--tooltip-text);padding:10px 14px;border-radius:8px;font-size:12px;z-index:60;width:300px;box-shadow:0 4px 12px rgba(0,0,0,.2);line-height:1.5;margin-top:6px">Lembretes são os checkpoints gerados no relatório de Timeline de Sprints cuja as datas cruzam com a sprint ativa atual.</div></div>';
         matched.forEach(cp => {
           const opts = { day: '2-digit', month: '2-digit' };
