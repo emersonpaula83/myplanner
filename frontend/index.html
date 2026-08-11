@@ -6929,7 +6929,7 @@ function renderAllocationBoxes(projects, container) {
       if (p.is_gdptc) {
         html += '<span class="alloc-box-star" title="Projeto do Portfólio Unificado">★</span>';
       }
-      html += '<span class="alloc-box-ticket">' + esc(p.numero_ticket) + '</span>';
+      html += '<span class="alloc-box-ticket">' + jiraTicketLink(p.numero_ticket) + '</span>';
       html += '</div>';
       html += '<div class="alloc-box-title" title="' + escAttr(p.resumo) + '">' + title + '</div>';
 
@@ -7092,7 +7092,7 @@ function renderAllocModal(detail) {
 
   var html = '<div class="alloc-modal-header">';
   html += '<div>';
-  html += '<h2>' + esc(epic.numero_ticket) + ': ' + esc(epic.apelido || epic.resumo) + ' <span class="alloc-badge ' + modalBadge.cls + '">' + modalBadge.text + '</span>';
+  html += '<h2>' + jiraTicketLink(epic.numero_ticket) + ': ' + esc(epic.apelido || epic.resumo) + ' <span class="alloc-badge ' + modalBadge.cls + '">' + modalBadge.text + '</span>';
   if (epic.is_gdptc) {
     html += ' <span class="alloc-badge alloc-badge-gdptc">★ Projeto do Portfólio Unificado</span>';
   }
@@ -7157,7 +7157,7 @@ function renderAllocModal(detail) {
     html += '<div class="alloc-section-body">';
     detail.completas.forEach(function(t) {
       html += '<div class="alloc-task-readonly">';
-      html += '<span class="alloc-task-ticket">' + esc(t.numero_ticket) + '</span>';
+      html += '<span class="alloc-task-ticket">' + jiraTicketLink(t.numero_ticket) + '</span>';
       html += taskStatusBadgeHtml(t);
       html += '<span class="alloc-task-resumo" title="' + escAttr(t.resumo) + '">' + esc(t.resumo) + '</span>';
       html += '<span>' + (t.estimativa_horas ? t.estimativa_horas.toFixed(1) + 'h' : '--') + '</span>';
@@ -7178,7 +7178,7 @@ function renderAllocModal(detail) {
     html += '<div class="alloc-section-body collapsed">';
     detail.concluidas.forEach(function(t) {
       html += '<div class="alloc-task-readonly">';
-      html += '<span class="alloc-task-ticket">' + esc(t.numero_ticket) + '</span>';
+      html += '<span class="alloc-task-ticket">' + jiraTicketLink(t.numero_ticket) + '</span>';
       html += taskStatusBadgeHtml(t);
       html += '<span class="alloc-task-resumo" title="' + escAttr(t.resumo) + '">' + esc(t.resumo) + '</span>';
       html += '<span>' + (t.estimativa_horas ? t.estimativa_horas.toFixed(1) + 'h' : '--') + '</span>';
@@ -7251,7 +7251,7 @@ function renderAllocGantt(detail) {
     var width = Math.max(1, (end - start) / yearRange * 100);
 
     html += '<div class="alloc-gantt-row">';
-    html += '<div class="alloc-gantt-label" title="' + escAttr(t.resumo) + '">' + esc(t.numero_ticket) + '</div>';
+    html += '<div class="alloc-gantt-label" title="' + escAttr(t.resumo) + '">' + jiraTicketLink(t.numero_ticket) + '</div>';
     html += '<div class="alloc-gantt-timeline" style="position:relative">';
 
     // Repeat deadline line in timeline area
@@ -7272,7 +7272,7 @@ function renderAllocGantt(detail) {
     html += '<div class="alloc-gantt-separator">Não Alocadas</div>';
     unallocated.forEach(function(t) {
       html += '<div class="alloc-gantt-row">';
-      html += '<div class="alloc-gantt-label" title="' + escAttr(t.resumo) + '">' + esc(t.numero_ticket) + '</div>';
+      html += '<div class="alloc-gantt-label" title="' + escAttr(t.resumo) + '">' + jiraTicketLink(t.numero_ticket) + '</div>';
       html += '<div class="alloc-gantt-timeline">';
       html += '<div class="alloc-gantt-bar alloc-gantt-bar-unallocated" style="left:0%;width:100%" title="' + escAttr(t.numero_ticket + ' - ' + t.resumo + ' — Não Alocada') + '"></div>';
       html += '</div></div>';
@@ -7289,7 +7289,7 @@ function renderAllocTaskEditable(t) {
   var estVal = t.estimativa_horas ? t.estimativa_horas.toFixed(1) : '';
 
   var html = '<div class="alloc-task-row">';
-  html += '<span class="alloc-task-ticket">' + esc(t.numero_ticket) + '</span>';
+  html += '<span class="alloc-task-ticket">' + jiraTicketLink(t.numero_ticket) + '</span>';
   html += taskStatusBadgeHtml(t);
   html += '<span class="alloc-task-resumo" title="' + escAttr(t.resumo) + '">' + esc(t.resumo) + '</span>';
   html += '<div class="alloc-task-controls">';
