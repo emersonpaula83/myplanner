@@ -2561,7 +2561,7 @@ async function loadProjetos() {
       const dl = p.data_limite ? new Date(p.data_limite + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
       const die = p.data_inicio_execucao ? new Date(p.data_inicio_execucao).toLocaleDateString('pt-BR') : '—';
       rows += '<tr onclick="openProjMetaModal(\'' + p.id + '\',\'' + esc(p.numero_ticket) + '\',\'' + esc(p.apelido || '') + '\',\'' + (p.data_inicio_execucao ? p.data_inicio_execucao.substring(0,10) : '') + '\',\'' + esc(p.data_limite || '') + '\')" style="cursor:pointer">' +
-        '<td style="font-weight:550;color:var(--accent)">' + esc(p.numero_ticket) + '</td>' +
+        '<td style="font-weight:550;color:var(--accent)">' + jiraTicketLink(p.numero_ticket) + '</td>' +
         '<td style="font-weight:550;color:var(--text-primary)">' + esc(p.apelido || '—') + '</td>' +
         '<td>' + esc(p.resumo || '') + '</td>' +
         '<td>' + esc(p.tipo_demanda || '—') + '</td>' +
@@ -3154,7 +3154,7 @@ function renderReviewContent(container, data) {
     h += '<th>Ticket</th><th>Produto</th><th>Resumo</th><th>Tipo</th><th>Tipo Demanda</th><th>Status</th>';
     h += '</tr></thead><tbody>';
     tarefas.forEach(function(t) {
-      h += '<tr><td>' + esc(t.numero_ticket) + '</td><td>' + esc(t.produto || '') + '</td><td>' + esc(t.resumo) + '</td><td>' + tipoBadge(t.tipo) + '</td><td>' + esc(t.tipo_demanda || '') + '</td><td>' + esc(t.status) + '</td></tr>';
+      h += '<tr><td>' + jiraTicketLink(t.numero_ticket) + '</td><td>' + esc(t.produto || '') + '</td><td>' + esc(t.resumo) + '</td><td>' + tipoBadge(t.tipo) + '</td><td>' + esc(t.tipo_demanda || '') + '</td><td>' + esc(t.status) + '</td></tr>';
     });
     h += '</tbody></table>';
     return h;
@@ -3342,7 +3342,7 @@ function buildExportContainer() {
     return ta - tb;
   });
   sortedTarefas.forEach(function(t) {
-    html += '<tr><td style="padding:4px 8px;border-bottom:1px solid #f0f0f0">' + esc(t.numero_ticket) + '</td>';
+    html += '<tr><td style="padding:4px 8px;border-bottom:1px solid #f0f0f0">' + jiraTicketLink(t.numero_ticket) + '</td>';
     html += '<td style="padding:4px 8px;border-bottom:1px solid #f0f0f0">' + esc(t.produto || '') + '</td>';
     html += '<td style="padding:4px 8px;border-bottom:1px solid #f0f0f0">' + esc(t.resumo) + '</td>';
     var _tl = (t.tipo || '').toLowerCase();
@@ -6068,7 +6068,7 @@ function showPieTooltip(tarefas) {
   tarefas.forEach(function(t) {
     var resumo = t.resumo || '';
     if (resumo.length > 60) resumo = resumo.substring(0, 57) + '...';
-    html += '<tr><td>' + esc(t.numero_ticket) + '</td><td class="resumo-col">' + esc(resumo) + '</td></tr>';
+    html += '<tr><td>' + jiraTicketLink(t.numero_ticket) + '</td><td class="resumo-col">' + esc(resumo) + '</td></tr>';
   });
   html += '</tbody></table>';
   tip.innerHTML = html;
