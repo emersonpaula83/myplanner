@@ -980,10 +980,23 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <button class="sidebar-toggle" title="Expandir menu" onclick="toggleSidebar()">
       <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-    <button class="sidebar-item active" data-page="equipes" title="Equipes" onclick="navigate('equipes')">
-      <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
-      <span class="sidebar-item-label">Equipes</span>
-    </button>
+    <div class="sidebar-group open" id="sidebar-group-estrutura">
+      <button class="sidebar-group-header" title="Estrutura" onclick="toggleSidebarGroup('estrutura')">
+        <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="4" rx="1"/><rect x="2" y="14" width="6" height="4" rx="1"/><rect x="16" y="14" width="6" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="10"/><line x1="5" y1="14" x2="5" y2="10"/><line x1="19" y1="14" x2="19" y2="10"/><line x1="5" y1="10" x2="19" y2="10"/></svg>
+        <span class="sidebar-item-label">Estrutura</span>
+        <span class="sidebar-arrow">▶</span>
+      </button>
+      <div class="sidebar-group-items">
+        <button class="sidebar-item active" data-page="equipes" title="Equipes" onclick="navigate('equipes')">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
+          <span class="sidebar-item-label">Equipes</span>
+        </button>
+        <button class="sidebar-item" data-page="investimentos" title="Investimentos" onclick="navigate('investimentos')">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          <span class="sidebar-item-label">Investimentos</span>
+        </button>
+      </div>
+    </div>
     <div class="sidebar-group" id="sidebar-group-projetos">
       <button class="sidebar-group-header" title="Projetos" onclick="toggleSidebarGroup('projetos')">
         <svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
@@ -1139,6 +1152,22 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <!-- MEMBRO DETAIL -->
     <div class="page" id="page-membro-detail">
       <div id="membro-detail-content"></div>
+    </div>
+
+    <!-- INVESTIMENTOS -->
+    <div class="page" id="page-investimentos">
+      <div class="page-header-row">
+        <h1 class="page-title">Investimentos</h1>
+      </div>
+      <div class="inv-filter-row">
+        <select class="filter-select" id="inv-equipe" onchange="onInvEquipeChange()">
+          <option value="">Selecione a equipe</option>
+        </select>
+        <div class="inv-avatar-row" id="inv-avatars"></div>
+      </div>
+      <div id="inv-content">
+        <div class="empty-state"><div class="empty-state-text">Selecione uma equipe para visualizar os investimentos.</div></div>
+      </div>
     </div>
 
     <!-- FONTES -->
@@ -1441,6 +1470,11 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       </div>
     </div>
     <div class="modal-actions"><button class="btn-cancel" type="button" onclick="closeMsgSettings()">Fechar</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="investimento-modal" onclick="if(event.target===this)closeInvestimentoModal()">
+  <div class="inv-modal-box">
+    <div id="investimento-modal-content"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
 <div id="apikey-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center">
@@ -2082,6 +2116,9 @@ function navigate(page) {
   var projPages = ['projetos', 'alocacao', 'tarefas'];
   var projGroup = document.getElementById('sidebar-group-projetos');
   if (projGroup && projPages.indexOf(page) >= 0) { projGroup.classList.add('open'); }
+  var estruturaPages = ['equipes', 'investimentos'];
+  var estruturaGroup = document.getElementById('sidebar-group-estrutura');
+  if (estruturaGroup && estruturaPages.indexOf(page) >= 0) { estruturaGroup.classList.add('open'); }
   if (page === 'usuarios') loadUsuarios();
   if (page === 'fontes') loadFontes();
   if (page === 'projetos') loadProjetos();
@@ -2089,6 +2126,7 @@ function navigate(page) {
   if (page === 'sprints-timeline') loadSprintsTimeline();
   if (page === 'alocacao') loadAlocacao();
   if (page === 'tarefas') loadTarefas();
+  if (page === 'investimentos') { /* page shown, data loads on equipe select */ }
 }
 
 function toggleSidebarGroup(name) {
@@ -2107,7 +2145,8 @@ async function loadEquipes() {
     const fills = [
       {sel: document.getElementById('equipe-select'), def: 'Todos os membros'},
       {sel: document.getElementById('sprints-equipe'), def: 'Todas as equipes'},
-      {sel: document.getElementById('stl-equipe'), def: 'Selecione uma equipe'}
+      {sel: document.getElementById('stl-equipe'), def: 'Selecione uma equipe'},
+      {sel: document.getElementById('inv-equipe'), def: 'Selecione a equipe'}
     ];
     fills.forEach(({sel, def}) => {
       sel.innerHTML = '<option value="">' + def + '</option>';
