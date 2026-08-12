@@ -982,13 +982,6 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .inv-modal-close:hover { background: var(--chip-bg); }
 .inv-modal-section { margin-bottom: 24px; }
 .inv-modal-section h3 { font-size: 14px; font-weight: 650; color: var(--text-primary); margin: 0 0 12px; }
-.inv-alloc-item { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.inv-alloc-info { min-width: 140px; flex-shrink: 0; }
-.inv-alloc-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.inv-alloc-key { font-size: 11px; color: var(--text-tertiary); opacity: .6; }
-.inv-alloc-bar-wrap { flex: 1; height: 20px; background: var(--member-bar-bg); border-radius: 4px; overflow: hidden; position: relative; }
-.inv-alloc-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s ease; min-width: 2px; }
-.inv-alloc-pct { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 45px; text-align: right; font-variant-numeric: tabular-nums; }
 .inv-modal-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 600px) { .inv-modal-charts { grid-template-columns: 1fr; } }
 .inv-modal-chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
@@ -2381,22 +2374,23 @@ async function removeMembroFromEquipe(equipeId, membroId) {
 
 function cargoLabelMap(cargo) {
   var labels = {
+    'analista_i': 'Analista I',
+    'analista_ii': 'Analista II',
+    'analista_iii': 'Analista III',
+    'especialista_i': 'Especialista I',
+    'especialista_ii': 'Especialista II',
+    'master': 'Master',
     'coordenador_desenvolvimento': 'Coord. Dev',
-    'po_produto': 'P.O.',
-    'gerente_tecnologia': 'Ger. Tecnologia',
-    'gerente_executivo': 'Ger. Executivo',
-    'scrum_master': 'Scrum Master',
-    'agile_master': 'Agile Master',
-    'desenvolvedor': 'Dev'
+    'lider_tecnico': 'Líder Técnico'
   };
   return labels[cargo] || '';
 }
 
 function cargoBadgeColor(cargo) {
   if (!cargo) return '';
-  if (cargo === 'po_produto') return 'purple';
-  if (cargo === 'scrum_master' || cargo === 'agile_master') return 'green';
-  if (cargo === 'desenvolvedor') return 'gray';
+  if (cargo === 'analista_i' || cargo === 'analista_ii') return 'gray';
+  if (cargo === 'especialista_ii' || cargo === 'master') return 'purple';
+  if (cargo === 'coordenador_desenvolvimento' || cargo === 'lider_tecnico') return 'green';
   return 'blue';
 }
 
@@ -6387,9 +6381,6 @@ function renderMembroCargo(cargo, membroId, container) {
     '</div>' +
     '<div id="produto-section-' + membroId + '"></div>';
   container.innerHTML = html;
-  if (cargo === 'po_produto') {
-    loadMembroProdutos(membroId);
-  }
 }
 
 function toggleCargoDropdown(membroId) {
@@ -6417,12 +6408,6 @@ async function selectCargo(membroId, value) {
   var cargo = value || null;
   try {
     await api('/membros/' + membroId + '/cargo', { method: 'PUT', body: JSON.stringify({ cargo: cargo }) });
-    var prodSection = document.getElementById('produto-section-' + membroId);
-    if (cargo === 'po_produto') {
-      loadMembroProdutos(membroId);
-    } else {
-      prodSection.innerHTML = '';
-    }
   } catch (err) {
     alert('Falha ao atualizar cargo');
   }
@@ -7907,20 +7892,9 @@ async function openInvestimentoModal(membroId) {
     html += '<button class="inv-modal-close" onclick="closeInvestimentoModal()" title="Fechar">&times;</button>';
     html += '</div>';
 
-    // Allocations section
+    // Allocations section — pie chart
     html += '<div class="inv-modal-section"><h3>Projetos & Alocações</h3>';
-    if (alocacoes.length > 0) {
-      alocacoes.forEach(function(a) {
-        html += '<div class="inv-alloc-item">';
-        html += '<div class="inv-alloc-info"><div class="inv-alloc-name">' + esc(a.apelido) + '</div><div class="inv-alloc-key">' + esc(a.chave_jira) + '</div></div>';
-        var pct = a.percentual_alocacao || 0;
-        html += '<div class="inv-alloc-bar-wrap"><div class="inv-alloc-bar" style="width:' + Math.min(pct, 100).toFixed(1) + '%"></div></div>';
-        html += '<div class="inv-alloc-pct">' + pct.toFixed(1) + '%</div>';
-        html += '</div>';
-      });
-    } else {
-      html += '<div style="color:var(--text-tertiary);font-size:13px">Nenhuma alocação registrada.</div>';
-    }
+    html += '<div id="inv-alloc-pie"></div>';
     html += '</div>';
 
     // History charts
@@ -7931,6 +7905,17 @@ async function openInvestimentoModal(membroId) {
     html += '</div></div>';
 
     content.innerHTML = html;
+
+    // Draw allocation pie chart
+    var pieContainer = document.getElementById('inv-alloc-pie');
+    if (alocacoes.length > 0) {
+      var slices = alocacoes.map(function(a) {
+        return { horas: a.percentual_alocacao || 0, label: a.apelido + ' (' + a.chave_jira + ')' };
+      });
+      drawPieChart(pieContainer, slices);
+    } else {
+      pieContainer.innerHTML = '<div class="pie-no-data">Nenhuma alocação registrada.</div>';
+    }
 
     // Draw salary history chart
     if (historicoSalario.length > 0) {
