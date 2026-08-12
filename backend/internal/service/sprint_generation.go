@@ -261,20 +261,21 @@ func init() {
 	}
 }
 
-func generateSprintSlots(startDate time.Time, durationDays int, year int) []sprintSlot {
+func generateSprintSlots(startDate time.Time, _ int, year int) []sprintSlot {
 	start := nextMonday(startDate)
 	yearEnd := time.Date(year, 12, 31, 23, 59, 59, 0, saoPaulo)
 
 	var slots []sprintSlot
 	for !start.After(yearEnd) {
-		end := start.AddDate(0, 0, durationDays-1)
+		// Always end on 2nd Friday: Monday + 11 calendar days = Friday
+		end := start.AddDate(0, 0, 11)
 		if end.After(yearEnd) {
 			break
 		}
 		slotStart := time.Date(start.Year(), start.Month(), start.Day(), 8, 30, 0, 0, saoPaulo)
 		slotEnd := time.Date(end.Year(), end.Month(), end.Day(), 18, 30, 0, 0, saoPaulo)
 		slots = append(slots, sprintSlot{start: slotStart, end: slotEnd})
-		start = end.AddDate(0, 0, 3)
+		start = end.AddDate(0, 0, 3) // Fri + 3 = next Monday
 	}
 	return slots
 }
@@ -344,7 +345,7 @@ func detectSprintPattern(sprints []jira.JiraSprint) (string, int, error) {
 
 		start := parseJiraDate(s.StartDate)
 		end := parseJiraDate(s.EndDate)
-		if start != nil && end != nil {
+		if start != nil && end != nil && start.Weekday() == time.Monday {
 			days := int(end.Sub(*start).Hours()/24) + 1
 			if days > 0 {
 				durationCounts[days]++

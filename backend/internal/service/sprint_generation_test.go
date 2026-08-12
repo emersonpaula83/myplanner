@@ -133,11 +133,13 @@ func TestGenerateSprintSlots_AdjustsToMonday(t *testing.T) {
 
 func TestGenerateSprintSlots_StopsAtYearEnd(t *testing.T) {
 	loc, _ := time.LoadLocation("America/Sao_Paulo")
-	start := time.Date(2026, 12, 20, 0, 0, 0, 0, loc)
-	slots := generateSprintSlots(start, 11, 2026)
+	// Dec 8 (Tue) → nextMonday = Dec 14. End = Dec 14 + 11 = Dec 25 (Fri). Fits.
+	// Next: Dec 28 (Mon) + 11 = Jan 8, 2027 > yearEnd. Stops.
+	start := time.Date(2026, 12, 8, 0, 0, 0, 0, loc)
+	slots := generateSprintSlots(start, 12, 2026)
 
 	if len(slots) != 1 {
-		t.Errorf("expected 1 slot (Dec 21 is Monday, end Dec 31), got %d", len(slots))
+		t.Errorf("expected 1 slot, got %d", len(slots))
 	}
 }
 
@@ -188,17 +190,56 @@ func TestPreviewSprints_UsesJiraAPI(t *testing.T) {
 	}
 }
 
-func TestGenerateSprintSlots_7DaySprints(t *testing.T) {
+func TestGenerateSprintSlots_AlwaysMonToFri(t *testing.T) {
 	loc, _ := time.LoadLocation("America/Sao_Paulo")
-	start := time.Date(2026, 8, 3, 0, 0, 0, 0, loc)
-	slots := generateSprintSlots(start, 5, 2026)
+	start := time.Date(2026, 8, 17, 0, 0, 0, 0, loc)
+	slots := generateSprintSlots(start, 14, 2026)
 
 	if len(slots) == 0 {
 		t.Fatal("expected at least one slot")
 	}
-	first := slots[0]
-	diff := int(first.end.Sub(first.start).Hours()/24) + 1
-	if diff != 5 {
-		t.Errorf("duration = %d days, want 5", diff)
+	for i, s := range slots {
+		if s.start.Weekday() != time.Monday {
+			t.Errorf("slot %d: start = %v (%s), want Monday", i, s.start, s.start.Weekday())
+		}
+		if s.end.Weekday() != time.Friday {
+			t.Errorf("slot %d: end = %v (%s), want Friday", i, s.end, s.end.Weekday())
+		}
+		diff := int(s.end.Sub(s.start).Hours()/24) + 1
+		if diff != 12 {
+			t.Errorf("slot %d: duration = %d, want 12", i, diff)
+		}
+	}
+	// Verify consecutive sprints: next starts Monday after previous Friday (3 calendar days)
+	for i := 1; i < len(slots); i++ {
+		prevEnd := slots[i-1].end
+		nextStart := slots[i].start
+		gapDays := nextStart.Day() - prevEnd.Day()
+		if prevEnd.Month() != nextStart.Month() {
+			lastDay := time.Date(prevEnd.Year(), prevEnd.Month()+1, 0, 0, 0, 0, 0, loc).Day()
+			gapDays = (lastDay - prevEnd.Day()) + nextStart.Day()
+		}
+		if gapDays != 3 {
+			t.Errorf("gap between slot %d and %d = %d calendar days, want 3 (Fri→Mon)", i-1, i, gapDays)
+		}
+	}
+}
+
+func TestDetectSprintPattern_IgnoresNonMondayStarts(t *testing.T) {
+	// Mix of correct (Mon start) and manually edited (non-Mon start) sprints
+	sdMon := "2026-07-07T08:30:00.000-0300" // Monday
+	edFri := "2026-07-18T18:30:00.000-0300" // Friday, 12 days
+	sdSat := "2026-07-11T11:30:00.000-0300" // Saturday (manual edit)
+	edFriB := "2026-07-24T21:30:00.000-0300" // Friday, 14 days
+	sprints := []jira.JiraSprint{
+		{ID: 1, Name: "RM Dev 07/07 - 18/07 [2026]", StartDate: &sdMon, EndDate: &edFri},
+		{ID: 2, Name: "RM Dev 11/07 - 24/07 [2026]", StartDate: &sdSat, EndDate: &edFriB},
+	}
+	_, days, err := detectSprintPattern(sprints)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if days != 12 {
+		t.Errorf("days = %d, want 12 (should ignore non-Monday sprint)", days)
 	}
 }

@@ -2041,7 +2041,22 @@ function showApp() {
   document.getElementById('app-shell').classList.remove('hidden');
   restoreSidebar();
   loadEquipes(); loadTimelineFilters(); loadAllMembros();
+  loadJiraBaseUrl();
   handleOAuthReturn();
+}
+function loadJiraBaseUrl() {
+  if (window._jiraBaseUrlReady) return window._jiraBaseUrlReady;
+  window._jiraBaseUrlReady = api('/fontes').then(function(fontes) {
+    if (fontes && fontes.length > 0) {
+      var f = fontes[0];
+      if (f.base_url && f.base_url.indexOf('api.atlassian.com') !== -1 && f.nome) {
+        window._jiraBaseUrl = 'https://' + f.nome + '.atlassian.net';
+      } else if (f.base_url) {
+        window._jiraBaseUrl = f.base_url.replace(/\/+$/, '');
+      }
+    }
+  }).catch(function() {});
+  return window._jiraBaseUrlReady;
 }
 function handleOAuthReturn() {
   const params = new URLSearchParams(window.location.search);
@@ -2532,6 +2547,7 @@ function hideCapTip(el) { document.getElementById('gantt-tooltip').style.display
 async function loadProjetos() {
   const el = document.getElementById('projetos-content');
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  await loadJiraBaseUrl();
 
   var prodSel = document.getElementById('projetos-produto');
   if (prodSel.options.length <= 1) {
@@ -2734,6 +2750,7 @@ function formatSprintDates(inicio, fim) {
 async function openSprintCapacity(sprintID) {
   const el = document.getElementById('sprints-content');
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  await loadJiraBaseUrl();
   try {
     const equipe = document.getElementById('sprints-equipe').value;
     const qs = equipe ? '?equipe=' + equipe : '';
@@ -2750,12 +2767,6 @@ async function openSprintCapacity(sprintID) {
     let syncStatus = null;
     if (fonteDadosId) {
       syncStatus = await api('/sync/status?fonte_dados_id=' + fonteDadosId).catch(() => null);
-      if (!window._jiraBaseUrl) {
-        try {
-          const fonte = await api('/fontes/' + fonteDadosId);
-          if (fonte && fonte.base_url) window._jiraBaseUrl = fonte.base_url.replace(/\/+$/, '');
-        } catch(e) {}
-      }
     }
     window._currentSprintID = sprintID;
     window._currentSprintNome = data.sprint ? data.sprint.nome : '';
@@ -3017,7 +3028,8 @@ function loadSprintReview() {
 
   container.innerHTML = '<div style="padding:20px;color:#888">Carregando review...</div>';
 
-  api(url).then(function(data) {
+  Promise.all([api(url), window._jiraBaseUrlReady || Promise.resolve()]).then(function(res) {
+    var data = res[0];
     _reviewData = data;
     container.dataset.loaded = '1';
     renderReviewContent(container, data);
@@ -5755,6 +5767,7 @@ async function openEqualizer(sprintID) {
   content.innerHTML = '<div class="eq-loading">Calculando equalização...</div>';
   actions.style.display = 'none';
   modal.classList.add('open');
+  await loadJiraBaseUrl();
 
   if (window._cachedEqualizerData) {
     equalizerData = window._cachedEqualizerData;
@@ -6627,9 +6640,9 @@ function fetchTarefas() {
   var busca = document.getElementById('tarefas-busca').value;
   if (busca) params += '&busca=' + encodeURIComponent(busca);
 
-  api('/tarefas' + params).then(function(result) {
-    renderTarefasTable(result, container);
-    renderTarefasPagination(result);
+  Promise.all([api('/tarefas' + params), window._jiraBaseUrlReady || Promise.resolve()]).then(function(res) {
+    renderTarefasTable(res[0], container);
+    renderTarefasPagination(res[0]);
   }).catch(function(err) {
     container.innerHTML = '<div class="alloc-empty">Erro ao carregar tarefas.</div>';
   });
@@ -6816,8 +6829,8 @@ function loadProjectAllocations() {
   });
   if (allocEquipeId) url += '&equipe_id=' + allocEquipeId;
 
-  api(url)
-    .then(function(projects) {
+  Promise.all([api(url), window._jiraBaseUrlReady || Promise.resolve()])
+    .then(function(res) { var projects = res[0];
       if (!projects || projects.length === 0) {
         container.innerHTML = '<div class="alloc-empty">Nenhum projeto encontrado para esta equipe e produto.</div>';
         return;
