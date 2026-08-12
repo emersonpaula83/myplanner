@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
@@ -46,6 +47,10 @@ func (h *InvestimentoHandler) GetDashboard(w http.ResponseWriter, r *http.Reques
 
 	dashboard, err := h.store.GetDashboard(r.Context(), equipeID)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, http.StatusNotFound, "equipe não encontrada")
+			return
+		}
 		h.logger.Error("failed to get investimento dashboard", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao carregar dashboard")
 		return
@@ -101,6 +106,10 @@ func (h *InvestimentoHandler) UpdateSalario(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := h.membroStore.UpdateSalario(r.Context(), id, req.Valor); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, http.StatusNotFound, "membro não encontrado")
+			return
+		}
 		h.logger.Error("failed to update salario", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao atualizar salário")
 		return
@@ -125,6 +134,10 @@ func (h *InvestimentoHandler) UpdateBancoHoras(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := h.membroStore.UpdateBancoHoras(r.Context(), id, req.Valor); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, http.StatusNotFound, "membro não encontrado")
+			return
+		}
 		h.logger.Error("failed to update banco_horas", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao atualizar banco de horas")
 		return
@@ -159,6 +172,10 @@ func (h *InvestimentoHandler) UpdateDataAdmissao(w http.ResponseWriter, r *http.
 	}
 
 	if err := h.membroStore.UpdateDataAdmissao(r.Context(), id, dt); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, http.StatusNotFound, "membro não encontrado")
+			return
+		}
 		h.logger.Error("failed to update data_admissao", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao atualizar data de admissão")
 		return
