@@ -7657,11 +7657,13 @@ function drawInvLineChart(container, points, opts) {
 
   var values = points.map(function(p) { return p.value; });
   var maxVal = Math.max.apply(null, values);
-  var minVal = Math.min.apply(null, values.filter(function(v) { return v > 0; }));
+  var positiveValues = values.filter(function(v) { return v > 0; });
+  var minVal = positiveValues.length > 0 ? Math.min.apply(null, positiveValues) : 0;
   if (maxVal === 0) maxVal = 1;
   if (minVal === maxVal) { minVal = 0; }
   else { minVal = Math.max(0, minVal * 0.85); }
   var range = maxVal - minVal || 1;
+  if (!isFinite(range) || range <= 0) range = 1;
 
   var svgNS = 'http://www.w3.org/2000/svg';
   var svg = document.createElementNS(svgNS, 'svg');
@@ -7719,6 +7721,8 @@ function drawInvLineChart(container, points, opts) {
     if (p.projected) {
       if (!dashedPath && lastSolidIdx >= 0) {
         dashedPath = 'M' + xScale(lastSolidIdx).toFixed(1) + ',' + yScale(points[lastSolidIdx].value).toFixed(1);
+      } else if (!dashedPath) {
+        dashedPath = 'M' + x + ',' + y;
       }
       dashedPath += ' L' + x + ',' + y;
     } else {
