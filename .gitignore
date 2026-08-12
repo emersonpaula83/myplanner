@@ -33,6 +33,10 @@ docker-compose.override.yml
 
 # Claude worktrees
 .claude/worktrees/
+.worktrees/
+
+# Superpowers
+.superpowers/
 
 # Binary
 backend/bin/
