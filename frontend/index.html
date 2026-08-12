@@ -7865,6 +7865,110 @@ function scrollToInvMembro(membroId) {
   }
 }
 
+async function openInvestimentoModal(membroId) {
+  var modal = document.getElementById('investimento-modal');
+  var content = document.getElementById('investimento-modal-content');
+  modal.classList.add('open');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  try {
+    // Find member data from cached dashboard
+    var membro = null;
+    if (invDashboardData && invDashboardData.membros) {
+      membro = invDashboardData.membros.find(function(m) { return m.id === membroId; });
+    }
+    if (!membro) {
+      content.innerHTML = '<div class="empty-state"><div class="empty-state-text">Membro não encontrado</div></div>';
+      return;
+    }
+
+    // Fetch all 3 endpoints in parallel
+    var results = await Promise.all([
+      api('/membros/' + membroId + '/alocacoes-projetos').catch(function() { return { projetos: [] }; }),
+      api('/membros/' + membroId + '/salario/historico').catch(function() { return []; }),
+      api('/membros/' + membroId + '/banco-horas/historico').catch(function() { return []; })
+    ]);
+
+    var alocacoes = results[0].projetos || [];
+    var historicoSalario = results[1] || [];
+    var historicoBanco = results[2] || [];
+
+    var avatarHtml = membro.avatar_url
+      ? '<img src="' + esc(membro.avatar_url) + '" alt="">'
+      : initials(membro.nome);
+
+    var html = '';
+
+    // Header
+    html += '<div class="inv-modal-header">';
+    html += '<div class="inv-modal-avatar" style="background:' + stringColor(membro.nome) + '">' + avatarHtml + '</div>';
+    html += '<div class="inv-modal-info"><h2>' + esc(membro.nome) + '</h2><p>' + esc(membro.cargo || '—') + '</p></div>';
+    html += '<button class="inv-modal-close" onclick="closeInvestimentoModal()" title="Fechar">&times;</button>';
+    html += '</div>';
+
+    // Allocations section
+    html += '<div class="inv-modal-section"><h3>Projetos & Alocações</h3>';
+    if (alocacoes.length > 0) {
+      alocacoes.forEach(function(a) {
+        html += '<div class="inv-alloc-item">';
+        html += '<div class="inv-alloc-info"><div class="inv-alloc-name">' + esc(a.apelido) + '</div><div class="inv-alloc-key">' + esc(a.chave_jira) + '</div></div>';
+        html += '<div class="inv-alloc-bar-wrap"><div class="inv-alloc-bar" style="width:' + Math.min(a.percentual_alocacao, 100).toFixed(1) + '%"></div></div>';
+        html += '<div class="inv-alloc-pct">' + a.percentual_alocacao.toFixed(1) + '%</div>';
+        html += '</div>';
+      });
+    } else {
+      html += '<div style="color:var(--text-tertiary);font-size:13px">Nenhuma alocação registrada.</div>';
+    }
+    html += '</div>';
+
+    // History charts
+    html += '<div class="inv-modal-section"><h3>Histórico</h3>';
+    html += '<div class="inv-modal-charts">';
+    html += '<div class="inv-modal-chart-box"><h4>Salário</h4><div id="inv-hist-salario"></div></div>';
+    html += '<div class="inv-modal-chart-box"><h4>Banco de Horas</h4><div id="inv-hist-banco"></div></div>';
+    html += '</div></div>';
+
+    content.innerHTML = html;
+
+    // Draw salary history chart
+    if (historicoSalario.length > 0) {
+      var salarioPoints = historicoSalario.map(function(h) {
+        var d = h.data_vigencia ? h.data_vigencia.substring(0, 10) : '';
+        return { label: fmtDateBR(d), value: h.valor || 0, projected: false };
+      });
+      drawInvLineChart(document.getElementById('inv-hist-salario'), salarioPoints, {
+        w: 300, h: 150, leftPad: 60,
+        formatY: function(v) { return 'R$ ' + (v / 1000).toFixed(1) + 'k'; },
+        formatTooltip: function(v) { return formatSalarioBR(v); }
+      });
+    } else {
+      document.getElementById('inv-hist-salario').innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:16px;font-size:12px">Sem histórico</div>';
+    }
+
+    // Draw banco de horas history chart
+    if (historicoBanco.length > 0) {
+      var bancoPoints = historicoBanco.map(function(h) {
+        var d = h.data_registro ? h.data_registro.substring(0, 10) : '';
+        return { label: fmtDateBR(d), value: h.valor || 0, projected: false };
+      });
+      drawInvLineChart(document.getElementById('inv-hist-banco'), bancoPoints, {
+        w: 300, h: 150, leftPad: 45,
+        color: 'var(--blue)',
+        formatY: function(v) { return v.toFixed(0) + 'h'; },
+        formatTooltip: function(v) { return v.toLocaleString('pt-BR') + 'h'; }
+      });
+    } else {
+      document.getElementById('inv-hist-banco').innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:16px;font-size:12px">Sem histórico</div>';
+    }
+  } catch (err) {
+    content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(err.message) + '</div></div>';
+  }
+}
+
+function closeInvestimentoModal() {
+  document.getElementById('investimento-modal').classList.remove('open');
+}
+
 // === INIT ===
 checkAuthHash();
 if (token) { api('/usuarios').then(() => showApp()).catch(() => logout()); }
