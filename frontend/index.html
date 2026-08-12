@@ -7640,8 +7640,8 @@ function renderInvestimentosDashboard(data) {
   // Load chart data
   loadInvGastosMensais(invCurrentEquipeId, sum.custo_mensal_total);
 
-  // Render members table (Task 4 will implement renderInvMembrosTable)
-  if (typeof renderInvMembrosTable === 'function') renderInvMembrosTable(membros);
+  // Render members table
+  renderInvMembrosTable(membros);
 }
 
 function drawInvLineChart(container, points, opts) {
@@ -7808,6 +7808,52 @@ async function loadInvGastosMensais(equipeId, custoAtual) {
   } catch (err) {
     chartEl.innerHTML = '<div style="color:var(--text-tertiary);text-align:center;padding:20px">Erro ao carregar gráfico</div>';
   }
+}
+
+function renderInvMembrosTable(membros) {
+  var el = document.getElementById('inv-members-table');
+  if (!el) return;
+  if (!membros || membros.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-text">Nenhum membro encontrado.</div></div>';
+    return;
+  }
+
+  var html = '<table class="inv-table"><thead><tr>';
+  html += '<th>Nome</th><th>R$/Mês</th><th>Tempo de Casa</th><th>Banco de Horas</th><th>Atuação</th>';
+  html += '</tr></thead><tbody>';
+
+  membros.forEach(function(m) {
+    var avatarHtml = m.avatar_url
+      ? '<img src="' + esc(m.avatar_url) + '" alt="">'
+      : initials(m.nome);
+
+    var salarioHtml = m.salario != null
+      ? formatSalarioBR(m.salario)
+      : '<span class="inv-salary-null">Não definido</span>';
+
+    var tempoHtml = m.data_admissao ? formatTempoCasa(m.tempo_casa_meses) : '<span class="inv-salary-null">—</span>';
+
+    var bancoHtml = (m.banco_horas || 0) > 0
+      ? m.banco_horas.toLocaleString('pt-BR') + 'h'
+      : '0h';
+
+    var produtosHtml = '';
+    (m.top_produtos || []).forEach(function(p) {
+      produtosHtml += '<span class="inv-chip">' + esc(p) + '</span>';
+    });
+    if (!produtosHtml) produtosHtml = '<span class="inv-salary-null">—</span>';
+
+    html += '<tr data-membro-id="' + m.id + '" onclick="openInvestimentoModal(\'' + m.id + '\')">';
+    html += '<td><div class="inv-member-cell"><div class="inv-member-avatar" style="background:' + stringColor(m.nome) + '">' + avatarHtml + '</div>' + esc(m.nome) + '</div></td>';
+    html += '<td>' + salarioHtml + '</td>';
+    html += '<td>' + tempoHtml + '</td>';
+    html += '<td>' + bancoHtml + '</td>';
+    html += '<td>' + produtosHtml + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
 function scrollToInvMembro(membroId) {
