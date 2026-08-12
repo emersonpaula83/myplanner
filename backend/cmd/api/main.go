@@ -103,6 +103,10 @@ func main() {
 	membroRepo := repository.NewMembroRepository(pool)
 	membroHandler := handler.NewMembroHandler(membroRepo, logger)
 
+	investRepo := repository.NewInvestimentoRepository(pool)
+	investService := service.NewInvestimentoService(equipeRepo, membroRepo, investRepo, logger)
+	investHandler := handler.NewInvestimentoHandler(investService, membroRepo, logger)
+
 	sprintRepo := repository.NewSprintRepository(pool)
 	sprintService := service.NewSprintService(sprintRepo, logger)
 	sprintHandler := handler.NewSprintHandler(sprintService, logger)
@@ -243,6 +247,18 @@ func main() {
 			r.Get("/equipes/{id}/membros", equipeHandler.GetMembros)
 			r.Post("/equipes/{id}/membros", equipeHandler.AddMembro)
 			r.Delete("/equipes/{id}/membros/{membroId}", equipeHandler.RemoveMembro)
+
+			// Investimentos
+			r.Get("/equipes/{id}/investimentos", investHandler.GetDashboard)
+			r.Get("/equipes/{id}/investimentos/gastos-mensais", investHandler.GetGastosMensais)
+
+			// Membro financial
+			r.Put("/membros/{id}/salario", investHandler.UpdateSalario)
+			r.Put("/membros/{id}/banco-horas", investHandler.UpdateBancoHoras)
+			r.Put("/membros/{id}/data-admissao", investHandler.UpdateDataAdmissao)
+			r.Get("/membros/{id}/salario/historico", investHandler.GetHistoricoSalario)
+			r.Get("/membros/{id}/banco-horas/historico", investHandler.GetHistoricoBancoHoras)
+			r.Get("/membros/{id}/alocacoes-projetos", investHandler.GetAlocacoesProjetos)
 
 			r.Get("/timeline-capacidade", timelineHandler.ListTimeline)
 			r.Post("/timeline-capacidade/analisar", timelineHandler.AnalisarCapacidade)
