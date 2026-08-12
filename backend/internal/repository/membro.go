@@ -245,3 +245,118 @@ func (r *MembroRepository) ListTeams(ctx context.Context) ([]string, error) {
 	}
 	return teams, rows.Err()
 }
+
+func (r *MembroRepository) UpdateSalario(ctx context.Context, id uuid.UUID, valor float64) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	result, err := tx.Exec(ctx, `
+		UPDATE membros SET salario = $2, updated_at = NOW() WHERE id = $1
+	`, id, valor)
+	if err != nil {
+		return fmt.Errorf("updating salario: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not found", id)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO membro_salarios (membro_id, valor, data_vigencia)
+		VALUES ($1, $2, CURRENT_DATE)
+	`, id, valor)
+	if err != nil {
+		return fmt.Errorf("inserting salary history: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *MembroRepository) UpdateBancoHoras(ctx context.Context, id uuid.UUID, valor float64) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	result, err := tx.Exec(ctx, `
+		UPDATE membros SET banco_horas = $2, updated_at = NOW() WHERE id = $1
+	`, id, valor)
+	if err != nil {
+		return fmt.Errorf("updating banco_horas: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not found", id)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO membro_banco_horas (membro_id, valor)
+		VALUES ($1, $2)
+	`, id, valor)
+	if err != nil {
+		return fmt.Errorf("inserting banco_horas history: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *MembroRepository) UpdateDataAdmissao(ctx context.Context, id uuid.UUID, data *time.Time) error {
+	result, err := r.pool.Exec(ctx, `
+		UPDATE membros SET data_admissao = $2, updated_at = NOW() WHERE id = $1
+	`, id, data)
+	if err != nil {
+		return fmt.Errorf("updating data_admissao: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not found", id)
+	}
+	return nil
+}
+
+func (r *MembroRepository) GetHistoricoSalario(ctx context.Context, membroID uuid.UUID) ([]domain.SalarioHistorico, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, membro_id, valor, data_vigencia, created_at
+		FROM membro_salarios
+		WHERE membro_id = $1
+		ORDER BY data_vigencia ASC
+	`, membroID)
+	if err != nil {
+		return nil, fmt.Errorf("querying salary history: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.SalarioHistorico
+	for rows.Next() {
+		var s domain.SalarioHistorico
+		if err := rows.Scan(&s.ID, &s.MembroID, &s.Valor, &s.DataVigencia, &s.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning salary history: %w", err)
+		}
+		result = append(result, s)
+	}
+	return result, rows.Err()
+}
+
+func (r *MembroRepository) GetHistoricoBancoHoras(ctx context.Context, membroID uuid.UUID) ([]domain.BancoHorasHistorico, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, membro_id, valor, data_registro, created_at
+		FROM membro_banco_horas
+		WHERE membro_id = $1
+		ORDER BY data_registro ASC
+	`, membroID)
+	if err != nil {
+		return nil, fmt.Errorf("querying banco_horas history: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.BancoHorasHistorico
+	for rows.Next() {
+		var b domain.BancoHorasHistorico
+		if err := rows.Scan(&b.ID, &b.MembroID, &b.Valor, &b.DataRegistro, &b.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning banco_horas history: %w", err)
+		}
+		result = append(result, b)
+	}
+	return result, rows.Err()
+}
