@@ -942,6 +942,57 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .tl-pct-badge.green { background: #16a34a18; color: #16a34a; }
 .tl-pct-badge.amber { background: #C78D2E18; color: #C78D2E; }
 .tl-pct-badge.red { background: #D4483B18; color: #D4483B; }
+
+/* === INVESTIMENTOS === */
+.inv-filter-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.inv-filter-row .filter-select { min-width: 220px; }
+.inv-avatar-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.inv-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #fff; background: var(--accent); cursor: pointer; overflow: hidden; transition: transform .15s, box-shadow .15s; border: 2px solid transparent; flex-shrink: 0; }
+.inv-avatar:hover { transform: scale(1.15); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.inv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.inv-team-header { margin-bottom: 20px; }
+.inv-team-name { font-size: 26px; font-weight: 700; color: var(--accent); letter-spacing: -.5px; margin: 0; }
+.inv-dashboard-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; margin-bottom: 28px; align-items: start; }
+@media (max-width: 900px) { .inv-dashboard-grid { grid-template-columns: 1fr; } }
+.inv-stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.inv-stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+.inv-stat-card .inv-stat-value { font-size: 24px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+.inv-stat-card .inv-stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .4px; }
+.inv-chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; min-height: 220px; }
+.inv-chart-wrap h4 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: .3px; }
+.inv-members-section { margin-top: 4px; }
+.inv-members-section h3 { font-size: 16px; font-weight: 650; margin: 0 0 12px; color: var(--text-primary); }
+.inv-table { width: 100%; border-collapse: collapse; }
+.inv-table th { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .4px; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.inv-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; color: var(--text-primary); vertical-align: middle; }
+.inv-table tr { cursor: pointer; transition: background .12s; }
+.inv-table tbody tr:hover { background: var(--accent-soft); }
+.inv-table .inv-member-cell { display: flex; align-items: center; gap: 10px; }
+.inv-table .inv-member-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #fff; overflow: hidden; flex-shrink: 0; }
+.inv-table .inv-member-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.inv-chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: var(--chip-bg); color: var(--chip-text); margin: 1px 2px; }
+.inv-salary-null { color: var(--text-tertiary); font-style: italic; }
+.inv-modal-box { background: var(--modal-bg); border-radius: 14px; padding: 28px; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+.inv-modal-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.inv-modal-avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; color: #fff; overflow: hidden; flex-shrink: 0; }
+.inv-modal-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.inv-modal-info h2 { font-size: 20px; font-weight: 650; color: var(--text-primary); margin: 0 0 4px; }
+.inv-modal-info p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.inv-modal-close { margin-left: auto; background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-secondary); padding: 4px 8px; border-radius: 6px; }
+.inv-modal-close:hover { background: var(--chip-bg); }
+.inv-modal-section { margin-bottom: 24px; }
+.inv-modal-section h3 { font-size: 14px; font-weight: 650; color: var(--text-primary); margin: 0 0 12px; }
+.inv-alloc-item { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.inv-alloc-info { min-width: 140px; flex-shrink: 0; }
+.inv-alloc-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.inv-alloc-key { font-size: 11px; color: var(--text-tertiary); opacity: .6; }
+.inv-alloc-bar-wrap { flex: 1; height: 20px; background: var(--member-bar-bg); border-radius: 4px; overflow: hidden; position: relative; }
+.inv-alloc-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s ease; min-width: 2px; }
+.inv-alloc-pct { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 45px; text-align: right; font-variant-numeric: tabular-nums; }
+.inv-modal-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .inv-modal-charts { grid-template-columns: 1fr; } }
+.inv-modal-chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.inv-modal-chart-box h4 { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 0 0 8px; text-transform: uppercase; letter-spacing: .3px; }
 </style>
 </head>
 <body>
@@ -7499,6 +7550,107 @@ function syncProjectTasks(epicId) {
       }
       alert('Erro ao sincronizar tarefas.');
     });
+}
+
+// === INVESTIMENTOS ===
+let invCurrentEquipeId = null;
+let invDashboardData = null;
+
+function formatSalarioBR(valor) {
+  if (valor == null) return '—';
+  return 'R$ ' + valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+}
+
+function formatTempoCasa(meses) {
+  if (!meses || meses <= 0) return '—';
+  var anos = Math.floor(meses / 12);
+  var m = meses % 12;
+  if (anos > 0 && m > 0) return anos + 'a ' + m + 'm';
+  if (anos > 0) return anos + 'a';
+  return m + 'm';
+}
+
+function onInvEquipeChange() {
+  var equipeId = document.getElementById('inv-equipe').value;
+  if (!equipeId) {
+    document.getElementById('inv-avatars').innerHTML = '';
+    document.getElementById('inv-content').innerHTML = '<div class="empty-state"><div class="empty-state-text">Selecione uma equipe para visualizar os investimentos.</div></div>';
+    return;
+  }
+  invCurrentEquipeId = equipeId;
+  loadInvestimentos(equipeId);
+}
+
+async function loadInvestimentos(equipeId) {
+  var content = document.getElementById('inv-content');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    var data = await api('/equipes/' + equipeId + '/investimentos');
+    invDashboardData = data;
+    renderInvestimentosDashboard(data);
+  } catch (err) {
+    content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(err.message) + '</div></div>';
+  }
+}
+
+function renderInvestimentosDashboard(data) {
+  var eq = data.equipe;
+  var sum = data.sumario;
+  var membros = data.membros || [];
+
+  // Avatars row
+  var avatarsHtml = '';
+  membros.forEach(function(m) {
+    var av = m.avatar_url
+      ? '<img src="' + esc(m.avatar_url) + '" alt="">'
+      : initials(m.nome);
+    avatarsHtml += '<div class="inv-avatar" title="' + esc(m.nome) + '" style="background:' + stringColor(m.nome) + '" onclick="scrollToInvMembro(\'' + m.id + '\')">' + av + '</div>';
+  });
+  document.getElementById('inv-avatars').innerHTML = avatarsHtml;
+
+  // Build page content
+  var html = '<div class="fade-in">';
+
+  // Team header
+  html += '<div class="inv-team-header"><h2 class="inv-team-name">' + esc(eq.nome) + '</h2></div>';
+
+  // Dashboard grid: stat cards (left) + chart (right)
+  html += '<div class="inv-dashboard-grid">';
+
+  // Stat cards
+  html += '<div class="inv-stat-cards">';
+  html += '<div class="inv-stat-card"><div class="inv-stat-value">' + formatSalarioBR(sum.custo_mensal_total) + '</div><div class="inv-stat-label">Investimento / Mês</div></div>';
+  html += '<div class="inv-stat-card"><div class="inv-stat-value">' + sum.total_membros + '</div><div class="inv-stat-label">Membros Ativos</div></div>';
+  html += '<div class="inv-stat-card"><div class="inv-stat-value">' + formatTempoCasa(sum.tempo_casa_medio_meses) + '</div><div class="inv-stat-label">Tempo Médio de Casa</div></div>';
+  html += '<div class="inv-stat-card"><div class="inv-stat-value">' + (sum.banco_horas_total || 0).toLocaleString('pt-BR') + 'h</div><div class="inv-stat-label">Banco de Horas Total</div></div>';
+  html += '</div>';
+
+  // Chart placeholder (filled by Task 3)
+  html += '<div class="inv-chart-wrap"><h4>Gastos Mensais ' + new Date().getFullYear() + '</h4><div id="inv-gastos-chart"></div></div>';
+
+  html += '</div>'; // close dashboard-grid
+
+  // Members table placeholder (filled by Task 4)
+  html += '<div class="inv-members-section"><h3>Equipe</h3><div id="inv-members-table"></div></div>';
+
+  html += '</div>'; // close fade-in
+
+  document.getElementById('inv-content').innerHTML = html;
+
+  // Load chart data (Task 3 will implement loadInvGastosMensais)
+  if (typeof loadInvGastosMensais === 'function') loadInvGastosMensais(invCurrentEquipeId, sum.custo_mensal_total);
+
+  // Render members table (Task 4 will implement renderInvMembrosTable)
+  if (typeof renderInvMembrosTable === 'function') renderInvMembrosTable(membros);
+}
+
+function scrollToInvMembro(membroId) {
+  var row = document.querySelector('.inv-table tr[data-membro-id="' + membroId + '"]');
+  if (row) {
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.style.background = 'var(--accent-soft)';
+    setTimeout(function() { row.style.background = ''; }, 1500);
+  }
 }
 
 // === INIT ===
