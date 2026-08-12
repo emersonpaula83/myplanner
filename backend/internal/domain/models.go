@@ -39,6 +39,9 @@ type Membro struct {
 	Ativo            bool       `json:"ativo" db:"ativo"`
 	DataDesligamento *time.Time `json:"data_desligamento" db:"data_desligamento"`
 	Cargo            *string    `json:"cargo" db:"cargo"`
+	Salario          *float64   `json:"salario,omitempty" db:"salario"`
+	DataAdmissao     *time.Time `json:"data_admissao,omitempty" db:"data_admissao"`
+	BancoHoras       *float64   `json:"banco_horas,omitempty" db:"banco_horas"`
 	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
 }

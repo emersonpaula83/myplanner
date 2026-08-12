@@ -110,7 +110,9 @@ func (r *EquipeRepository) DeleteEquipe(ctx context.Context, id uuid.UUID) error
 func (r *EquipeRepository) GetMembrosEquipe(ctx context.Context, equipeID uuid.UUID) ([]domain.Membro, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT m.id, m.fonte_dados_id, m.jira_account_id, m.nome, m.email,
-		       m.avatar_url, m.team, m.ativo, m.data_desligamento, m.cargo, m.created_at, m.updated_at
+		       m.avatar_url, m.team, m.ativo, m.data_desligamento, m.cargo,
+		       m.salario, m.data_admissao, m.banco_horas,
+		       m.created_at, m.updated_at
 		FROM membros m
 		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1
 		WHERE m.ativo = true
@@ -127,7 +129,9 @@ func (r *EquipeRepository) GetMembrosEquipe(ctx context.Context, equipeID uuid.U
 		var m domain.Membro
 		if err := rows.Scan(
 			&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email,
-			&m.AvatarURL, &m.Team, &m.Ativo, &m.DataDesligamento, &m.Cargo, &m.CreatedAt, &m.UpdatedAt,
+			&m.AvatarURL, &m.Team, &m.Ativo, &m.DataDesligamento, &m.Cargo,
+			&m.Salario, &m.DataAdmissao, &m.BancoHoras,
+			&m.CreatedAt, &m.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning membro: %w", err)
 		}
