@@ -7637,11 +7637,173 @@ function renderInvestimentosDashboard(data) {
 
   document.getElementById('inv-content').innerHTML = html;
 
-  // Load chart data (Task 3 will implement loadInvGastosMensais)
-  if (typeof loadInvGastosMensais === 'function') loadInvGastosMensais(invCurrentEquipeId, sum.custo_mensal_total);
+  // Load chart data
+  loadInvGastosMensais(invCurrentEquipeId, sum.custo_mensal_total);
 
   // Render members table (Task 4 will implement renderInvMembrosTable)
   if (typeof renderInvMembrosTable === 'function') renderInvMembrosTable(membros);
+}
+
+function drawInvLineChart(container, points, opts) {
+  if (!container || !points || points.length === 0) {
+    if (container) container.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:20px">Sem dados</div>';
+    return;
+  }
+  opts = opts || {};
+  var W = opts.w || 460, H = opts.h || 180;
+  var pad = { t: 15, r: 20, b: 30, l: opts.leftPad || 65 };
+  var plotW = W - pad.l - pad.r;
+  var plotH = H - pad.t - pad.b;
+
+  var values = points.map(function(p) { return p.value; });
+  var maxVal = Math.max.apply(null, values);
+  var minVal = Math.min.apply(null, values.filter(function(v) { return v > 0; }));
+  if (maxVal === 0) maxVal = 1;
+  if (minVal === maxVal) { minVal = 0; }
+  else { minVal = Math.max(0, minVal * 0.85); }
+  var range = maxVal - minVal || 1;
+
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.setAttribute('width', '100%');
+  svg.style.maxWidth = W + 'px';
+  svg.style.display = 'block';
+
+  var xScale = function(i) { return pad.l + (points.length > 1 ? (i / (points.length - 1)) * plotW : plotW / 2); };
+  var yScale = function(v) { return pad.t + plotH - ((v - minVal) / range) * plotH; };
+
+  // Horizontal grid lines (4 lines)
+  for (var g = 0; g <= 3; g++) {
+    var gy = pad.t + (g / 3) * plotH;
+    var gv = maxVal - (g / 3) * range;
+    var gridLine = document.createElementNS(svgNS, 'line');
+    gridLine.setAttribute('x1', pad.l);
+    gridLine.setAttribute('x2', W - pad.r);
+    gridLine.setAttribute('y1', gy);
+    gridLine.setAttribute('y2', gy);
+    gridLine.setAttribute('stroke', 'var(--border-subtle)');
+    gridLine.setAttribute('stroke-width', '1');
+    svg.appendChild(gridLine);
+
+    var yLabel = document.createElementNS(svgNS, 'text');
+    yLabel.setAttribute('x', pad.l - 6);
+    yLabel.setAttribute('y', gy + 4);
+    yLabel.setAttribute('text-anchor', 'end');
+    yLabel.setAttribute('font-size', '10');
+    yLabel.setAttribute('fill', 'var(--text-tertiary)');
+    yLabel.textContent = opts.formatY ? opts.formatY(gv) : Math.round(gv).toLocaleString('pt-BR');
+    svg.appendChild(yLabel);
+  }
+
+  // X axis labels
+  var labelStep = points.length > 12 ? Math.ceil(points.length / 12) : 1;
+  points.forEach(function(p, i) {
+    if (i % labelStep !== 0 && i !== points.length - 1) return;
+    var xLabel = document.createElementNS(svgNS, 'text');
+    xLabel.setAttribute('x', xScale(i));
+    xLabel.setAttribute('y', H - 6);
+    xLabel.setAttribute('text-anchor', 'middle');
+    xLabel.setAttribute('font-size', '10');
+    xLabel.setAttribute('fill', 'var(--text-tertiary)');
+    xLabel.textContent = p.label;
+    svg.appendChild(xLabel);
+  });
+
+  // Build solid and dashed paths
+  var solidPath = '', dashedPath = '';
+  var lastSolidIdx = -1;
+
+  points.forEach(function(p, i) {
+    var x = xScale(i).toFixed(1), y = yScale(p.value).toFixed(1);
+    if (p.projected) {
+      if (!dashedPath && lastSolidIdx >= 0) {
+        dashedPath = 'M' + xScale(lastSolidIdx).toFixed(1) + ',' + yScale(points[lastSolidIdx].value).toFixed(1);
+      }
+      dashedPath += ' L' + x + ',' + y;
+    } else {
+      solidPath += (solidPath === '' ? 'M' : ' L') + x + ',' + y;
+      lastSolidIdx = i;
+    }
+  });
+
+  // Draw solid line
+  if (solidPath) {
+    var sPath = document.createElementNS(svgNS, 'path');
+    sPath.setAttribute('d', solidPath);
+    sPath.setAttribute('fill', 'none');
+    sPath.setAttribute('stroke', opts.color || 'var(--accent)');
+    sPath.setAttribute('stroke-width', '2.5');
+    sPath.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(sPath);
+  }
+
+  // Draw dashed line (projected)
+  if (dashedPath) {
+    var dPath = document.createElementNS(svgNS, 'path');
+    dPath.setAttribute('d', dashedPath);
+    dPath.setAttribute('fill', 'none');
+    dPath.setAttribute('stroke', opts.color || 'var(--accent)');
+    dPath.setAttribute('stroke-width', '2');
+    dPath.setAttribute('stroke-dasharray', '6,4');
+    dPath.setAttribute('opacity', '0.5');
+    dPath.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(dPath);
+  }
+
+  // Data point circles + tooltips
+  points.forEach(function(p, i) {
+    var cx = xScale(i), cy = yScale(p.value);
+    var circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', cx.toFixed(1));
+    circle.setAttribute('cy', cy.toFixed(1));
+    circle.setAttribute('r', '4');
+    circle.setAttribute('fill', p.projected ? 'var(--surface)' : (opts.color || 'var(--accent)'));
+    circle.setAttribute('stroke', opts.color || 'var(--accent)');
+    circle.setAttribute('stroke-width', '2');
+    circle.style.cursor = 'pointer';
+
+    var title = document.createElementNS(svgNS, 'title');
+    title.textContent = p.label + ': ' + (opts.formatTooltip ? opts.formatTooltip(p.value) : p.value.toLocaleString('pt-BR'));
+    circle.appendChild(title);
+    svg.appendChild(circle);
+  });
+
+  container.innerHTML = '';
+  container.appendChild(svg);
+}
+
+async function loadInvGastosMensais(equipeId, custoAtual) {
+  var chartEl = document.getElementById('inv-gastos-chart');
+  if (!chartEl) return;
+  try {
+    var data = await api('/equipes/' + equipeId + '/investimentos/gastos-mensais');
+    var meses = data.meses || [];
+    var mesLabels = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    var currentMonth = new Date().getMonth() + 1; // 1-based
+
+    var points = meses.map(function(m) {
+      return {
+        label: mesLabels[m.mes - 1] || m.mes,
+        value: m.custo_total || 0,
+        projected: m.mes > currentMonth
+      };
+    });
+
+    // For future months with zero cost, project using current monthly cost
+    points.forEach(function(p) {
+      if (p.projected && p.value === 0 && custoAtual > 0) {
+        p.value = custoAtual;
+      }
+    });
+
+    drawInvLineChart(chartEl, points, {
+      formatY: function(v) { return 'R$ ' + (v / 1000).toFixed(0) + 'k'; },
+      formatTooltip: function(v) { return formatSalarioBR(v); }
+    });
+  } catch (err) {
+    chartEl.innerHTML = '<div style="color:var(--text-tertiary);text-align:center;padding:20px">Erro ao carregar gráfico</div>';
+  }
 }
 
 function scrollToInvMembro(membroId) {
