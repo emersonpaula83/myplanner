@@ -61,7 +61,7 @@ func (r *InvestimentoRepository) GetSalarioVigenteNoMes(ctx context.Context, mem
 	err := r.pool.QueryRow(ctx, `
 		SELECT valor FROM membro_salarios
 		WHERE membro_id = $1 AND data_vigencia <= $2
-		ORDER BY data_vigencia DESC
+		ORDER BY data_vigencia DESC, created_at DESC
 		LIMIT 1
 	`, membroID, lastDay).Scan(&valor)
 	if err != nil {
