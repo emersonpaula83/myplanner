@@ -965,7 +965,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .inv-table { width: 100%; border-collapse: collapse; }
 .inv-table th { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .4px; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
 .inv-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; color: var(--text-primary); vertical-align: middle; }
-.inv-table tr { cursor: pointer; transition: background .12s; }
+.inv-table tbody tr { cursor: pointer; transition: background .12s; }
 .inv-table tbody tr:hover { background: var(--accent-soft); }
 .inv-table .inv-member-cell { display: flex; align-items: center; gap: 10px; }
 .inv-table .inv-member-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #fff; overflow: hidden; flex-shrink: 0; }
@@ -7584,6 +7584,7 @@ function onInvEquipeChange() {
 async function loadInvestimentos(equipeId) {
   var content = document.getElementById('inv-content');
   content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('inv-avatars').innerHTML = '';
   try {
     var data = await api('/equipes/' + equipeId + '/investimentos');
     invDashboardData = data;
@@ -7912,8 +7913,9 @@ async function openInvestimentoModal(membroId) {
       alocacoes.forEach(function(a) {
         html += '<div class="inv-alloc-item">';
         html += '<div class="inv-alloc-info"><div class="inv-alloc-name">' + esc(a.apelido) + '</div><div class="inv-alloc-key">' + esc(a.chave_jira) + '</div></div>';
-        html += '<div class="inv-alloc-bar-wrap"><div class="inv-alloc-bar" style="width:' + Math.min(a.percentual_alocacao, 100).toFixed(1) + '%"></div></div>';
-        html += '<div class="inv-alloc-pct">' + a.percentual_alocacao.toFixed(1) + '%</div>';
+        var pct = a.percentual_alocacao || 0;
+        html += '<div class="inv-alloc-bar-wrap"><div class="inv-alloc-bar" style="width:' + Math.min(pct, 100).toFixed(1) + '%"></div></div>';
+        html += '<div class="inv-alloc-pct">' + pct.toFixed(1) + '%</div>';
         html += '</div>';
       });
     } else {
