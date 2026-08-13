@@ -34,6 +34,7 @@ type mockEquipeStore struct {
 	transferirMembroFn           func(ctx context.Context, equipeOrigemID, equipeDestinoID, membroID uuid.UUID) error
 	insertMeritoPromocaoFn       func(ctx context.Context, membroID uuid.UUID, tipo string, cargoAnterior, cargoNovo *string, salarioAnterior *float64, salarioNovo float64, dataVigencia time.Time) (*domain.HistoricoMeritoPromocao, error)
 	getMembrosEquipeComEntradaFn func(ctx context.Context, equipeID uuid.UUID) ([]domain.MembroComEntrada, error)
+	getMembroByIDFn              func(ctx context.Context, id uuid.UUID) (*domain.Membro, error)
 }
 
 func (m *mockEquipeStore) ListEquipes(ctx context.Context) ([]domain.Equipe, error) {
@@ -89,6 +90,9 @@ func (m *mockEquipeStore) InsertMeritoPromocao(ctx context.Context, membroID uui
 }
 func (m *mockEquipeStore) GetMembrosEquipeComEntrada(ctx context.Context, equipeID uuid.UUID) ([]domain.MembroComEntrada, error) {
 	return m.getMembrosEquipeComEntradaFn(ctx, equipeID)
+}
+func (m *mockEquipeStore) GetMembroByID(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
+	return m.getMembroByIDFn(ctx, id)
 }
 
 func newTestEquipeHandler(store *mockEquipeStore) *EquipeHandler {

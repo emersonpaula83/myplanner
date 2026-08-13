@@ -245,6 +245,21 @@ func (r *EquipeRepository) GetMembrosEquipeComEntrada(ctx context.Context, equip
 	return result, rows.Err()
 }
 
+func (r *EquipeRepository) GetMembroByID(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
+	var m domain.Membro
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, data_desligamento, cargo, salario, data_admissao, banco_horas, matricula, ultimo_aumento, gestor_id, created_at, updated_at
+		FROM membros WHERE id = $1
+	`, id).Scan(&m.ID, &m.FonteDadosID, &m.JiraAccountID, &m.Nome, &m.Email, &m.AvatarURL, &m.Team, &m.Ativo, &m.DataDesligamento, &m.Cargo, &m.Salario, &m.DataAdmissao, &m.BancoHoras, &m.Matricula, &m.UltimoAumento, &m.GestorID, &m.CreatedAt, &m.UpdatedAt)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("getting membro by id: %w", err)
+	}
+	return &m, nil
+}
+
 func (r *EquipeRepository) InsertMeritoPromocao(ctx context.Context, membroID uuid.UUID, tipo string, cargoAnterior, cargoNovo *string, salarioAnterior *float64, salarioNovo float64, dataVigencia time.Time) (*domain.HistoricoMeritoPromocao, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

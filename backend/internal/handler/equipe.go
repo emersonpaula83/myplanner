@@ -31,6 +31,7 @@ type EquipeStore interface {
 	TransferirMembro(ctx context.Context, equipeOrigemID, equipeDestinoID, membroID uuid.UUID) error
 	InsertMeritoPromocao(ctx context.Context, membroID uuid.UUID, tipo string, cargoAnterior, cargoNovo *string, salarioAnterior *float64, salarioNovo float64, dataVigencia time.Time) (*domain.HistoricoMeritoPromocao, error)
 	GetMembrosEquipeComEntrada(ctx context.Context, equipeID uuid.UUID) ([]domain.MembroComEntrada, error)
+	GetMembroByID(ctx context.Context, id uuid.UUID) (*domain.Membro, error)
 }
 
 type EquipeHandler struct {
@@ -495,6 +496,97 @@ func (h *EquipeHandler) GetMembroProdutos(w http.ResponseWriter, r *http.Request
 		return
 	}
 	respondJSON(w, http.StatusOK, produtos)
+}
+
+func (h *EquipeHandler) MeritoPromocao(w http.ResponseWriter, r *http.Request) {
+	membroID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+
+	var req domain.MeritoPromocaoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+
+	if req.Tipo != "merito" && req.Tipo != "promocao" {
+		respondError(w, http.StatusBadRequest, "tipo deve ser 'merito' ou 'promocao'")
+		return
+	}
+
+	dataVigencia, err := time.Parse("2006-01-02", req.DataVigencia)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "data_vigencia inválida (use YYYY-MM-DD)")
+		return
+	}
+
+	membro, err := h.store.GetMembroByID(r.Context(), membroID)
+	if err != nil {
+		h.logger.Error("failed to get membro", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar membro")
+		return
+	}
+	if membro == nil {
+		respondError(w, http.StatusNotFound, "membro não encontrado")
+		return
+	}
+
+	if membro.Salario != nil && req.SalarioNovo < *membro.Salario {
+		respondError(w, http.StatusBadRequest, "salário novo não pode ser menor que o atual")
+		return
+	}
+
+	var cargoNovo *string
+	if req.Tipo == "promocao" {
+		if req.CargoNovo == nil || *req.CargoNovo == "" {
+			respondError(w, http.StatusBadRequest, "cargo_novo obrigatório para promoção")
+			return
+		}
+		if !domain.IsCargoValido(*req.CargoNovo) {
+			respondError(w, http.StatusBadRequest, "cargo_novo inválido")
+			return
+		}
+		cargoAtual := ""
+		if membro.Cargo != nil {
+			cargoAtual = *membro.Cargo
+		}
+		if !domain.IsPromocaoValida(cargoAtual, *req.CargoNovo) {
+			respondError(w, http.StatusBadRequest, "promoção inválida: "+cargoAtual+" não pode ser promovido para "+*req.CargoNovo)
+			return
+		}
+		cargoNovo = req.CargoNovo
+	} else {
+		if req.CargoNovo != nil && *req.CargoNovo != "" && (membro.Cargo == nil || *req.CargoNovo != *membro.Cargo) {
+			respondError(w, http.StatusBadRequest, "mérito não altera cargo")
+			return
+		}
+	}
+
+	historico, err := h.store.InsertMeritoPromocao(
+		r.Context(), membroID, req.Tipo,
+		membro.Cargo, cargoNovo,
+		membro.Salario, req.SalarioNovo, dataVigencia,
+	)
+	if err != nil {
+		h.logger.Error("failed to insert merito/promocao", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao registrar mérito/promoção")
+		return
+	}
+
+	depois := domain.MembroSnapshot{Salario: &req.SalarioNovo}
+	if req.Tipo == "promocao" && cargoNovo != nil {
+		depois.Cargo = cargoNovo
+	} else {
+		depois.Cargo = membro.Cargo
+	}
+
+	respondJSON(w, http.StatusOK, domain.MeritoPromocaoResponse{
+		HistoricoID: historico.ID,
+		Antes:       domain.MembroSnapshot{Cargo: membro.Cargo, Salario: membro.Salario},
+		Depois:      depois,
+	})
 }
 
 func (h *EquipeHandler) SetMembroProdutos(w http.ResponseWriter, r *http.Request) {

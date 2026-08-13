@@ -252,6 +252,7 @@ func main() {
 			r.Post("/equipes/{id}/membros", equipeHandler.AddMembro)
 			r.Delete("/equipes/{id}/membros/{membroId}", equipeHandler.RemoveMembro)
 			r.Post("/equipes/{id}/membros/{membroId}/transferir", equipeHandler.TransferMembro)
+			r.Post("/membros/{id}/merito-promocao", equipeHandler.MeritoPromocao)
 
 			// Investimentos
 			r.Get("/equipes/{id}/investimentos", investHandler.GetDashboard)
