@@ -116,7 +116,7 @@ cmd_start() {
     cmd_build
     LOG_FILE="/tmp/myplanner.log"
     log "Iniciando servidor em http://localhost:$PORT ..."
-    cd "$BACKEND" && "$BIN" >> "$LOG_FILE" 2>&1 &
+    (cd "$BACKEND" && exec "$BIN" >> "$LOG_FILE" 2>&1) &
     echo $! > "$PID_FILE"
     sleep 2
     if curl -sf http://localhost:$PORT/health >/dev/null 2>&1; then
