@@ -790,6 +790,12 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .search-result-item .sr-added { font-size: 11px; color: var(--accent); font-weight: 600; margin-left: auto; }
 .btn-remove-member { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--red-soft); background: transparent; color: var(--red); font-family: inherit; transition: all .15s; }
 .btn-remove-member:hover { background: var(--red-soft); }
+.btn-member-action { background: none; border: 1px solid var(--border-subtle); color: var(--text-secondary); cursor: pointer; padding: 3px 9px; border-radius: 6px; font-size: 13px; margin-right: 4px; font-family: inherit; transition: all .15s; }
+.btn-member-action:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.btn-member-action.btn-merito:hover { background: var(--amber-soft); color: var(--amber); border-color: var(--amber); }
+.transfer-dropdown { position: absolute; right: 0; top: 100%; background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 50; min-width: 200px; max-height: 250px; overflow-y: auto; padding: 4px; }
+.transfer-dropdown-item { padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 13px; color: var(--text-primary); }
+.transfer-dropdown-item:hover { background: var(--accent-soft); color: var(--accent); }
 .equipe-create-wrap { display: flex; gap: 8px; }
 .equipe-create-input { padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none; width: 200px; }
 .equipe-create-input:focus { border-color: var(--accent); }
@@ -1486,6 +1492,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div class="modal-title" id="timeline-detail-title"></div>
     <div id="timeline-detail-content"></div>
     <div class="modal-actions"><button class="btn-cancel" onclick="closeTimelineDetailModal()">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="merito-modal" onclick="if(event.target===this)closeMeritoModal()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title" id="merito-modal-title">Mérito/Promoção</div>
+    <div id="merito-modal-body"></div>
   </div>
 </div>
 
@@ -2243,6 +2256,7 @@ function toggleSidebarGroup(name) {
 // === EQUIPES ===
 let currentEquipePeriod = '3m';
 let currentEquipeId = null;
+let equipeMembrosCache = {};
 let currentEquipeNome = null;
 
 async function loadEquipes() {
@@ -2413,10 +2427,24 @@ async function searchMembroToAdd(equipeId) {
 
 async function addMembroToEquipe(equipeId, membroId, el) {
   try {
-    await api('/equipes/' + equipeId + '/membros', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+    var headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    var response = await fetch(API + '/equipes/' + equipeId + '/membros', {
+      method: 'POST', headers: headers,
       body: JSON.stringify({membro_id: membroId})
     });
+    var data = await response.json().catch(() => null);
+    if (response.status === 409 && data && data.conflito) {
+      if (confirm('Membro já está em "' + data.equipe_atual.nome + '". Transferir para esta equipe?')) {
+        await api('/equipes/' + data.equipe_atual.id + '/membros/' + membroId + '/transferir', {
+          method: 'POST', body: JSON.stringify({ equipe_destino_id: equipeId })
+        });
+      } else { return; }
+    } else if (response.status === 401) {
+      logout(); return;
+    } else if (!response.ok) {
+      throw new Error((data && data.error) || 'Erro ao adicionar');
+    }
     if (el) {
       el.innerHTML += '<span class="sr-added">Adicionado!</span>';
       el.style.pointerEvents = 'none';
@@ -2432,6 +2460,177 @@ async function removeMembroFromEquipe(equipeId, membroId) {
     await api('/equipes/' + equipeId + '/membros/' + membroId, { method: 'DELETE' });
     loadEquipeResumo();
   } catch (e) { alert('Erro: ' + e.message); }
+}
+
+var activeTransferDropdown = null;
+
+async function openTransferDropdown(equipeId, membroId, btn) {
+  if (activeTransferDropdown) { activeTransferDropdown.remove(); activeTransferDropdown = null; return; }
+  try {
+    var equipes = await api('/equipes');
+    var dd = document.createElement('div');
+    dd.className = 'transfer-dropdown';
+    var outras = (equipes || []).filter(function(e) { return e.id !== equipeId; });
+    if (outras.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'transfer-dropdown-item';
+      empty.style.cursor = 'default';
+      empty.style.color = 'var(--text-tertiary)';
+      empty.textContent = 'Nenhuma outra equipe';
+      dd.appendChild(empty);
+    }
+    outras.forEach(function(e) {
+      var item = document.createElement('div');
+      item.className = 'transfer-dropdown-item';
+      item.textContent = e.nome;
+      item.onclick = async function(ev) {
+        ev.stopPropagation();
+        if (!confirm('Transferir para "' + e.nome + '"?')) return;
+        try {
+          await api('/equipes/' + equipeId + '/membros/' + membroId + '/transferir', {
+            method: 'POST', body: JSON.stringify({ equipe_destino_id: e.id })
+          });
+          dd.remove(); activeTransferDropdown = null;
+          loadEquipeResumo();
+        } catch (err) { alert('Erro: ' + err.message); }
+      };
+      dd.appendChild(item);
+    });
+    btn.parentElement.style.position = 'relative';
+    btn.parentElement.appendChild(dd);
+    activeTransferDropdown = dd;
+    setTimeout(function() {
+      document.addEventListener('click', function closeDD() {
+        if (activeTransferDropdown) { activeTransferDropdown.remove(); activeTransferDropdown = null; }
+        document.removeEventListener('click', closeDD);
+      }, { once: true });
+    }, 0);
+  } catch (e) { alert('Erro: ' + e.message); }
+}
+
+// === MÉRITO / PROMOÇÃO ===
+var meritoState = {};
+
+function openMeritoModal(membroId) {
+  var m = equipeMembrosCache[membroId] || {};
+  meritoState = { membroId: membroId, nome: m.nome || '', cargo: m.cargo || '', salario: m.salario != null ? m.salario : null, tipo: 'merito' };
+  document.getElementById('merito-modal-title').textContent = 'Mérito/Promoção' + (m.nome ? ' — ' + m.nome : '');
+  renderMeritoForm();
+  document.getElementById('merito-modal').classList.add('open');
+}
+
+function closeMeritoModal() {
+  document.getElementById('merito-modal').classList.remove('open');
+  meritoState = {};
+}
+
+function renderMeritoForm() {
+  var s = meritoState;
+  var promoOpts = getPromocaoOptions(s.cargo);
+  var html = '<div style="padding:4px 0">';
+  html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+  html += '<button type="button" class="period-chip' + (s.tipo !== 'promocao' ? ' active' : '') + '" onclick="meritoState.tipo=\'merito\';renderMeritoForm()">Mérito</button>';
+  html += '<button type="button" class="period-chip' + (s.tipo === 'promocao' ? ' active' : '') + '" onclick="meritoState.tipo=\'promocao\';renderMeritoForm()">Promoção</button>';
+  html += '</div>';
+
+  if (s.tipo === 'promocao') {
+    html += '<div class="form-group"><label class="form-label">Novo Cargo</label>';
+    html += '<select class="form-select" id="merito-cargo">';
+    if (promoOpts.length === 0) {
+      html += '<option value="">Cargo terminal — sem promoções disponíveis</option>';
+    } else {
+      html += '<option value="">Selecionar...</option>';
+      promoOpts.forEach(function(o) { html += '<option value="' + o.value + '">' + esc(o.label) + '</option>'; });
+    }
+    html += '</select></div>';
+  }
+
+  html += '<div class="form-group"><label class="form-label">Data de Vigência</label>';
+  html += '<input class="form-input" type="date" id="merito-data" value="' + new Date().toISOString().slice(0,10) + '" /></div>';
+
+  html += '<div class="form-group"><label class="form-label">Salário Atual</label>';
+  html += '<input class="form-input" type="text" readonly value="' + (s.salario != null ? formatSalarioBR(s.salario) : 'Não definido') + '" style="opacity:.7" /></div>';
+
+  html += '<div class="form-group"><label class="form-label">Novo Salário</label>';
+  html += '<div style="display:flex;gap:8px;align-items:center">';
+  html += '<input class="form-input" type="number" id="merito-salario" step="0.01" min="' + (s.salario || 0) + '" placeholder="0.00" style="flex:1" oninput="updateMeritoPct()" />';
+  html += '<span id="merito-pct" style="font-weight:600;color:var(--accent);min-width:60px;text-align:right"></span>';
+  html += '</div></div>';
+
+  html += '<div class="modal-actions"><button type="button" class="btn-cancel" onclick="closeMeritoModal()">Cancelar</button><button type="button" class="btn-primary" style="width:auto" onclick="submitMeritoForm()">Confirmar</button></div>';
+  html += '</div>';
+  document.getElementById('merito-modal-body').innerHTML = html;
+}
+
+function getPromocaoOptions(cargoAtual) {
+  var hierarchy = {
+    'analista_i': ['analista_ii'],
+    'analista_ii': ['analista_iii'],
+    'analista_iii': ['especialista_i', 'coordenador_desenvolvimento'],
+    'especialista_i': ['especialista_ii', 'coordenador_desenvolvimento', 'lider_tecnico'],
+    'especialista_ii': ['master', 'lider_tecnico'],
+    'coordenador_desenvolvimento': ['lider_tecnico']
+  };
+  var validos = hierarchy[cargoAtual] || [];
+  return validos.map(function(v) { return { value: v, label: cargoLabelMap(v) }; });
+}
+
+function updateMeritoPct() {
+  var el = document.getElementById('merito-pct');
+  var novoVal = parseFloat(document.getElementById('merito-salario').value);
+  if (!novoVal || !meritoState.salario) { el.textContent = ''; return; }
+  var pct = (novoVal - meritoState.salario) / meritoState.salario * 100;
+  el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+  el.style.color = pct >= 0 ? 'var(--accent)' : 'var(--red)';
+}
+
+async function submitMeritoForm() {
+  var s = meritoState;
+  var tipo = s.tipo === 'promocao' ? 'promocao' : 'merito';
+  var salarioNovo = parseFloat(document.getElementById('merito-salario').value);
+  var dataVigencia = document.getElementById('merito-data').value;
+  if (!salarioNovo || salarioNovo <= 0) { alert('Informe o novo salário'); return; }
+  if (s.salario != null && salarioNovo < s.salario) { alert('Salário não pode ser menor que o atual'); return; }
+  if (!dataVigencia) { alert('Informe a data'); return; }
+
+  var body = { tipo: tipo, salario_novo: salarioNovo, data_vigencia: dataVigencia };
+  if (tipo === 'promocao') {
+    var cargoNovo = document.getElementById('merito-cargo').value;
+    if (!cargoNovo) { alert('Selecione o novo cargo'); return; }
+    body.cargo_novo = cargoNovo;
+  }
+
+  try {
+    var resp = await api('/membros/' + s.membroId + '/merito-promocao', {
+      method: 'POST', body: JSON.stringify(body)
+    });
+    renderMeritoConfirmacao(resp);
+  } catch (e) { alert('Erro: ' + e.message); }
+}
+
+function renderMeritoConfirmacao(resp) {
+  var a = resp.antes || {}, d = resp.depois || {};
+  var html = '<div>';
+  html += '<div style="text-align:center;margin-bottom:16px;color:var(--accent);font-weight:600">✓ Registrado com sucesso</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:14px">';
+  html += '<tr style="border-bottom:1px solid var(--border-subtle)"><th style="text-align:left;padding:8px;color:var(--text-secondary)">Campo</th><th style="padding:8px;color:var(--text-secondary)">Antes</th><th style="padding:8px;color:var(--text-secondary)">Depois</th></tr>';
+
+  if (a.cargo !== d.cargo) {
+    html += '<tr><td style="padding:8px">Cargo</td><td style="padding:8px;text-align:center">' + (a.cargo ? cargoLabelMap(a.cargo) : '—') + '</td><td style="padding:8px;text-align:center;font-weight:600;color:var(--accent)">' + (d.cargo ? cargoLabelMap(d.cargo) : '—') + '</td></tr>';
+  }
+
+  var salAntes = a.salario != null ? formatSalarioBR(a.salario) : '—';
+  var salDepois = d.salario != null ? formatSalarioBR(d.salario) : '—';
+  var pctAumento = (a.salario && d.salario) ? ((d.salario - a.salario) / a.salario * 100).toFixed(1) : null;
+  html += '<tr><td style="padding:8px">Salário</td><td style="padding:8px;text-align:center">' + salAntes + '</td><td style="padding:8px;text-align:center;font-weight:600;color:var(--accent)">' + salDepois + '</td></tr>';
+  if (pctAumento != null) {
+    html += '<tr><td style="padding:8px">Aumento</td><td style="padding:8px;text-align:center">—</td><td style="padding:8px;text-align:center;font-weight:600;color:var(--accent)">+' + pctAumento + '%</td></tr>';
+  }
+
+  html += '</table>';
+  html += '<div class="modal-actions"><button type="button" class="btn-primary" style="width:auto" onclick="closeMeritoModal();loadEquipeResumo()">Fechar</button></div>';
+  html += '</div>';
+  document.getElementById('merito-modal-body').innerHTML = html;
 }
 
 function cargoLabelMap(cargo) {
@@ -2464,12 +2663,16 @@ function renderEquipeResumo(r, equipeId, activePeriod) {
   const ini = r.detalhes_iniciativas || {};
   const iniTotal = (ini.percentual_manutencao||0) + (ini.percentual_melhorias||0) + (ini.percentual_suporte||0);
   let membersHtml = '';
+  equipeMembrosCache = {};
   (r.membros || []).forEach((m, i) => {
     const c = colors[i % colors.length]; const pct = m.atuacao_rastreada || 0;
+    equipeMembrosCache[m.id] = m;
     membersHtml += '<div class="member-row" onclick="openMembroDetail(\'' + m.id + '\')">' +
       '<div class="member-avatar" style="background:' + c + '">' + initials(m.nome) + '</div>' +
       '<div class="member-info"><div class="member-name">' + esc(m.nome) + (m.cargo ? '<span class="cargo-badge ' + cargoBadgeColor(m.cargo) + '">' + cargoLabelMap(m.cargo) + '</span>' : '') + '</div><div class="member-email">' + esc(m.email) + '</div></div>' +
       '<div class="member-metric-wrap"><div class="member-bar-wrap"><div class="member-bar"><div class="member-bar-fill ' + barClass(pct) + '" style="width:' + pctBar(pct) + '%"></div></div></div><div class="member-pct">' + pct.toFixed(1) + '%</div>' +
+      '<button class="btn-member-action" onclick="event.stopPropagation();openTransferDropdown(\'' + equipeId + '\',\'' + m.id + '\',this)" title="Transferir">↗</button>' +
+      '<button class="btn-member-action btn-merito" onclick="event.stopPropagation();openMeritoModal(\'' + m.id + '\')" title="Mérito/Promoção">⭐</button>' +
       '<button class="btn-remove-member" onclick="event.stopPropagation();removeMembroFromEquipe(\'' + equipeId + '\',\'' + m.id + '\')">Remover</button></div></div>';
   });
   const segWidth = v => iniTotal > 0 ? (v / iniTotal * 100).toFixed(1) : 0;
