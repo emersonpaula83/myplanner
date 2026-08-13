@@ -7,19 +7,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
 
 type SchedulerService struct {
 	syncSvc      *SyncService
-	scheduleRepo *repository.SyncScheduleRepository
+	scheduleRepo SyncScheduleStore
 	logger       *zap.Logger
 	mu           sync.Mutex
 	lastFired    map[uuid.UUID]string
 }
 
-func NewSchedulerService(syncSvc *SyncService, scheduleRepo *repository.SyncScheduleRepository, logger *zap.Logger) *SchedulerService {
+func NewSchedulerService(syncSvc *SyncService, scheduleRepo SyncScheduleStore, logger *zap.Logger) *SchedulerService {
 	return &SchedulerService{
 		syncSvc:      syncSvc,
 		scheduleRepo: scheduleRepo,

@@ -9,16 +9,15 @@ import (
 	"net/smtp"
 	"strings"
 
-	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
 
 type EmailProvider struct {
-	configRepo *repository.ConfigRepository
+	configRepo ConfigStore
 	logger     *zap.Logger
 }
 
-func NewEmailProvider(configRepo *repository.ConfigRepository, logger *zap.Logger) *EmailProvider {
+func NewEmailProvider(configRepo ConfigStore, logger *zap.Logger) *EmailProvider {
 	return &EmailProvider{configRepo: configRepo, logger: logger}
 }
 

@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 type NotificationService struct {
 	reviewSvc    *ReviewService
-	destRepo     *repository.DestinatarioRepository
-	sprintRepo   *repository.SprintRepository
+	destRepo     DestinatarioStore
+	sprintRepo   SprintRepoStore
 	emailProv    *EmailProvider
 	whatsappProv *WhatsAppProvider
 	logger       *zap.Logger
@@ -22,8 +21,8 @@ type NotificationService struct {
 
 func NewNotificationService(
 	reviewSvc *ReviewService,
-	destRepo *repository.DestinatarioRepository,
-	sprintRepo *repository.SprintRepository,
+	destRepo DestinatarioStore,
+	sprintRepo SprintRepoStore,
 	emailProv *EmailProvider,
 	whatsappProv *WhatsAppProvider,
 	logger *zap.Logger,

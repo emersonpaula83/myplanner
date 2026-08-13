@@ -107,10 +107,10 @@ type AllocateTaskResult struct {
 }
 
 type AllocationService struct {
-	repo          *repository.AllocationRepository
+	repo          AllocationStore
 	sprintSvc     *SprintService
-	sprintRepo    *repository.SprintRepository
-	fdRepo        *repository.FonteDadosRepository
+	sprintRepo    SprintRepoStore
+	fdRepo        FonteDadosStore
 	syncSvc       *SyncService
 	clientFactory ClientFactory
 	oauthFactory  OAuthClientFactory
@@ -120,10 +120,10 @@ type AllocationService struct {
 }
 
 func NewAllocationService(
-	repo *repository.AllocationRepository,
+	repo AllocationStore,
 	sprintSvc *SprintService,
-	sprintRepo *repository.SprintRepository,
-	fdRepo *repository.FonteDadosRepository,
+	sprintRepo SprintRepoStore,
+	fdRepo FonteDadosStore,
 	syncSvc *SyncService,
 	clientFactory ClientFactory,
 	oauthFactory OAuthClientFactory,

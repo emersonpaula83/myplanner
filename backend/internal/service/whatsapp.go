@@ -9,17 +9,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"go.uber.org/zap"
 )
 
 type WhatsAppProvider struct {
-	configRepo *repository.ConfigRepository
+	configRepo ConfigStore
 	httpClient *http.Client
 	logger     *zap.Logger
 }
 
-func NewWhatsAppProvider(configRepo *repository.ConfigRepository, logger *zap.Logger) *WhatsAppProvider {
+func NewWhatsAppProvider(configRepo ConfigStore, logger *zap.Logger) *WhatsAppProvider {
 	return &WhatsAppProvider{
 		configRepo: configRepo,
 		httpClient: &http.Client{Timeout: 30 * time.Second},

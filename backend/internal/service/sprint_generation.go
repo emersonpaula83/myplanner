@@ -8,16 +8,15 @@ import (
 	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/jira"
-	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 type SprintGenerationService struct {
-	fdRepo             *repository.FonteDadosRepository
-	equipeRepo         *repository.EquipeRepository
-	syncRepo           *repository.SyncRepository
-	sprintRepo         *repository.SprintRepository
+	fdRepo             FonteDadosStore
+	equipeRepo         EquipeStore
+	syncRepo           SyncRepoStore
+	sprintRepo         SprintRepoStore
 	clientFactory      ClientFactory
 	oauthClientFactory OAuthClientFactory
 	oauthSvc           *jira.OAuthService
@@ -26,10 +25,10 @@ type SprintGenerationService struct {
 }
 
 func NewSprintGenerationService(
-	fdRepo *repository.FonteDadosRepository,
-	equipeRepo *repository.EquipeRepository,
-	syncRepo *repository.SyncRepository,
-	sprintRepo *repository.SprintRepository,
+	fdRepo FonteDadosStore,
+	equipeRepo EquipeStore,
+	syncRepo SyncRepoStore,
+	sprintRepo SprintRepoStore,
 	clientFactory ClientFactory,
 	oauthClientFactory OAuthClientFactory,
 	oauthSvc *jira.OAuthService,

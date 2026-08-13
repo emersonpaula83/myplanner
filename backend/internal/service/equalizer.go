@@ -111,8 +111,8 @@ type membroState struct {
 type EqualizerService struct {
 	sprintSvc          *SprintService
 	sprintRepo         *repository.SprintRepository
-	fdRepo             *repository.FonteDadosRepository
-	configRepo         *repository.ConfigRepository
+	fdRepo             FonteDadosStore
+	configRepo         ConfigStore
 	clientFactory      ClientFactory
 	oauthClientFactory OAuthClientFactory
 	oauthSvc           *jira.OAuthService
@@ -123,8 +123,8 @@ type EqualizerService struct {
 func NewEqualizerService(
 	sprintSvc *SprintService,
 	sprintRepo *repository.SprintRepository,
-	fdRepo *repository.FonteDadosRepository,
-	configRepo *repository.ConfigRepository,
+	fdRepo FonteDadosStore,
+	configRepo ConfigStore,
 	clientFactory ClientFactory,
 	oauthClientFactory OAuthClientFactory,
 	oauthSvc *jira.OAuthService,

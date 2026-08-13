@@ -14,12 +14,12 @@ import (
 )
 
 type ReviewService struct {
-	repo       *repository.ReviewRepository
-	configRepo *repository.ConfigRepository
+	repo       ReviewStore
+	configRepo ConfigStore
 	logger     *zap.Logger
 }
 
-func NewReviewService(repo *repository.ReviewRepository, configRepo *repository.ConfigRepository, logger *zap.Logger) *ReviewService {
+func NewReviewService(repo ReviewStore, configRepo ConfigStore, logger *zap.Logger) *ReviewService {
 	return &ReviewService{repo: repo, configRepo: configRepo, logger: logger}
 }
 

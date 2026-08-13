@@ -92,11 +92,11 @@ type SprintCapacityResult struct {
 }
 
 type SprintService struct {
-	repo   *repository.SprintRepository
+	repo   SprintRepoStore
 	logger *zap.Logger
 }
 
-func NewSprintService(repo *repository.SprintRepository, logger *zap.Logger) *SprintService {
+func NewSprintService(repo SprintRepoStore, logger *zap.Logger) *SprintService {
 	return &SprintService{repo: repo, logger: logger}
 }
 

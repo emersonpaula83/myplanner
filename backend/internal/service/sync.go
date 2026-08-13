@@ -32,8 +32,8 @@ type SyncStore interface {
 }
 
 type SyncService struct {
-	repo               *repository.SyncRepository
-	fdRepo             *repository.FonteDadosRepository
+	repo               SyncRepoStore
+	fdRepo             FonteDadosStore
 	clientFactory      ClientFactory
 	oauthClientFactory OAuthClientFactory
 	oauthSvc           *jira.OAuthService
@@ -41,7 +41,7 @@ type SyncService struct {
 	logger             *zap.Logger
 }
 
-func NewSyncService(repo *repository.SyncRepository, fdRepo *repository.FonteDadosRepository, clientFactory ClientFactory, oauthClientFactory OAuthClientFactory, oauthSvc *jira.OAuthService, rateLimit int, logger *zap.Logger) *SyncService {
+func NewSyncService(repo SyncRepoStore, fdRepo FonteDadosStore, clientFactory ClientFactory, oauthClientFactory OAuthClientFactory, oauthSvc *jira.OAuthService, rateLimit int, logger *zap.Logger) *SyncService {
 	return &SyncService{
 		repo:               repo,
 		fdRepo:             fdRepo,
