@@ -52,8 +52,8 @@ func (r *InvestimentoRepository) GetTopProdutosMembro(ctx context.Context, membr
 
 // GetSalarioVigenteNoMes returns the salary in effect for a given month.
 // It looks at membro_salarios for the most recent record with data_vigencia
-// on or before the last day of the month, falling back to membros.salario
-// when there is no salary history.
+// on or before the last day of the month. Returns nil when no salary
+// history exists for the member before that month.
 func (r *InvestimentoRepository) GetSalarioVigenteNoMes(ctx context.Context, membroID uuid.UUID, ano, mes int) (*float64, error) {
 	lastDay := time.Date(ano, time.Month(mes)+1, 0, 0, 0, 0, 0, time.UTC)
 
@@ -65,15 +65,10 @@ func (r *InvestimentoRepository) GetSalarioVigenteNoMes(ctx context.Context, mem
 		LIMIT 1
 	`, membroID, lastDay).Scan(&valor)
 	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("getting salario vigente: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
 		}
-		err2 := r.pool.QueryRow(ctx, `
-			SELECT salario FROM membros WHERE id = $1
-		`, membroID).Scan(&valor)
-		if err2 != nil {
-			return nil, fmt.Errorf("getting fallback salario: %w", err2)
-		}
+		return nil, fmt.Errorf("getting salario vigente: %w", err)
 	}
 	return valor, nil
 }

@@ -1,0 +1,2 @@
+-- No safe way to identify backfilled rows vs manually inserted ones.
+-- This is a data migration; rollback is a no-op.

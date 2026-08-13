@@ -5239,7 +5239,7 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const pad = { top: 30, right: 60, bottom: 50, left: 55 };
+  const pad = { top: 30, right: 60, bottom: 24, left: 55 };
   const cw = W - pad.left - pad.right;
   const ch = H - pad.top - pad.bottom;
 
@@ -5461,20 +5461,6 @@ function drawSprintsTimeline(canvas, data, ano, checkpoints) {
       cpHitAreas.push({ x1: x1 - 6, x2: x1 + 6, cp: cp });
     }
 
-    ctx.restore();
-  });
-
-  // Sprint name labels (rotated, under each bar)
-  ctx.fillStyle = colText;
-  ctx.font = '9px system-ui';
-  data.forEach(function(d) {
-    var mid = (dateToX(d.data_inicio) + dateToX(d.data_fim)) / 2;
-    var label = d.sprint_nome.length > 14 ? d.sprint_nome.substring(0, 14) + '…' : d.sprint_nome;
-    ctx.save();
-    ctx.translate(mid, pad.top + ch + 6);
-    ctx.rotate(Math.PI / 6);
-    ctx.textAlign = 'left';
-    ctx.fillText(label, 0, 0);
     ctx.restore();
   });
 
@@ -8287,7 +8273,41 @@ function renderImportPreviewTable() {
   var eqById = {};
   importAllEquipes.forEach(function(e) { eqById[e.id] = e; });
 
-  var html = '<div id="import-preview-table-wrap"><table class="inv-table"><thead><tr>';
+  var criticalChanges = [];
+  linhas.forEach(function(l) {
+    if (l.ignorar || !l.changes || l.changes.length === 0) return;
+    var membro = l.membro_id ? byId[l.membro_id] : null;
+    if (!membro) return;
+    var critical = l.changes.filter(function(c) { return c === 'salario' || c === 'cargo'; });
+    if (critical.length > 0) {
+      var details = [];
+      if (critical.indexOf('salario') >= 0) {
+        var oldSal = membro.salario != null ? formatSalarioBR(membro.salario) : 'Não definido';
+        var newSal = l.dados.salario != null ? formatSalarioBR(l.dados.salario) : '—';
+        details.push('Salário: ' + oldSal + ' → ' + newSal);
+      }
+      if (critical.indexOf('cargo') >= 0) {
+        var oldCargo = membro.cargo ? cargoSlugLabel(membro.cargo) : 'Não definido';
+        var newCargo = l.dados.cargo ? cargoSlugLabel(l.dados.cargo) : '—';
+        details.push('Cargo: ' + oldCargo + ' → ' + newCargo);
+      }
+      criticalChanges.push({ nome: membro.nome, details: details });
+    }
+  });
+
+  var html = '<div id="import-preview-table-wrap">';
+
+  if (criticalChanges.length > 0) {
+    html += '<div style="background:var(--amber-soft, rgba(245,158,11,0.1));border:1px solid var(--amber, #f59e0b);border-radius:8px;padding:12px 16px;margin-bottom:12px">';
+    html += '<div style="font-weight:600;margin-bottom:8px;color:var(--amber, #f59e0b)">⚠ Alterações detectadas em salário/cargo</div>';
+    criticalChanges.forEach(function(c) {
+      html += '<div style="margin-bottom:4px"><b>' + esc(c.nome) + '</b>: ' + c.details.map(function(d) { return esc(d); }).join(' | ') + '</div>';
+    });
+    html += '<div style="margin-top:8px;font-size:13px;color:var(--text-secondary)">Revise as alterações antes de confirmar a importação.</div>';
+    html += '</div>';
+  }
+
+  html += '<table class="inv-table"><thead><tr>';
   html += '<th>Nome</th><th>Equipe</th><th>Cargo</th><th>Salário</th><th>Admissão</th><th>Matrícula</th><th>Ação</th>';
   html += '</tr></thead><tbody>';
 
@@ -8297,20 +8317,33 @@ function renderImportPreviewTable() {
     var nome = membro ? membro.nome : '—';
     var equipe = l.equipe_id ? eqById[l.equipe_id] : null;
     var equipeNome = equipe ? equipe.nome : '—';
+    var ch = l.changes || [];
+    var hasChanges = ch.length > 0;
+
     var cargoLabel = cargoSlugLabel(l.dados.cargo);
+    if (ch.indexOf('cargo') >= 0 && membro && membro.cargo) {
+      cargoLabel = cargoSlugLabel(membro.cargo) + ' → ' + cargoLabel;
+    }
+
     var salario = l.dados.salario != null ? formatSalarioBR(l.dados.salario) : '—';
+    if (ch.indexOf('salario') >= 0 && membro && membro.salario != null) {
+      salario = formatSalarioBR(membro.salario) + ' → ' + salario;
+    }
+
     var admissao = l.dados.data_admissao ? fmtDateBR(l.dados.data_admissao) : '—';
     var matricula = l.dados.matricula || '—';
-    var acao = (l.changes && l.changes.length > 0) ? 'Atualizar' : 'Sem mudança';
+    var acao = hasChanges ? 'Atualizar' : 'Sem mudança';
+    var acaoStyle = hasChanges ? 'background:var(--amber-soft, rgba(245,158,11,0.15));color:var(--amber, #f59e0b)' : '';
 
+    var changedStyle = 'font-weight:600;color:var(--amber, #f59e0b)';
     html += '<tr>';
     html += '<td>' + esc(nome) + '</td>';
     html += '<td>' + esc(equipeNome) + '</td>';
-    html += '<td>' + esc(cargoLabel) + '</td>';
-    html += '<td>' + esc(salario) + '</td>';
-    html += '<td>' + esc(admissao) + '</td>';
-    html += '<td>' + esc(matricula) + '</td>';
-    html += '<td><span class="inv-chip">' + acao + '</span></td>';
+    html += '<td' + (ch.indexOf('cargo') >= 0 ? ' style="' + changedStyle + '"' : '') + '>' + esc(cargoLabel) + '</td>';
+    html += '<td' + (ch.indexOf('salario') >= 0 ? ' style="' + changedStyle + '"' : '') + '>' + esc(salario) + '</td>';
+    html += '<td' + (ch.indexOf('data_admissao') >= 0 ? ' style="' + changedStyle + '"' : '') + '>' + esc(admissao) + '</td>';
+    html += '<td' + (ch.indexOf('matricula') >= 0 ? ' style="' + changedStyle + '"' : '') + '>' + esc(matricula) + '</td>';
+    html += '<td><span class="inv-chip" style="' + acaoStyle + '">' + acao + '</span></td>';
     html += '</tr>';
   });
 

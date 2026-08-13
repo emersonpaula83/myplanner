@@ -359,6 +359,17 @@ func (r *MembroRepository) UpdateCamposImport(ctx context.Context, id uuid.UUID,
 	return nil
 }
 
+func (r *MembroRepository) InsertSalarioHistorico(ctx context.Context, membroID uuid.UUID, valor float64, dataVigencia time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO membro_salarios (membro_id, valor, data_vigencia)
+		VALUES ($1, $2, $3)
+	`, membroID, valor, dataVigencia)
+	if err != nil {
+		return fmt.Errorf("inserting salary history: %w", err)
+	}
+	return nil
+}
+
 func (r *MembroRepository) GetHistoricoBancoHoras(ctx context.Context, membroID uuid.UUID) ([]domain.BancoHorasHistorico, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, membro_id, valor, data_registro, created_at

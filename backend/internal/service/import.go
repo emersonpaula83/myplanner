@@ -83,7 +83,7 @@ func (s *ImportService) FetchGoogleSheetCSV(ctx context.Context, sheetsURL strin
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return "", "", "", fmt.Errorf("reading response: %w", err)
 	}
@@ -121,6 +121,19 @@ func (s *ImportService) ConfirmImport(ctx context.Context, req domain.ConfirmImp
 				return nil, fmt.Errorf("linha %d: ultimo_aumento inválido: %w", linha.Linha, err)
 			}
 			ultimoAumento = &t
+		}
+
+		if linha.Dados.Salario != nil {
+			current, err := s.membroRepo.GetByID(ctx, *linha.MembroID)
+			if err == nil && (current.Salario == nil || *current.Salario != *linha.Dados.Salario) {
+				dataVig := time.Now()
+				if ultimoAumento != nil {
+					dataVig = *ultimoAumento
+				}
+				if err := s.membroRepo.InsertSalarioHistorico(ctx, *linha.MembroID, *linha.Dados.Salario, dataVig); err != nil {
+					s.logger.Warn("failed to insert salary history on import", zap.Error(err))
+				}
+			}
 		}
 
 		if err := s.membroRepo.UpdateCamposImport(ctx, *linha.MembroID, linha.Dados.Salario, linha.Dados.Cargo, dataAdmissao, linha.Dados.Matricula, ultimoAumento, linha.Dados.GestorID); err != nil {
