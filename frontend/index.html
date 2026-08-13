@@ -986,6 +986,15 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 @media (max-width: 600px) { .inv-modal-charts { grid-template-columns: 1fr; } }
 .inv-modal-chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
 .inv-modal-chart-box h4 { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 0 0 8px; text-transform: uppercase; letter-spacing: .3px; }
+/* === IMPORT PLANILHA === */
+.inv-sync-info { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; }
+.import-tabs { display: flex; gap: 4px; margin: 12px 0 16px; border-bottom: 1px solid var(--border); }
+.import-tab-btn { padding: 8px 14px; border: none; background: none; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; }
+.import-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.import-tab-btn:hover { color: var(--accent); }
+.import-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 6px; }
+.import-status { margin-top: 10px; min-height: 18px; }
+.import-error { color: #D4483B; font-size: 12px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -1208,6 +1217,11 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
           <option value="">Selecione a equipe</option>
         </select>
         <div class="inv-avatar-row" id="inv-avatars"></div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <span id="inv-sync-info" class="inv-sync-info" style="display:none"></span>
+          <button class="btn-add" id="inv-sync-btn" style="display:none" onclick="typeof syncImportPlanilha === 'function' && syncImportPlanilha()" title="Sincronizar importação">↻ Sync</button>
+          <button class="btn-add" onclick="openImportModal()" title="Importar planilha">⬆ Importar</button>
+        </div>
       </div>
       <div id="inv-content">
         <div class="empty-state"><div class="empty-state-text">Selecione uma equipe para visualizar os investimentos.</div></div>
@@ -1519,6 +1533,34 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 <div class="modal-overlay" id="investimento-modal" onclick="if(event.target===this)closeInvestimentoModal()">
   <div class="inv-modal-box">
     <div id="investimento-modal-content"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+<div class="modal-overlay" id="import-modal" onclick="if(event.target===this)closeImportModal()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title">⬆ Importar Planilha de Investimentos</div>
+    <div class="import-tabs">
+      <button class="import-tab-btn active" id="import-tab-csv-btn" onclick="switchImportTab('csv')">Upload CSV</button>
+      <button class="import-tab-btn" id="import-tab-url-btn" onclick="switchImportTab('url')">Google Sheets URL</button>
+    </div>
+    <div class="import-tab-content" id="import-tab-csv">
+      <label class="form-label">Arquivo CSV</label>
+      <input type="file" id="import-csv-file" accept=".csv" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--card-bg);color:var(--text);box-sizing:border-box">
+      <div id="import-csv-status" class="import-status"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeImportModal()">Cancelar</button>
+        <button class="btn-add" type="button" onclick="submitImportCSV()">Enviar</button>
+      </div>
+    </div>
+    <div class="import-tab-content" id="import-tab-url" style="display:none">
+      <label class="form-label">URL da Planilha Google Sheets</label>
+      <input type="text" id="import-sheets-url" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card-bg);color:var(--text);box-sizing:border-box">
+      <div class="import-hint">A planilha precisa estar pública ("qualquer pessoa com o link pode ver").</div>
+      <div id="import-url-status" class="import-status"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeImportModal()">Cancelar</button>
+        <button class="btn-add" type="button" onclick="submitImportSheetsURL()">Buscar</button>
+      </div>
+    </div>
   </div>
 </div>
 <div id="apikey-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center">
@@ -7954,6 +7996,77 @@ async function openInvestimentoModal(membroId) {
 
 function closeInvestimentoModal() {
   document.getElementById('investimento-modal').classList.remove('open');
+}
+
+// === IMPORT PLANILHA ===
+function openImportModal() {
+  document.getElementById('import-csv-file').value = '';
+  document.getElementById('import-sheets-url').value = '';
+  document.getElementById('import-csv-status').innerHTML = '';
+  document.getElementById('import-url-status').innerHTML = '';
+  switchImportTab('csv');
+  document.getElementById('import-modal').classList.add('open');
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').classList.remove('open');
+}
+
+function switchImportTab(tab) {
+  document.getElementById('import-tab-csv-btn').classList.toggle('active', tab === 'csv');
+  document.getElementById('import-tab-url-btn').classList.toggle('active', tab === 'url');
+  document.getElementById('import-tab-csv').style.display = tab === 'csv' ? 'block' : 'none';
+  document.getElementById('import-tab-url').style.display = tab === 'url' ? 'block' : 'none';
+}
+
+function apiUpload(path, formData) {
+  const headers = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  return fetch(API + path, { method: 'POST', headers, body: formData }).then(async r => {
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      if (r.status === 401) { logout(); return; }
+      throw new Error((data && data.error) || r.statusText);
+    }
+    return data;
+  });
+}
+
+async function submitImportCSV() {
+  var fileInput = document.getElementById('import-csv-file');
+  var statusEl = document.getElementById('import-csv-status');
+  if (!fileInput.files || fileInput.files.length === 0) {
+    statusEl.innerHTML = '<span class="import-error">Selecione um arquivo CSV.</span>';
+    return;
+  }
+  statusEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    var formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    var result = await apiUpload('/investimentos/import', formData);
+    closeImportModal();
+    if (typeof openImportResolveModal === 'function') openImportResolveModal(result, { tipo: 'csv' });
+  } catch (err) {
+    statusEl.innerHTML = '<span class="import-error">' + esc(err.message) + '</span>';
+  }
+}
+
+async function submitImportSheetsURL() {
+  var urlInput = document.getElementById('import-sheets-url');
+  var statusEl = document.getElementById('import-url-status');
+  var url = urlInput.value.trim();
+  if (!url) {
+    statusEl.innerHTML = '<span class="import-error">Informe a URL da planilha.</span>';
+    return;
+  }
+  statusEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    var result = await api('/investimentos/import', { method: 'POST', body: JSON.stringify({ sheets_url: url }) });
+    closeImportModal();
+    if (typeof openImportResolveModal === 'function') openImportResolveModal(result, { tipo: 'sheets_url', url: url });
+  } catch (err) {
+    statusEl.innerHTML = '<span class="import-error">' + esc(err.message) + '</span>';
+  }
 }
 
 // === INIT ===
