@@ -38,3 +38,20 @@ var CargoLabels = map[string]string{
 func IsCargoValido(cargo string) bool {
 	return slices.Contains(CargosValidos, cargo)
 }
+
+var PromocoesValidas = map[string][]string{
+	CargoAnalistaI:                  {CargoAnalistaII},
+	CargoAnalistaII:                 {CargoAnalistaIII},
+	CargoAnalistaIII:                {CargoEspecialistaI, CargoCoordenadorDesenvolvimento},
+	CargoEspecialistaI:              {CargoEspecialistaII, CargoCoordenadorDesenvolvimento, CargoLiderTecnico},
+	CargoEspecialistaII:             {CargoMaster, CargoLiderTecnico},
+	CargoCoordenadorDesenvolvimento: {CargoLiderTecnico},
+}
+
+func IsPromocaoValida(cargoAtual, cargoNovo string) bool {
+	validas, ok := PromocoesValidas[cargoAtual]
+	if !ok {
+		return false
+	}
+	return slices.Contains(validas, cargoNovo)
+}

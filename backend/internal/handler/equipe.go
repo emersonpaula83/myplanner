@@ -27,6 +27,10 @@ type EquipeStore interface {
 	ListProdutos(ctx context.Context) ([]domain.Produto, error)
 	GetMembroProdutos(ctx context.Context, membroID uuid.UUID) ([]domain.Produto, error)
 	SetMembroProdutos(ctx context.Context, membroID uuid.UUID, produtoIDs []uuid.UUID) error
+	GetEquipeAtivaMembro(ctx context.Context, membroID uuid.UUID) (*domain.Equipe, error)
+	TransferirMembro(ctx context.Context, equipeOrigemID, equipeDestinoID, membroID uuid.UUID) error
+	InsertMeritoPromocao(ctx context.Context, membroID uuid.UUID, tipo string, cargoAnterior, cargoNovo *string, salarioAnterior *float64, salarioNovo float64, dataVigencia time.Time) (*domain.HistoricoMeritoPromocao, error)
+	GetMembrosEquipeComEntrada(ctx context.Context, equipeID uuid.UUID) ([]domain.MembroComEntrada, error)
 }
 
 type EquipeHandler struct {

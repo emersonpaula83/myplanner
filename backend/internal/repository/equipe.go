@@ -114,7 +114,7 @@ func (r *EquipeRepository) GetMembrosEquipe(ctx context.Context, equipeID uuid.U
 		       m.salario, m.data_admissao, m.banco_horas,
 		       m.created_at, m.updated_at
 		FROM membros m
-		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1
+		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1 AND em.data_saida IS NULL
 		WHERE m.ativo = true
 		  AND (m.data_desligamento IS NULL OR m.data_desligamento > NOW())
 		ORDER BY m.nome
@@ -142,8 +142,9 @@ func (r *EquipeRepository) GetMembrosEquipe(ctx context.Context, equipeID uuid.U
 
 func (r *EquipeRepository) AddMembroEquipe(ctx context.Context, equipeID uuid.UUID, membroID uuid.UUID) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO equipe_membros (equipe_id, membro_id) VALUES ($1, $2)
-		ON CONFLICT (equipe_id, membro_id) DO NOTHING
+		INSERT INTO equipe_membros (equipe_id, membro_id, data_entrada)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (membro_id) WHERE data_saida IS NULL DO NOTHING
 	`, equipeID, membroID)
 	if err != nil {
 		return fmt.Errorf("adding membro to equipe: %w", err)
@@ -153,15 +154,143 @@ func (r *EquipeRepository) AddMembroEquipe(ctx context.Context, equipeID uuid.UU
 
 func (r *EquipeRepository) RemoveMembroEquipe(ctx context.Context, equipeID uuid.UUID, membroID uuid.UUID) error {
 	result, err := r.pool.Exec(ctx, `
-		DELETE FROM equipe_membros WHERE equipe_id = $1 AND membro_id = $2
+		UPDATE equipe_membros SET data_saida = NOW()
+		WHERE equipe_id = $1 AND membro_id = $2 AND data_saida IS NULL
 	`, equipeID, membroID)
 	if err != nil {
 		return fmt.Errorf("removing membro from equipe: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("membro %s not in equipe %s", membroID, equipeID)
+		return fmt.Errorf("membro %s not active in equipe %s", membroID, equipeID)
 	}
 	return nil
+}
+
+func (r *EquipeRepository) GetEquipeAtivaMembro(ctx context.Context, membroID uuid.UUID) (*domain.Equipe, error) {
+	var e domain.Equipe
+	err := r.pool.QueryRow(ctx, `
+		SELECT eq.id, eq.nome, eq.board_id, eq.created_at, eq.updated_at
+		FROM equipes eq
+		INNER JOIN equipe_membros em ON em.equipe_id = eq.id
+		WHERE em.membro_id = $1 AND em.data_saida IS NULL
+	`, membroID).Scan(&e.ID, &e.Nome, &e.BoardID, &e.CreatedAt, &e.UpdatedAt)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("getting equipe ativa for membro: %w", err)
+	}
+	return &e, nil
+}
+
+func (r *EquipeRepository) TransferirMembro(ctx context.Context, equipeOrigemID, equipeDestinoID, membroID uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	result, err := tx.Exec(ctx, `
+		UPDATE equipe_membros SET data_saida = NOW()
+		WHERE membro_id = $1 AND equipe_id = $2 AND data_saida IS NULL
+	`, membroID, equipeOrigemID)
+	if err != nil {
+		return fmt.Errorf("closing old membership: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not active in equipe %s", membroID, equipeOrigemID)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO equipe_membros (equipe_id, membro_id, data_entrada)
+		VALUES ($1, $2, NOW())
+	`, equipeDestinoID, membroID)
+	if err != nil {
+		return fmt.Errorf("creating new membership: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *EquipeRepository) GetMembrosEquipeComEntrada(ctx context.Context, equipeID uuid.UUID) ([]domain.MembroComEntrada, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT m.id, m.fonte_dados_id, m.jira_account_id, m.nome, m.email,
+		       m.avatar_url, m.team, m.ativo, m.data_desligamento, m.cargo,
+		       m.salario, m.data_admissao, m.banco_horas,
+		       m.created_at, m.updated_at, em.data_entrada
+		FROM membros m
+		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1 AND em.data_saida IS NULL
+		WHERE m.ativo = true
+		  AND (m.data_desligamento IS NULL OR m.data_desligamento > NOW())
+		ORDER BY m.nome
+	`, equipeID)
+	if err != nil {
+		return nil, fmt.Errorf("getting membros com entrada: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]domain.MembroComEntrada, 0)
+	for rows.Next() {
+		var mc domain.MembroComEntrada
+		if err := rows.Scan(
+			&mc.Membro.ID, &mc.Membro.FonteDadosID, &mc.Membro.JiraAccountID, &mc.Membro.Nome, &mc.Membro.Email,
+			&mc.Membro.AvatarURL, &mc.Membro.Team, &mc.Membro.Ativo, &mc.Membro.DataDesligamento, &mc.Membro.Cargo,
+			&mc.Membro.Salario, &mc.Membro.DataAdmissao, &mc.Membro.BancoHoras,
+			&mc.Membro.CreatedAt, &mc.Membro.UpdatedAt, &mc.DataEntrada,
+		); err != nil {
+			return nil, fmt.Errorf("scanning membro com entrada: %w", err)
+		}
+		result = append(result, mc)
+	}
+	return result, rows.Err()
+}
+
+func (r *EquipeRepository) InsertMeritoPromocao(ctx context.Context, membroID uuid.UUID, tipo string, cargoAnterior, cargoNovo *string, salarioAnterior *float64, salarioNovo float64, dataVigencia time.Time) (*domain.HistoricoMeritoPromocao, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var h domain.HistoricoMeritoPromocao
+	err = tx.QueryRow(ctx, `
+		INSERT INTO historico_salario (membro_id, tipo, cargo_anterior, cargo_novo, salario_anterior, salario_novo, data_vigencia)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, membro_id, tipo, cargo_anterior, cargo_novo, salario_anterior, salario_novo, data_vigencia, created_at
+	`, membroID, tipo, cargoAnterior, cargoNovo, salarioAnterior, salarioNovo, dataVigencia).Scan(
+		&h.ID, &h.MembroID, &h.Tipo, &h.CargoAnterior, &h.CargoNovo,
+		&h.SalarioAnterior, &h.SalarioNovo, &h.DataVigencia, &h.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("inserting historico salario: %w", err)
+	}
+
+	// Update membro salary + cargo + ultimo_aumento
+	updateCargo := ""
+	args := []interface{}{membroID, salarioNovo, dataVigencia}
+	if tipo == "promocao" && cargoNovo != nil {
+		updateCargo = ", cargo = $4"
+		args = append(args, *cargoNovo)
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE membros SET salario = $2, ultimo_aumento = $3`+updateCargo+`, updated_at = NOW() WHERE id = $1
+	`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("updating membro salary: %w", err)
+	}
+
+	// Insert into membro_salarios for investimentos gastos-mensais tracking
+	_, err = tx.Exec(ctx, `
+		INSERT INTO membro_salarios (membro_id, valor, data_vigencia) VALUES ($1, $2, $3)
+	`, membroID, salarioNovo, dataVigencia)
+	if err != nil {
+		return nil, fmt.Errorf("inserting membro_salarios: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+	return &h, nil
 }
 
 func (r *EquipeRepository) GetDiasAusencia(ctx context.Context, membroIDs []uuid.UUID, inicio, fim time.Time) (map[uuid.UUID]int, error) {
