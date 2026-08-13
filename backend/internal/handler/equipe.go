@@ -410,13 +410,28 @@ func (h *EquipeHandler) TransferMembro(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if equipeOrigemID == equipeDestinoID {
+		respondError(w, http.StatusBadRequest, "equipe destino deve ser diferente da origem")
+		return
+	}
+
 	origem, err := h.store.GetEquipeByID(r.Context(), equipeOrigemID)
-	if err != nil || origem == nil {
+	if err != nil {
+		h.logger.Error("failed to get equipe origem", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar equipe")
+		return
+	}
+	if origem == nil {
 		respondError(w, http.StatusNotFound, "equipe origem não encontrada")
 		return
 	}
 	destino, err := h.store.GetEquipeByID(r.Context(), equipeDestinoID)
-	if err != nil || destino == nil {
+	if err != nil {
+		h.logger.Error("failed to get equipe destino", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao buscar equipe")
+		return
+	}
+	if destino == nil {
 		respondError(w, http.StatusNotFound, "equipe destino não encontrada")
 		return
 	}
