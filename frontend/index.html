@@ -947,7 +947,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .inv-filter-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .inv-filter-row .filter-select { min-width: 220px; }
 .inv-avatar-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.inv-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #fff; background: var(--accent); cursor: pointer; overflow: hidden; transition: transform .15s, box-shadow .15s; border: 2px solid transparent; flex-shrink: 0; }
+.inv-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #fff; background: var(--accent); cursor: pointer; overflow: hidden; transition: transform .15s, box-shadow .15s; border: 2px solid transparent; flex-shrink: 0; position: relative; }
 .inv-avatar:hover { transform: scale(1.15); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
 .inv-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .inv-team-header { margin-bottom: 20px; }
@@ -1003,6 +1003,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .import-resolve-linha { font-size: 11px; color: var(--text-tertiary); margin-left: 6px; }
 .import-ignored-list { display: flex; flex-direction: column; gap: 4px; }
 .import-ignored-item { font-size: 12px; color: var(--text-tertiary); }
+.inv-badge-novo { position: absolute; top: -4px; right: -4px; background: #16a34a; color: #fff; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 6px; line-height: 1.4; letter-spacing: .3px; }
+.inv-badge-novo-inline { background: #16a34a; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 6px; letter-spacing: .3px; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -1227,7 +1229,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <div class="inv-avatar-row" id="inv-avatars"></div>
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
           <span id="inv-sync-info" class="inv-sync-info" style="display:none"></span>
-          <button class="btn-add" id="inv-sync-btn" style="display:none" onclick="typeof syncImportPlanilha === 'function' && syncImportPlanilha()" title="Sincronizar importação">↻ Sync</button>
+          <button class="btn-add" id="inv-sync-btn" style="display:none" onclick="syncImportPlanilha()" title="Sincronizar importação">↻ Sync</button>
           <button class="btn-add" onclick="openImportModal()" title="Importar planilha">⬆ Importar</button>
         </div>
       </div>
@@ -1577,7 +1579,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
     <div id="import-resolve-body" class="import-resolve-body"></div>
     <div class="modal-actions">
       <button class="btn-cancel" type="button" onclick="closeImportResolveModal()">Cancelar</button>
-      <button class="btn-add" type="button" id="import-confirm-btn" onclick="typeof confirmImportSubmit === 'function' && confirmImportSubmit()">Confirmar Importação</button>
+      <button class="btn-add" type="button" id="import-confirm-btn" onclick="confirmImportSubmit()">Confirmar Importação</button>
     </div>
   </div>
 </div>
@@ -2230,7 +2232,7 @@ function navigate(page) {
   if (page === 'sprints-timeline') loadSprintsTimeline();
   if (page === 'alocacao') loadAlocacao();
   if (page === 'tarefas') loadTarefas();
-  if (page === 'investimentos') { /* page shown, data loads on equipe select */ }
+  if (page === 'investimentos') { loadImportSyncConfig(); }
 }
 
 function toggleSidebarGroup(name) {
@@ -7650,7 +7652,8 @@ function renderInvestimentosDashboard(data) {
     var av = m.avatar_url
       ? '<img src="' + esc(m.avatar_url) + '" alt="">'
       : initials(m.nome);
-    avatarsHtml += '<div class="inv-avatar" title="' + esc(m.nome) + '" style="background:' + stringColor(m.nome) + '" onclick="scrollToInvMembro(\'' + m.id + '\')">' + av + '</div>';
+    var novoBadge = isDataAdmissaoFutura(m.data_admissao) ? '<span class="inv-badge-novo" title="Novo">NOVO</span>' : '';
+    avatarsHtml += '<div class="inv-avatar" title="' + esc(m.nome) + '" style="background:' + stringColor(m.nome) + '" onclick="scrollToInvMembro(\'' + m.id + '\')">' + av + novoBadge + '</div>';
   });
   document.getElementById('inv-avatars').innerHTML = avatarsHtml;
 
@@ -7890,7 +7893,8 @@ function renderInvMembrosTable(membros) {
     if (!produtosHtml) produtosHtml = '<span class="inv-salary-null">—</span>';
 
     html += '<tr data-membro-id="' + m.id + '" onclick="openInvestimentoModal(\'' + m.id + '\')">';
-    html += '<td><div class="inv-member-cell"><div class="inv-member-avatar" style="background:' + stringColor(m.nome) + '">' + avatarHtml + '</div>' + esc(m.nome) + '</div></td>';
+    var novoInline = isDataAdmissaoFutura(m.data_admissao) ? ' <span class="inv-badge-novo-inline">NOVO</span>' : '';
+    html += '<td><div class="inv-member-cell"><div class="inv-member-avatar" style="background:' + stringColor(m.nome) + '">' + avatarHtml + '</div>' + esc(m.nome) + novoInline + '</div></td>';
     html += '<td>' + salarioHtml + '</td>';
     html += '<td>' + tempoHtml + '</td>';
     html += '<td>' + bancoHtml + '</td>';
@@ -8312,6 +8316,86 @@ function renderImportPreviewTable() {
 
   html += '</tbody></table></div>';
   return html;
+}
+
+function isDataAdmissaoFutura(dataAdmissao) {
+  if (!dataAdmissao) return false;
+  var hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  var d = new Date(dataAdmissao + 'T00:00:00');
+  return d > hoje;
+}
+
+async function confirmImportSubmit() {
+  var linhas = buildImportResolvedLinhas().filter(function(l) { return !l.ignorar; });
+  if (linhas.length === 0) {
+    alert('Nenhum membro para importar.');
+    return;
+  }
+  var btn = document.getElementById('import-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Importando...';
+  try {
+    var payload = { linhas: linhas, tipo: importMeta.tipo };
+    if (importMeta.tipo === 'sheets_url') payload.url = importMeta.url;
+    var resp = await api('/investimentos/import/confirmar', { method: 'POST', body: JSON.stringify(payload) });
+    closeImportResolveModal();
+    alert(resp.atualizados + ' membro(s) atualizado(s) com sucesso.');
+    loadImportSyncConfig();
+    if (invCurrentEquipeId) loadInvestimentos(invCurrentEquipeId);
+  } catch (err) {
+    alert('Erro ao confirmar importação: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Confirmar Importação';
+  }
+}
+
+let importLastConfig = null;
+
+async function loadImportSyncConfig() {
+  var btn = document.getElementById('inv-sync-btn');
+  var info = document.getElementById('inv-sync-info');
+  if (!btn || !info) return;
+  try {
+    var cfg = await api('/investimentos/import/config');
+    importLastConfig = cfg;
+    if (!cfg) {
+      btn.style.display = 'none';
+      info.style.display = 'none';
+      return;
+    }
+    btn.style.display = 'inline-flex';
+    if (cfg.ultimo_sync) {
+      info.style.display = 'inline';
+      info.textContent = 'Último sync: ' + fmtDateTimeBR(cfg.ultimo_sync);
+    } else {
+      info.style.display = 'none';
+    }
+  } catch (err) {
+    console.error('Failed to load import config', err);
+  }
+}
+
+async function syncImportPlanilha() {
+  if (!importLastConfig) return;
+  if (importLastConfig.tipo === 'csv') {
+    openImportModal();
+    switchImportTab('csv');
+    return;
+  }
+  var btn = document.getElementById('inv-sync-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ Sincronizando...';
+  try {
+    var result = await api('/investimentos/import/sync', { method: 'POST' });
+    openImportResolveModal(result, { tipo: 'sheets_url', url: importLastConfig.url });
+  } catch (err) {
+    alert('Erro ao sincronizar: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↻ Sync';
+  }
 }
 
 // === INIT ===
