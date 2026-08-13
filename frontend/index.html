@@ -2511,12 +2511,19 @@ async function openTransferDropdown(equipeId, membroId, btn) {
 // === MÉRITO / PROMOÇÃO ===
 var meritoState = {};
 
-function openMeritoModal(membroId) {
-  var m = equipeMembrosCache[membroId] || {};
-  meritoState = { membroId: membroId, nome: m.nome || '', cargo: m.cargo || '', salario: m.salario != null ? m.salario : null, tipo: 'merito' };
-  document.getElementById('merito-modal-title').textContent = 'Mérito/Promoção' + (m.nome ? ' — ' + m.nome : '');
-  renderMeritoForm();
+async function openMeritoModal(membroId) {
+  var cached = equipeMembrosCache[membroId] || {};
+  meritoState = { membroId: membroId, nome: cached.nome || '', cargo: cached.cargo || '', salario: null, tipo: 'merito' };
+  document.getElementById('merito-modal-title').textContent = 'Mérito/Promoção' + (cached.nome ? ' — ' + cached.nome : '');
   document.getElementById('merito-modal').classList.add('open');
+  try {
+    var data = await api('/membros/' + membroId);
+    if (data && data.membro) {
+      meritoState.salario = data.membro.salario != null ? data.membro.salario : null;
+      meritoState.cargo = data.membro.cargo || meritoState.cargo;
+    }
+  } catch(e) { /* use cached values */ }
+  renderMeritoForm();
 }
 
 function closeMeritoModal() {
