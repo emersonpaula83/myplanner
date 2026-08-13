@@ -16,13 +16,14 @@ import (
 type MembroStore interface {
 	List(ctx context.Context) ([]domain.Membro, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Membro, error)
-	Search(ctx context.Context, query string) ([]domain.Membro, error)
+	Search(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error)
 	ListDisponibilidade(ctx context.Context, membroID uuid.UUID) ([]domain.Disponibilidade, error)
 	CreateDisponibilidade(ctx context.Context, d *domain.Disponibilidade) error
 	UpdateDisponibilidade(ctx context.Context, id uuid.UUID, tipo string, dataInicio, dataFim pgtype.Date, descricao *string) error
 	DeleteDisponibilidade(ctx context.Context, id uuid.UUID) error
 	GetMembroStats(ctx context.Context, membroID uuid.UUID, inicio, fim time.Time) (*domain.MembroStats, error)
 	UpdateDataDesligamento(ctx context.Context, id uuid.UUID, dataDesligamento *time.Time) error
+	UpdateAtivo(ctx context.Context, id uuid.UUID, ativo bool) error
 }
 
 type MembroHandler struct {
@@ -50,13 +51,44 @@ func (h *MembroHandler) Search(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusOK, []domain.Membro{})
 		return
 	}
-	membros, err := h.store.Search(r.Context(), q)
+	incluirInativos := r.URL.Query().Get("inativos") == "true"
+	membros, err := h.store.Search(r.Context(), q, incluirInativos)
 	if err != nil {
 		h.logger.Error("failed to search membros", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao buscar membros")
 		return
 	}
 	respondJSON(w, http.StatusOK, membros)
+}
+
+// SetAtivo tira o membro das listagens, ou o traz de volta. Usado para registro
+// duplicado do JIRA: a mesma pessoa com duas contas vira dois membros, e o que
+// não está mais em uso precisa sumir da busca e do casamento do import.
+func (h *MembroHandler) SetAtivo(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id de membro inválido")
+		return
+	}
+
+	var req struct {
+		Ativo *bool `json:"ativo"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	if req.Ativo == nil {
+		respondError(w, http.StatusBadRequest, "informe o campo ativo")
+		return
+	}
+
+	if err := h.store.UpdateAtivo(r.Context(), id, *req.Ativo); err != nil {
+		h.logger.Error("failed to update membro ativo", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao atualizar situação do membro")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]bool{"ativo": *req.Ativo})
 }
 
 func (h *MembroHandler) GetByID(w http.ResponseWriter, r *http.Request) {

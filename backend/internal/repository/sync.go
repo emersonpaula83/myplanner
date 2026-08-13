@@ -68,7 +68,7 @@ func (r *SyncRepository) UpsertMembro(ctx context.Context, fonteDadosID uuid.UUI
 		ON CONFLICT (fonte_dados_id, jira_account_id)
 		DO UPDATE SET nome = EXCLUDED.nome, email = EXCLUDED.email,
 		              avatar_url = EXCLUDED.avatar_url, team = COALESCE(membros.team, EXCLUDED.team),
-		              ativo = true, updated_at = NOW()
+		              ativo = (membros.desativado_em IS NULL), updated_at = NOW()
 		RETURNING id
 	`, fonteDadosID, jiraAccountID, nome, email, avatarURL, team).Scan(&id)
 	if err != nil {
