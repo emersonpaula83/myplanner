@@ -995,6 +995,14 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .import-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 6px; }
 .import-status { margin-top: 10px; min-height: 18px; }
 .import-error { color: #D4483B; font-size: 12px; font-weight: 600; }
+.import-resolve-body { max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+.import-resolve-section { margin-bottom: 20px; }
+.import-resolve-section h4 { font-size: 13px; font-weight: 650; color: var(--text-primary); margin: 0 0 10px; }
+.import-resolve-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; }
+.import-resolve-label { flex: 1; min-width: 180px; font-size: 13px; color: var(--text-primary); }
+.import-resolve-linha { font-size: 11px; color: var(--text-tertiary); margin-left: 6px; }
+.import-ignored-list { display: flex; flex-direction: column; gap: 4px; }
+.import-ignored-item { font-size: 12px; color: var(--text-tertiary); }
 </style>
 </head>
 <body>
@@ -1560,6 +1568,16 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <button class="btn-cancel" type="button" onclick="closeImportModal()">Cancelar</button>
         <button class="btn-add" type="button" onclick="submitImportSheetsURL()">Buscar</button>
       </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="import-resolve-modal" onclick="if(event.target===this)closeImportResolveModal()">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-title">Resolver Importação</div>
+    <div id="import-resolve-body" class="import-resolve-body"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" type="button" onclick="closeImportResolveModal()">Cancelar</button>
+      <button class="btn-add" type="button" id="import-confirm-btn" onclick="typeof confirmImportSubmit === 'function' && confirmImportSubmit()">Confirmar Importação</button>
     </div>
   </div>
 </div>
@@ -8067,6 +8085,233 @@ async function submitImportSheetsURL() {
   } catch (err) {
     statusEl.innerHTML = '<span class="import-error">' + esc(err.message) + '</span>';
   }
+}
+
+let importMatchResult = null;
+let importMeta = null;
+let importAllMembros = null;
+let importAllEquipes = null;
+let importLinhaToMembroOverride = {};
+let importLinhaToEquipeId = {};
+let importLinhaToGestorId = {};
+
+async function openImportResolveModal(result, meta) {
+  importMatchResult = result;
+  importMeta = meta;
+  importLinhaToMembroOverride = {};
+  importLinhaToEquipeId = {};
+  importLinhaToGestorId = {};
+
+  if (!importAllMembros) importAllMembros = await api('/membros');
+  if (!importAllEquipes) importAllEquipes = await api('/equipes');
+  if (!allCargos) allCargos = await api('/cargos');
+
+  renderImportResolveModal();
+  document.getElementById('import-resolve-modal').classList.add('open');
+}
+
+function closeImportResolveModal() {
+  document.getElementById('import-resolve-modal').classList.remove('open');
+}
+
+function cargoSlugLabel(slug) {
+  if (!slug) return '—';
+  if (allCargos) {
+    var found = allCargos.find(function(c) { return c.value === slug; });
+    if (found) return found.label;
+  }
+  return slug;
+}
+
+function renderImportResolveModal() {
+  var r = importMatchResult;
+  var body = document.getElementById('import-resolve-body');
+  var html = '';
+
+  if (r.ignorados && r.ignorados.length > 0) {
+    html += '<div class="import-resolve-section"><h4>Ignorados (' + r.ignorados.length + ')</h4><div class="import-ignored-list">';
+    r.ignorados.forEach(function(i) {
+      html += '<div class="import-ignored-item">Linha ' + i.linha + ': ' + esc(i.nome) + ' <span class="inv-chip">' + esc(i.motivo) + '</span></div>';
+    });
+    html += '</div></div>';
+  }
+
+  if (r.unmatched_membros && r.unmatched_membros.length > 0) {
+    html += '<div class="import-resolve-section"><h4>Membros não encontrados (' + r.unmatched_membros.length + ')</h4>';
+    r.unmatched_membros.forEach(function(u, idx) {
+      html += '<div class="import-resolve-row">';
+      html += '<div class="import-resolve-label">' + esc(u.nome_planilha) + '<span class="import-resolve-linha">linha ' + u.linha + '</span></div>';
+      html += '<select class="filter-select" onchange="setImportResolvedMembro(' + idx + ', this.value)">';
+      html += '<option value="">Ignorar</option>';
+      importAllMembros.forEach(function(m) { html += '<option value="' + m.id + '">' + esc(m.nome) + '</option>'; });
+      html += '</select></div>';
+    });
+    html += '</div>';
+  }
+
+  if (r.unmatched_equipes && r.unmatched_equipes.length > 0) {
+    html += '<div class="import-resolve-section"><h4>Equipes não encontradas (' + r.unmatched_equipes.length + ')</h4>';
+    r.unmatched_equipes.forEach(function(u, idx) {
+      html += '<div class="import-resolve-row">';
+      html += '<div class="import-resolve-label">' + esc(u.nome_planilha) + '<span class="import-resolve-linha">' + u.linhas.length + ' membro(s)</span></div>';
+      html += '<select class="filter-select" id="import-eq-select-' + idx + '" onchange="setImportResolvedEquipe(' + idx + ', this.value)">';
+      html += '<option value="">Ignorar</option>';
+      importAllEquipes.forEach(function(e) { html += '<option value="' + e.id + '">' + esc(e.nome) + '</option>'; });
+      html += '</select>';
+      html += '<button class="btn-add" type="button" onclick="criarEquipeImport(' + idx + ')">+ Criar equipe</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  if (r.unmatched_gestores && r.unmatched_gestores.length > 0) {
+    html += '<div class="import-resolve-section"><h4>Gestores não encontrados (' + r.unmatched_gestores.length + ')</h4>';
+    r.unmatched_gestores.forEach(function(u, idx) {
+      html += '<div class="import-resolve-row">';
+      html += '<div class="import-resolve-label">' + esc(u.nome_planilha) + '<span class="import-resolve-linha">' + u.linhas.length + ' membro(s)</span></div>';
+      html += '<select class="filter-select" onchange="setImportResolvedGestor(' + idx + ', this.value)">';
+      html += '<option value="">Ignorar</option>';
+      importAllMembros.forEach(function(m) { html += '<option value="' + m.id + '">' + esc(m.nome) + '</option>'; });
+      html += '</select></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="import-resolve-section"><h4>Preview (' + r.matched.length + ' membro(s) reconhecidos)</h4>';
+  html += renderImportPreviewTable();
+  html += '</div>';
+
+  body.innerHTML = html;
+}
+
+function setImportResolvedMembro(idx, membroId) {
+  var u = importMatchResult.unmatched_membros[idx];
+  importLinhaToMembroOverride[u.linha] = membroId || null;
+  refreshImportPreview();
+}
+
+function setImportResolvedEquipe(idx, equipeId) {
+  var u = importMatchResult.unmatched_equipes[idx];
+  u.linhas.forEach(function(linha) { importLinhaToEquipeId[linha] = equipeId || null; });
+  refreshImportPreview();
+}
+
+function setImportResolvedGestor(idx, membroId) {
+  var u = importMatchResult.unmatched_gestores[idx];
+  u.linhas.forEach(function(linha) { importLinhaToGestorId[linha] = membroId || null; });
+  refreshImportPreview();
+}
+
+async function criarEquipeImport(idx) {
+  var u = importMatchResult.unmatched_equipes[idx];
+  if (!confirm('Criar equipe "' + u.nome_planilha + '"?')) return;
+  try {
+    var nova = await api('/equipes', { method: 'POST', body: JSON.stringify({ nome: u.nome_planilha }) });
+    importAllEquipes.push(nova);
+    u.linhas.forEach(function(linha) { importLinhaToEquipeId[linha] = nova.id; });
+    var sel = document.getElementById('import-eq-select-' + idx);
+    if (sel) {
+      var opt = document.createElement('option');
+      opt.value = nova.id;
+      opt.textContent = nova.nome;
+      opt.selected = true;
+      sel.appendChild(opt);
+    }
+    refreshImportPreview();
+  } catch (err) {
+    alert('Erro ao criar equipe: ' + err.message);
+  }
+}
+
+function refreshImportPreview() {
+  var container = document.getElementById('import-preview-table-wrap');
+  if (container) container.outerHTML = renderImportPreviewTable();
+}
+
+function buildImportResolvedLinhas() {
+  var r = importMatchResult;
+  var linhas = [];
+
+  r.matched.forEach(function(m) {
+    var equipeId = m.equipe_id || importLinhaToEquipeId[m.linha] || null;
+    var gestorId = m.dados.gestor_id || importLinhaToGestorId[m.linha] || null;
+    linhas.push({
+      linha: m.linha,
+      membro_id: m.membro_id,
+      equipe_id: equipeId,
+      ignorar: false,
+      changes: m.changes,
+      dados: {
+        cargo: m.dados.cargo,
+        matricula: m.dados.matricula,
+        salario: m.dados.salario,
+        data_admissao: m.dados.data_admissao,
+        ultimo_aumento: m.dados.ultimo_aumento,
+        gestor_id: gestorId
+      }
+    });
+  });
+
+  r.unmatched_membros.forEach(function(u) {
+    var membroId = importLinhaToMembroOverride.hasOwnProperty(u.linha) ? importLinhaToMembroOverride[u.linha] : null;
+    var equipeId = importLinhaToEquipeId[u.linha] || null;
+    var gestorId = u.dados.gestor_id || importLinhaToGestorId[u.linha] || null;
+    linhas.push({
+      linha: u.linha,
+      membro_id: membroId,
+      equipe_id: equipeId,
+      ignorar: !membroId,
+      changes: ['manual'],
+      dados: {
+        cargo: u.dados.cargo,
+        matricula: u.dados.matricula,
+        salario: u.dados.salario,
+        data_admissao: u.dados.data_admissao,
+        ultimo_aumento: u.dados.ultimo_aumento,
+        gestor_id: gestorId
+      }
+    });
+  });
+
+  return linhas;
+}
+
+function renderImportPreviewTable() {
+  var linhas = buildImportResolvedLinhas();
+  var byId = {};
+  importAllMembros.forEach(function(m) { byId[m.id] = m; });
+  var eqById = {};
+  importAllEquipes.forEach(function(e) { eqById[e.id] = e; });
+
+  var html = '<div id="import-preview-table-wrap"><table class="inv-table"><thead><tr>';
+  html += '<th>Nome</th><th>Equipe</th><th>Cargo</th><th>Salário</th><th>Admissão</th><th>Matrícula</th><th>Ação</th>';
+  html += '</tr></thead><tbody>';
+
+  linhas.forEach(function(l) {
+    if (l.ignorar) return;
+    var membro = l.membro_id ? byId[l.membro_id] : null;
+    var nome = membro ? membro.nome : '—';
+    var equipe = l.equipe_id ? eqById[l.equipe_id] : null;
+    var equipeNome = equipe ? equipe.nome : '—';
+    var cargoLabel = cargoSlugLabel(l.dados.cargo);
+    var salario = l.dados.salario != null ? formatSalarioBR(l.dados.salario) : '—';
+    var admissao = l.dados.data_admissao ? fmtDateBR(l.dados.data_admissao) : '—';
+    var matricula = l.dados.matricula || '—';
+    var acao = (l.changes && l.changes.length > 0) ? 'Atualizar' : 'Sem mudança';
+
+    html += '<tr>';
+    html += '<td>' + esc(nome) + '</td>';
+    html += '<td>' + esc(equipeNome) + '</td>';
+    html += '<td>' + esc(cargoLabel) + '</td>';
+    html += '<td>' + esc(salario) + '</td>';
+    html += '<td>' + esc(admissao) + '</td>';
+    html += '<td>' + esc(matricula) + '</td>';
+    html += '<td><span class="inv-chip">' + acao + '</span></td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  return html;
 }
 
 // === INIT ===
