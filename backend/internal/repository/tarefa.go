@@ -65,7 +65,7 @@ func (r *TarefaRepository) ListTarefas(ctx context.Context, f TarefaListFilter) 
 	}
 
 	if f.EquipeID != nil {
-		conditions = append(conditions, fmt.Sprintf(`t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $%d)`, argN))
+		conditions = append(conditions, fmt.Sprintf(`t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $%d AND data_saida IS NULL)`, argN))
 		args = append(args, *f.EquipeID)
 		argN++
 	}
@@ -103,7 +103,7 @@ func (r *TarefaRepository) ListTarefas(ctx context.Context, f TarefaListFilter) 
 		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.status, t.tipo_demanda,
 		       m.nome,
 		       (SELECT p.nome FROM tarefa_produtos tp JOIN produtos p ON p.id = tp.produto_id WHERE tp.tarefa_id = t.id LIMIT 1),
-		       (SELECT eq.nome FROM equipe_membros em JOIN equipes eq ON eq.id = em.equipe_id WHERE em.membro_id = t.responsavel_id LIMIT 1),
+		       (SELECT eq.nome FROM equipe_membros em JOIN equipes eq ON eq.id = em.equipe_id WHERE em.membro_id = t.responsavel_id AND em.data_saida IS NULL LIMIT 1),
 		       t.removido_em, t.motivo_remocao, t.updated_at
 		FROM tarefas t
 		LEFT JOIN membros m ON m.id = t.responsavel_id

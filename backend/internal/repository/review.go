@@ -67,7 +67,7 @@ func (r *ReviewRepository) GetReviewTasks(ctx context.Context, sprintID uuid.UUI
 	if equipeID != nil {
 		argN++
 		args = append(args, *equipeID)
-		equipeJoin = "INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id"
+		equipeJoin = "INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.data_saida IS NULL"
 		equipeWhere = fmt.Sprintf("AND em.equipe_id = $%d", argN)
 	}
 
@@ -185,7 +185,7 @@ func (r *ReviewRepository) GetReviewPOs(ctx context.Context, equipeID uuid.UUID,
 	query := fmt.Sprintf(`
 		SELECT m.nome, ARRAY_AGG(DISTINCT p.nome) AS produtos
 		FROM membros m
-		JOIN equipe_membros em ON em.membro_id = m.id
+		JOIN equipe_membros em ON em.membro_id = m.id AND em.data_saida IS NULL
 		JOIN membro_produtos mp ON mp.membro_id = m.id
 		JOIN produtos p ON p.id = mp.produto_id
 		WHERE em.equipe_id = $1 AND m.cargo = 'po_produto'

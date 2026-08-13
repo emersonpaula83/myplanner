@@ -167,7 +167,7 @@ func (r *AllocationRepository) GetEpicsByEquipeAndProduto(ctx context.Context, e
 				SELECT DISTINCT m.fonte_dados_id
 				FROM equipe_membros em
 				JOIN membros m ON em.membro_id = m.id
-				WHERE em.equipe_id = $1
+				WHERE em.equipe_id = $1 AND em.data_saida IS NULL
 			)
 			OR e.id IN (SELECT epico_id FROM epico_equipes WHERE equipe_id = $1)
 		  ))

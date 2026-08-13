@@ -86,7 +86,7 @@ func (r *InvestimentoRepository) GetMembrosEquipeNoMes(ctx context.Context, equi
 		       m.salario, m.data_admissao, m.banco_horas,
 		       m.created_at, m.updated_at
 		FROM membros m
-		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1
+		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1 AND em.data_saida IS NULL
 		WHERE (m.data_admissao IS NULL OR m.data_admissao <= $2)
 		  AND (m.data_desligamento IS NULL OR m.data_desligamento >= $3)
 	`, equipeID, lastDay, firstDay)

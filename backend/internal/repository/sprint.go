@@ -52,7 +52,7 @@ func (r *SprintRepository) ListProjetosComSprints(ctx context.Context, equipeID 
 			FROM projetos p
 			INNER JOIN sprints s ON s.projeto_id = p.id
 			INNER JOIN tarefas t ON t.projeto_id = p.id
-			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id
+			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.data_saida IS NULL
 			WHERE p.ativo = true AND em.equipe_id = $1
 			ORDER BY p.nome
 		`
@@ -146,7 +146,7 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 			query += fmt.Sprintf(` AND (
 				EXISTS (
 					SELECT 1 FROM tarefas t2
-					INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id
+					INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id AND em.data_saida IS NULL
 					WHERE t2.sprint_id = s.id AND em.equipe_id = $%d
 				)
 				OR (
@@ -154,7 +154,7 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 					AND EXISTS (
 						SELECT 1 FROM sprints s2
 						INNER JOIN tarefas t4 ON t4.sprint_id = s2.id
-						INNER JOIN equipe_membros em2 ON em2.membro_id = t4.responsavel_id
+						INNER JOIN equipe_membros em2 ON em2.membro_id = t4.responsavel_id AND em2.data_saida IS NULL
 						WHERE s2.projeto_id = s.projeto_id AND em2.equipe_id = $%d
 					)
 				)
@@ -162,7 +162,7 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 		} else {
 			query += fmt.Sprintf(` AND EXISTS (
 				SELECT 1 FROM tarefas t2
-				INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id
+				INNER JOIN equipe_membros em ON em.membro_id = t2.responsavel_id AND em.data_saida IS NULL
 				WHERE t2.sprint_id = s.id AND em.equipe_id = $%d
 			)`, argN)
 		}
@@ -454,6 +454,7 @@ func (r *SprintRepository) GetMembrosEquipeIDs(ctx context.Context, equipeID uui
 		SELECT em.membro_id FROM equipe_membros em
 		JOIN membros m ON m.id = em.membro_id
 		WHERE em.equipe_id = $1
+		  AND em.data_saida IS NULL
 		  AND (m.data_desligamento IS NULL OR m.data_desligamento > $2)
 	`, equipeID, dataFim)
 	if err != nil {
@@ -516,7 +517,7 @@ func (r *SprintRepository) GetUnplannedStats(ctx context.Context, sprintID uuid.
 				COALESCE(SUM(t.estimativa_tempo) FILTER (WHERE (%s) AND NOT (%s)), 0) / 3600.0 AS outras_horas
 			FROM tarefas t
 			INNER JOIN sprints s ON s.id = t.sprint_id
-			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id
+			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.data_saida IS NULL
 			WHERE t.sprint_id = $1 AND t.responsavel_id IS NOT NULL
 			  AND s.data_inicio IS NOT NULL AND em.equipe_id = $2
 		`, naoPlanejadasFilter, naoPlanejadasFilter,
@@ -582,7 +583,7 @@ func (r *SprintRepository) GetDisclaimerTasks(ctx context.Context, sprintID uuid
 	var equipeJoin, equipeWhere string
 	args := []interface{}{sprintID}
 	if equipeID != nil {
-		equipeJoin = "INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id"
+		equipeJoin = "INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.data_saida IS NULL"
 		equipeWhere = fmt.Sprintf("AND em.equipe_id = $%d", len(args)+1)
 		args = append(args, *equipeID)
 	}
@@ -678,7 +679,7 @@ func (r *SprintRepository) GetHistoricalUnplanned(ctx context.Context, projetoID
 				COUNT(DISTINCT t.responsavel_id) FILTER (WHERE em.equipe_id = $2) AS total_membros
 			FROM sprints s
 			INNER JOIN tarefas t ON t.sprint_id = s.id AND t.responsavel_id IS NOT NULL
-			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.equipe_id = $2
+			INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.equipe_id = $2 AND em.data_saida IS NULL
 			WHERE s.projeto_id = $1 AND s.estado = 'closed'
 			  AND s.data_inicio IS NOT NULL AND s.data_fim IS NOT NULL
 			  AND s.id != $3
@@ -768,7 +769,7 @@ func (r *SprintRepository) GetMembrosEquipeInfo(ctx context.Context, equipeID uu
 	rows, err := r.pool.Query(ctx, `
 		SELECT m.id, m.nome, m.avatar_url, m.data_desligamento
 		FROM membros m
-		INNER JOIN equipe_membros em ON em.membro_id = m.id
+		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.data_saida IS NULL
 		WHERE em.equipe_id = $1
 		  AND (m.data_desligamento IS NULL OR m.data_desligamento > $2)
 		ORDER BY m.nome
@@ -793,7 +794,7 @@ func (r *SprintRepository) GetAllMembrosEquipe(ctx context.Context, equipeID uui
 	rows, err := r.pool.Query(ctx, `
 		SELECT m.id, m.nome, m.avatar_url, m.data_desligamento
 		FROM membros m
-		INNER JOIN equipe_membros em ON em.membro_id = m.id
+		INNER JOIN equipe_membros em ON em.membro_id = m.id AND em.data_saida IS NULL
 		WHERE em.equipe_id = $1
 		ORDER BY m.nome
 	`, equipeID)
@@ -862,7 +863,7 @@ func (r *SprintRepository) GetBurndownTarefas(ctx context.Context, sprintID uuid
 	`
 	args := []any{sprintID}
 	if equipeID != nil {
-		query += ` AND t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $2)`
+		query += ` AND t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $2 AND data_saida IS NULL)`
 		args = append(args, *equipeID)
 	}
 
@@ -911,7 +912,7 @@ func (r *SprintRepository) GetTimelineDetailTarefas(ctx context.Context, sprintI
 		LEFT JOIN tarefas parent ON t.parent_id = parent.id
 		LEFT JOIN membros m ON m.id = t.relator_id
 		WHERE t.sprint_id = $1
-		  AND t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $2)
+		  AND t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $2 AND data_saida IS NULL)
 		  AND t.tipo NOT IN ('Épico', 'Projeto')
 		  AND t.status != 'Cancelado'
 		ORDER BY t.numero_ticket

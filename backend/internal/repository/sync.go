@@ -486,7 +486,7 @@ func (r *SyncRepository) GetProjectKeysForSync(ctx context.Context, fonteDadosID
 		SELECT DISTINCT p.chave
 		FROM projetos p
 		INNER JOIN tarefas t ON t.projeto_id = p.id
-		INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id
+		INNER JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.data_saida IS NULL
 		WHERE p.fonte_dados_id = $1 AND p.ativo = true
 	`, fonteDadosID)
 	if err != nil {
@@ -543,7 +543,7 @@ func (r *SyncRepository) AutoDetectEquipeBoardIDs(ctx context.Context, fonteDado
 			       ROW_NUMBER() OVER (PARTITION BY em.equipe_id ORDER BY COUNT(*) DESC, s.board_id ASC) as rn
 			FROM sprints s
 			JOIN tarefas t ON t.sprint_id = s.id
-			JOIN equipe_membros em ON em.membro_id = t.responsavel_id
+			JOIN equipe_membros em ON em.membro_id = t.responsavel_id AND em.data_saida IS NULL
 			WHERE s.fonte_dados_id = $1 AND s.board_id IS NOT NULL
 			GROUP BY em.equipe_id, s.board_id
 		)

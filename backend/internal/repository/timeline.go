@@ -34,7 +34,7 @@ func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, equipeID uu
 			COALESCE(
 				(SELECT SUM(c.estimativa_tempo) FROM tarefas c
 				 WHERE c.parent_id = e.id
-				   AND c.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)),
+				   AND c.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1 AND data_saida IS NULL)),
 				0
 			) AS total_segundos_equipe,
 			EXISTS(
@@ -46,7 +46,7 @@ func (r *TimelineRepository) BuscarEpicosEquipe(ctx context.Context, equipeID uu
 		  AND EXISTS (
 		      SELECT 1 FROM tarefas ch
 		      WHERE ch.parent_id = e.id
-		        AND ch.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1)
+		        AND ch.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $1 AND data_saida IS NULL)
 		  )
 		  AND (
 			  e.status IN ('Em Andamento', 'Desenvolvimento')
@@ -85,7 +85,7 @@ func (r *TimelineRepository) ContarMembrosAtivosEquipe(ctx context.Context, equi
 		SELECT COUNT(*)
 		FROM equipe_membros em
 		JOIN membros m ON m.id = em.membro_id
-		WHERE em.equipe_id = $1 AND m.ativo = true
+		WHERE em.equipe_id = $1 AND em.data_saida IS NULL AND m.ativo = true
 		  AND (m.data_desligamento IS NULL OR m.data_desligamento > $2)
 	`, equipeID, inicioAno).Scan(&count)
 	if err != nil {
@@ -105,7 +105,7 @@ func (r *TimelineRepository) BuscarAusenciasMensais(ctx context.Context, equipeI
 			       EXTRACT(MONTH FROM dia)::int AS mes, dia::date
 			FROM disponibilidade d
 			JOIN membros m ON m.id = d.membro_id
-			JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1
+			JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = $1 AND em.data_saida IS NULL
 			CROSS JOIN LATERAL generate_series(
 				GREATEST(d.data_inicio, $2::date),
 				LEAST(d.data_fim, $3::date),
@@ -199,7 +199,7 @@ func (r *TimelineRepository) BuscarMembrosComAusencias(ctx context.Context, equi
 	rows, err := r.pool.Query(ctx, `
 		SELECT m.id, m.nome, m.avatar_url, e.nome AS equipe_nome, m.data_desligamento
 		FROM membros m
-		JOIN equipe_membros em ON em.membro_id = m.id
+		JOIN equipe_membros em ON em.membro_id = m.id AND em.data_saida IS NULL
 		JOIN equipes e ON e.id = em.equipe_id
 		WHERE em.equipe_id = ANY($1)
 		  AND m.ativo = true
@@ -280,7 +280,7 @@ func (r *TimelineRepository) ContarMembrosAtivosEquipes(ctx context.Context, equ
 		SELECT COUNT(DISTINCT m.id)
 		FROM equipe_membros em
 		JOIN membros m ON m.id = em.membro_id
-		WHERE em.equipe_id = ANY($1)
+		WHERE em.equipe_id = ANY($1) AND em.data_saida IS NULL
 		  AND m.ativo = true
 		  AND (m.data_desligamento IS NULL OR m.data_desligamento > $2)
 	`, equipeIDs, inicioAno).Scan(&count)
@@ -301,7 +301,7 @@ func (r *TimelineRepository) BuscarAusenciasMensaisEquipes(ctx context.Context, 
 			       EXTRACT(MONTH FROM dia)::int AS mes, dia::date
 			FROM disponibilidade d
 			JOIN membros m ON m.id = d.membro_id
-			JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = ANY($1)
+			JOIN equipe_membros em ON em.membro_id = m.id AND em.equipe_id = ANY($1) AND em.data_saida IS NULL
 			CROSS JOIN LATERAL generate_series(
 				GREATEST(d.data_inicio, $2::date),
 				LEAST(d.data_fim, $3::date),
