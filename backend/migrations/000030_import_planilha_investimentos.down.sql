@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS import_configs;
+ALTER TABLE membros DROP COLUMN IF EXISTS gestor_id;
+ALTER TABLE membros DROP COLUMN IF EXISTS ultimo_aumento;
+ALTER TABLE membros DROP COLUMN IF EXISTS matricula;
