@@ -185,7 +185,8 @@ func main() {
 	tarefaRepo := repository.NewTarefaRepository(pool)
 	tarefaHandler := handler.NewTarefaHandler(tarefaRepo, logger)
 
-	importService := service.NewImportService(membroRepo, equipeRepo, logger)
+	importConfigRepo := repository.NewImportConfigRepository(pool)
+	importService := service.NewImportService(membroRepo, equipeRepo, importConfigRepo, logger)
 	importHandler := handler.NewImportHandler(importService, logger)
 
 	r := chi.NewRouter()
@@ -264,6 +265,9 @@ func main() {
 			r.Get("/membros/{id}/alocacoes-projetos", investHandler.GetAlocacoesProjetos)
 
 			r.Post("/investimentos/import", importHandler.Import)
+			r.Post("/investimentos/import/confirmar", importHandler.Confirmar)
+			r.Get("/investimentos/import/config", importHandler.GetConfig)
+			r.Post("/investimentos/import/sync", importHandler.Sync)
 
 			r.Get("/timeline-capacidade", timelineHandler.ListTimeline)
 			r.Post("/timeline-capacidade/analisar", timelineHandler.AnalisarCapacidade)

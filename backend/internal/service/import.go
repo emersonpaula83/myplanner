@@ -33,14 +33,16 @@ func ExtractSheetsIDAndGid(sheetsURL string) (id string, gid string, err error) 
 type ImportService struct {
 	membroRepo *repository.MembroRepository
 	equipeRepo *repository.EquipeRepository
+	configRepo *repository.ImportConfigRepository
 	httpClient *http.Client
 	logger     *zap.Logger
 }
 
-func NewImportService(membroRepo *repository.MembroRepository, equipeRepo *repository.EquipeRepository, logger *zap.Logger) *ImportService {
+func NewImportService(membroRepo *repository.MembroRepository, equipeRepo *repository.EquipeRepository, configRepo *repository.ImportConfigRepository, logger *zap.Logger) *ImportService {
 	return &ImportService{
 		membroRepo: membroRepo,
 		equipeRepo: equipeRepo,
+		configRepo: configRepo,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		logger:     logger,
 	}
@@ -92,4 +94,101 @@ func (s *ImportService) FetchGoogleSheetCSV(ctx context.Context, sheetsURL strin
 	}
 
 	return string(body), id, gid, nil
+}
+
+func (s *ImportService) ConfirmImport(ctx context.Context, req domain.ConfirmImportRequest) (*domain.ConfirmImportResponse, error) {
+	resp := &domain.ConfirmImportResponse{}
+
+	for _, linha := range req.Linhas {
+		if linha.Ignorar || linha.MembroID == nil {
+			resp.Ignorados++
+			continue
+		}
+
+		var dataAdmissao *time.Time
+		if linha.Dados.DataAdmissao != nil {
+			t, err := time.Parse("2006-01-02", *linha.Dados.DataAdmissao)
+			if err != nil {
+				return nil, fmt.Errorf("linha %d: data_admissao inválida: %w", linha.Linha, err)
+			}
+			dataAdmissao = &t
+		}
+
+		var ultimoAumento *time.Time
+		if linha.Dados.UltimoAumento != nil {
+			t, err := time.Parse("2006-01-02", *linha.Dados.UltimoAumento)
+			if err != nil {
+				return nil, fmt.Errorf("linha %d: ultimo_aumento inválido: %w", linha.Linha, err)
+			}
+			ultimoAumento = &t
+		}
+
+		if err := s.membroRepo.UpdateCamposImport(ctx, *linha.MembroID, linha.Dados.Salario, linha.Dados.Cargo, dataAdmissao, linha.Dados.Matricula, ultimoAumento, linha.Dados.GestorID); err != nil {
+			return nil, fmt.Errorf("linha %d: atualizando membro: %w", linha.Linha, err)
+		}
+
+		if linha.EquipeID != nil {
+			if err := s.equipeRepo.AddMembroEquipe(ctx, *linha.EquipeID, *linha.MembroID); err != nil {
+				return nil, fmt.Errorf("linha %d: associando equipe: %w", linha.Linha, err)
+			}
+		}
+
+		resp.Atualizados++
+	}
+
+	if req.Tipo != "" {
+		if err := s.configRepo.Save(ctx, req.Tipo, req.URL, req.Gid); err != nil {
+			s.logger.Warn("failed to save import config", zap.Error(err))
+		}
+	}
+
+	return resp, nil
+}
+
+func (s *ImportService) GetSyncConfig(ctx context.Context) (*domain.ImportConfigResponse, error) {
+	cfg, err := s.configRepo.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting import config: %w", err)
+	}
+	if cfg == nil {
+		return nil, nil
+	}
+	resp := &domain.ImportConfigResponse{Tipo: cfg.Tipo, URL: cfg.URL, Gid: cfg.Gid}
+	if cfg.UltimoSync != nil {
+		formatted := cfg.UltimoSync.Format(time.RFC3339)
+		resp.UltimoSync = &formatted
+	}
+	return resp, nil
+}
+
+func (s *ImportService) Sync(ctx context.Context) (*domain.ImportMatchResult, error) {
+	cfg, err := s.configRepo.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting import config: %w", err)
+	}
+	if cfg == nil {
+		return nil, fmt.Errorf("nenhuma configuração de sincronização salva")
+	}
+	if cfg.Tipo != "sheets_url" {
+		return nil, fmt.Errorf("configuração é do tipo CSV; faça o upload de um novo arquivo")
+	}
+	if cfg.URL == nil {
+		return nil, fmt.Errorf("configuração sem URL salva")
+	}
+
+	csvContent, _, _, err := s.FetchGoogleSheetCSV(ctx, *cfg.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.MatchPlanilha(ctx, csvContent)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.configRepo.UpdateUltimoSync(ctx); err != nil {
+		s.logger.Warn("failed to update ultimo_sync", zap.Error(err))
+	}
+
+	return result, nil
 }

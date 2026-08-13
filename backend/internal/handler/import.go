@@ -14,6 +14,9 @@ import (
 type ImportStore interface {
 	MatchPlanilha(ctx context.Context, csvContent string) (*domain.ImportMatchResult, error)
 	FetchGoogleSheetCSV(ctx context.Context, sheetsURL string) (csvContent, id, gid string, err error)
+	ConfirmImport(ctx context.Context, req domain.ConfirmImportRequest) (*domain.ConfirmImportResponse, error)
+	GetSyncConfig(ctx context.Context) (*domain.ImportConfigResponse, error)
+	Sync(ctx context.Context) (*domain.ImportMatchResult, error)
 }
 
 type ImportHandler struct {
@@ -65,6 +68,45 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 	result, err := h.store.MatchPlanilha(r.Context(), csvContent)
 	if err != nil {
 		h.logger.Error("failed to match planilha", zap.Error(err))
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (h *ImportHandler) Confirmar(w http.ResponseWriter, r *http.Request) {
+	var req domain.ConfirmImportRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	if len(req.Linhas) == 0 {
+		respondError(w, http.StatusBadRequest, "nenhuma linha para importar")
+		return
+	}
+
+	resp, err := h.store.ConfirmImport(r.Context(), req)
+	if err != nil {
+		h.logger.Error("failed to confirm import", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao confirmar importação")
+		return
+	}
+	respondJSON(w, http.StatusOK, resp)
+}
+
+func (h *ImportHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := h.store.GetSyncConfig(r.Context())
+	if err != nil {
+		h.logger.Error("failed to get import config", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao carregar configuração de sync")
+		return
+	}
+	respondJSON(w, http.StatusOK, cfg)
+}
+
+func (h *ImportHandler) Sync(w http.ResponseWriter, r *http.Request) {
+	result, err := h.store.Sync(r.Context())
+	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}

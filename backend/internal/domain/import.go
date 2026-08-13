@@ -69,3 +69,39 @@ type ImportMatchResult struct {
 	UnmatchedGestores []ImportUnmatchedGestor `json:"unmatched_gestores"`
 	Ignorados         []ImportIgnorado        `json:"ignorados"`
 }
+
+type ImportDadosConfirm struct {
+	Cargo         *string    `json:"cargo"`
+	Matricula     *string    `json:"matricula"`
+	Salario       *float64   `json:"salario"`
+	DataAdmissao  *string    `json:"data_admissao"`
+	UltimoAumento *string    `json:"ultimo_aumento"`
+	GestorID      *uuid.UUID `json:"gestor_id"`
+}
+
+type ConfirmImportLinha struct {
+	Linha    int                `json:"linha"`
+	MembroID *uuid.UUID         `json:"membro_id"`
+	EquipeID *uuid.UUID         `json:"equipe_id"`
+	Ignorar  bool               `json:"ignorar"`
+	Dados    ImportDadosConfirm `json:"dados"`
+}
+
+type ConfirmImportRequest struct {
+	Linhas []ConfirmImportLinha `json:"linhas"`
+	Tipo   string               `json:"tipo"`
+	URL    *string              `json:"url"`
+	Gid    *string              `json:"gid"`
+}
+
+type ConfirmImportResponse struct {
+	Atualizados int `json:"atualizados"`
+	Ignorados   int `json:"ignorados"`
+}
+
+type ImportConfigResponse struct {
+	Tipo       string  `json:"tipo"`
+	URL        *string `json:"url"`
+	Gid        *string `json:"gid"`
+	UltimoSync *string `json:"ultimo_sync"`
+}

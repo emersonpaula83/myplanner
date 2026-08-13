@@ -16,6 +16,9 @@ import (
 type mockImportStore struct {
 	matchPlanilhaFn       func(ctx context.Context, csvContent string) (*domain.ImportMatchResult, error)
 	fetchGoogleSheetCSVFn func(ctx context.Context, sheetsURL string) (string, string, string, error)
+	confirmImportFn       func(ctx context.Context, req domain.ConfirmImportRequest) (*domain.ConfirmImportResponse, error)
+	getSyncConfigFn       func(ctx context.Context) (*domain.ImportConfigResponse, error)
+	syncFn                func(ctx context.Context) (*domain.ImportMatchResult, error)
 }
 
 func (m *mockImportStore) MatchPlanilha(ctx context.Context, csvContent string) (*domain.ImportMatchResult, error) {
@@ -23,6 +26,15 @@ func (m *mockImportStore) MatchPlanilha(ctx context.Context, csvContent string) 
 }
 func (m *mockImportStore) FetchGoogleSheetCSV(ctx context.Context, sheetsURL string) (string, string, string, error) {
 	return m.fetchGoogleSheetCSVFn(ctx, sheetsURL)
+}
+func (m *mockImportStore) ConfirmImport(ctx context.Context, req domain.ConfirmImportRequest) (*domain.ConfirmImportResponse, error) {
+	return m.confirmImportFn(ctx, req)
+}
+func (m *mockImportStore) GetSyncConfig(ctx context.Context) (*domain.ImportConfigResponse, error) {
+	return m.getSyncConfigFn(ctx)
+}
+func (m *mockImportStore) Sync(ctx context.Context) (*domain.ImportMatchResult, error) {
+	return m.syncFn(ctx)
 }
 
 func newTestImportHandler(store *mockImportStore) *ImportHandler {
@@ -124,3 +136,109 @@ var errPlanilhaPrivada = &testError{"planilha não está pública"}
 type testError struct{ msg string }
 
 func (e *testError) Error() string { return e.msg }
+
+func TestConfirmar_Success(t *testing.T) {
+	store := &mockImportStore{
+		confirmImportFn: func(_ context.Context, req domain.ConfirmImportRequest) (*domain.ConfirmImportResponse, error) {
+			if len(req.Linhas) != 1 {
+				t.Errorf("got %d linhas, want 1", len(req.Linhas))
+			}
+			return &domain.ConfirmImportResponse{Atualizados: 1, Ignorados: 0}, nil
+		},
+	}
+	h := newTestImportHandler(store)
+
+	body := `{"linhas":[{"linha":1,"membro_id":"11111111-1111-1111-1111-111111111111","ignorar":false,"dados":{"salario":6480.00}}],"tipo":"csv"}`
+	req := httptest.NewRequest("POST", "/api/v1/investimentos/import/confirmar", bytes.NewBufferString(body))
+	rr := httptest.NewRecorder()
+	h.Confirmar(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+}
+
+func TestConfirmar_EmptyLinhas_BadRequest(t *testing.T) {
+	store := &mockImportStore{}
+	h := newTestImportHandler(store)
+
+	req := httptest.NewRequest("POST", "/api/v1/investimentos/import/confirmar", bytes.NewBufferString(`{"linhas":[]}`))
+	rr := httptest.NewRecorder()
+	h.Confirmar(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+func TestGetConfig_Success(t *testing.T) {
+	url := "https://docs.google.com/spreadsheets/d/abc/edit"
+	store := &mockImportStore{
+		getSyncConfigFn: func(_ context.Context) (*domain.ImportConfigResponse, error) {
+			return &domain.ImportConfigResponse{Tipo: "sheets_url", URL: &url}, nil
+		},
+	}
+	h := newTestImportHandler(store)
+
+	req := httptest.NewRequest("GET", "/api/v1/investimentos/import/config", nil)
+	rr := httptest.NewRecorder()
+	h.GetConfig(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+}
+
+func TestGetConfig_NilConfig(t *testing.T) {
+	store := &mockImportStore{
+		getSyncConfigFn: func(_ context.Context) (*domain.ImportConfigResponse, error) {
+			return nil, nil
+		},
+	}
+	h := newTestImportHandler(store)
+
+	req := httptest.NewRequest("GET", "/api/v1/investimentos/import/config", nil)
+	rr := httptest.NewRecorder()
+	h.GetConfig(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	if strings.TrimSpace(rr.Body.String()) != "null" {
+		t.Errorf("body = %q, want null", rr.Body.String())
+	}
+}
+
+func TestSync_Success(t *testing.T) {
+	store := &mockImportStore{
+		syncFn: func(_ context.Context) (*domain.ImportMatchResult, error) {
+			return &domain.ImportMatchResult{Matched: []domain.ImportMatched{}}, nil
+		},
+	}
+	h := newTestImportHandler(store)
+
+	req := httptest.NewRequest("POST", "/api/v1/investimentos/import/sync", nil)
+	rr := httptest.NewRecorder()
+	h.Sync(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+}
+
+func TestSync_NoConfig_BadRequest(t *testing.T) {
+	store := &mockImportStore{
+		syncFn: func(_ context.Context) (*domain.ImportMatchResult, error) {
+			return nil, errPlanilhaPrivada
+		},
+	}
+	h := newTestImportHandler(store)
+
+	req := httptest.NewRequest("POST", "/api/v1/investimentos/import/sync", nil)
+	rr := httptest.NewRecorder()
+	h.Sync(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}

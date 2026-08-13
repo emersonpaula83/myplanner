@@ -338,6 +338,27 @@ func (r *MembroRepository) GetHistoricoSalario(ctx context.Context, membroID uui
 	return result, rows.Err()
 }
 
+func (r *MembroRepository) UpdateCamposImport(ctx context.Context, id uuid.UUID, salario *float64, cargo *string, dataAdmissao *time.Time, matricula *string, ultimoAumento *time.Time, gestorID *uuid.UUID) error {
+	result, err := r.pool.Exec(ctx, `
+		UPDATE membros SET
+			salario = $2,
+			cargo = COALESCE($3, cargo),
+			data_admissao = $4,
+			matricula = $5,
+			ultimo_aumento = $6,
+			gestor_id = $7,
+			updated_at = NOW()
+		WHERE id = $1
+	`, id, salario, cargo, dataAdmissao, matricula, ultimoAumento, gestorID)
+	if err != nil {
+		return fmt.Errorf("updating campos import: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not found", id)
+	}
+	return nil
+}
+
 func (r *MembroRepository) GetHistoricoBancoHoras(ctx context.Context, membroID uuid.UUID) ([]domain.BancoHorasHistorico, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, membro_id, valor, data_registro, created_at
