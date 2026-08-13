@@ -1014,14 +1014,24 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 
 /* === RELATÓRIO DE ESFORÇO === */
 .esf-topo { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(260px, 1fr); gap: 16px; align-items: stretch; }
-@media (max-width: 900px) { .esf-topo { grid-template-columns: 1fr; } }
+/* Com uma fatia selecionada o topo ganha a terceira coluna do drill-down de
+   produtos; auto-fit quebra a linha sozinho em tela estreita. */
+.esf-topo-drill { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+@media (max-width: 900px) { .esf-topo, .esf-topo-drill { grid-template-columns: 1fr; } }
+#esf-produtos-slot { display: none; }
+.esf-topo-drill #esf-produtos-slot { display: block; }
 .esf-card { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: var(--shadow-card); padding: 18px; }
 .esf-card-titulo { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 14px; }
 
 .esf-pie-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .esf-pie { width: 100%; max-width: 300px; height: auto; overflow: visible; }
 .esf-slice { transform-origin: 120px 120px; transition: transform .2s cubic-bezier(.34,1.4,.64,1), filter .2s ease; cursor: pointer; }
-.esf-slice:hover { transform: translate(var(--dx), var(--dy)) scale(1.06); filter: drop-shadow(0 4px 14px var(--glow)) brightness(1.12); }
+.esf-slice:hover, .esf-slice:focus-visible { transform: translate(var(--dx), var(--dy)) scale(1.06); filter: drop-shadow(0 4px 14px var(--glow)) brightness(1.12); }
+.esf-slice:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+/* Fatia selecionada fica descolada mesmo sem o mouse: é o que liga a pizza ao
+   card de produtos aberto ao lado. */
+.esf-slice-ativa { transform: translate(var(--dx), var(--dy)) scale(1.06); filter: drop-shadow(0 4px 14px var(--glow)) brightness(1.12); }
+.esf-slice-apagada { opacity: .45; }
 .esf-slice-pct { fill: #fff; font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: rgba(0,0,0,.32); stroke-width: 3px; stroke-linejoin: round; }
 .esf-pie-brilho { pointer-events: none; }
 .esf-legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; }
@@ -1036,6 +1046,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .esf-proj-horas { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
 .esf-proj-barra { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: var(--stacked-bar-bg); overflow: hidden; }
 .esf-proj-barra > div { height: 100%; background: var(--accent); border-radius: 2px; }
+.esf-proj-cobertura { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-tertiary); line-height: 1.6; }
+
+.esf-prod-titulo { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.esf-prod-titulo .esf-card-titulo { margin-bottom: 0; display: flex; align-items: center; gap: 6px; }
+.esf-prod-fechar { background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+.esf-prod-fechar:hover { background: var(--chip-bg); color: var(--text-primary); }
+.esf-prod-outros .esf-proj-nome, .esf-prod-outros .esf-proj-horas { color: var(--text-tertiary); font-style: italic; }
 
 .esf-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
 .esf-numero { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: var(--shadow-card); padding: 20px; border-top: 3px solid var(--esf-cor, var(--accent)); }
@@ -2942,7 +2959,8 @@ async function loadEsforco() {
 function esfPieSVG(buckets, total) {
   var CX = 120, CY = 120, R = 100;
   var f = function(n) { return Math.round(n * 100) / 100; };
-  var svg = '<svg class="esf-pie" viewBox="0 0 240 240" role="img" aria-label="Percentual de horas por tipo de trabalho">';
+  // role="group", não "img": cada fatia é um botão que abre o recorte por produto.
+  var svg = '<svg class="esf-pie" viewBox="0 0 240 240" role="group" aria-label="Percentual de horas por tipo de trabalho. Clique numa fatia para ver a divisão por produto">';
   svg += '<defs><radialGradient id="esf-brilho" cx="34%" cy="26%" r="62%">' +
          '<stop offset="0%" stop-color="#fff" stop-opacity=".30"/>' +
          '<stop offset="55%" stop-color="#fff" stop-opacity=".06"/>' +
@@ -2950,6 +2968,7 @@ function esfPieSVG(buckets, total) {
 
   var ang = -Math.PI / 2; // começa no topo
   buckets.forEach(function(b) {
+    var jsChave = b.chave.replace(/'/g, "\\'");
     var frac = total > 0 ? b.horas / total : 0;
     if (frac <= 0) return;
     var sweep = frac * Math.PI * 2;
@@ -2966,13 +2985,107 @@ function esfPieSVG(buckets, total) {
     }
     var lx = CX + Math.cos(mid) * R * 0.62, ly = CY + Math.sin(mid) * R * 0.62;
     var rotulo = frac >= 0.04 ? '<text class="esf-slice-pct" x="' + f(lx) + '" y="' + f(ly) + '">' + esfPct(b.percentual) + '</text>' : '';
-    svg += '<g class="esf-slice" style="--dx:' + f(Math.cos(mid) * 9) + 'px;--dy:' + f(Math.sin(mid) * 9) + 'px;--glow:' + cor + '">' +
+    svg += '<g class="esf-slice" data-bucket="' + esc(b.chave) + '" role="button" tabindex="0"' +
+             ' aria-label="' + esc(b.rotulo) + ': ' + esfHoras(b.horas) + ', ' + b.cards + ' cards. Abrir divisão por produto"' +
+             ' onclick="esfSelecionarBucket(\'' + jsChave + '\')"' +
+             ' onkeydown="if (event.key === \'Enter\' || event.key === \' \') { event.preventDefault(); esfSelecionarBucket(\'' + jsChave + '\'); }"' +
+             ' style="--dx:' + f(Math.cos(mid) * 9) + 'px;--dy:' + f(Math.sin(mid) * 9) + 'px;--glow:' + cor + '">' +
            forma + '<title>' + esc(b.rotulo) + ': ' + esfHoras(b.horas) + ' · ' + b.cards + ' cards</title>' + rotulo + '</g>';
     ang += sweep;
   });
 
   svg += '<circle class="esf-pie-brilho" cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="url(#esf-brilho)"/>';
   return svg + '</svg>';
+}
+
+// Drill-down da pizza. renderEsforco reconstrói o innerHTML inteiro, então
+// seleção e dados ficam aqui fora — o clique repinta só o card lateral.
+var esforcoBucketSelecionado = null;
+var esforcoDados = null;
+
+function esfSelecionarBucket(chave) {
+  esforcoBucketSelecionado = esforcoBucketSelecionado === chave ? null : chave;
+  esfPintarDrill();
+}
+
+function esfFecharProdutos() {
+  esforcoBucketSelecionado = null;
+  esfPintarDrill();
+}
+
+function esfPintarDrill() {
+  var topo = document.getElementById('esf-topo');
+  var slot = document.getElementById('esf-produtos-slot');
+  if (!topo || !slot) return;
+
+  var aberto = !!esforcoBucketSelecionado;
+  topo.classList.toggle('esf-topo-drill', aberto);
+  slot.innerHTML = aberto ? esfProdutosHTML(esforcoBucketSelecionado) : '';
+
+  document.querySelectorAll('#esforco-content .esf-slice').forEach(function(g) {
+    var desta = g.dataset.bucket === esforcoBucketSelecionado;
+    g.classList.toggle('esf-slice-ativa', desta);
+    g.classList.toggle('esf-slice-apagada', aberto && !desta);
+    g.setAttribute('aria-pressed', desta ? 'true' : 'false');
+  });
+}
+
+function esfProdutosHTML(chave) {
+  var d = esforcoDados;
+  if (!d) return '';
+  var balde = (d.buckets || []).filter(function(b) { return b.chave === chave; })[0];
+  var pb = (d.produtos_por_bucket || {})[chave] || {produtos: [], total_produtos: 0, cards_somados: 0, horas_somadas: 0, sem_produto: {cards: 0, horas: 0}};
+  var cor = ESF_CORES[chave] || 'var(--accent)';
+  var rotulo = balde ? balde.rotulo : chave;
+
+  var cabecalho = '<div class="esf-prod-titulo">' +
+    '<div class="esf-card-titulo"><span class="esf-legenda-cor" style="background:' + cor + '"></span>Produtos · ' + esc(rotulo) + '</div>' +
+    '<button class="esf-prod-fechar" onclick="esfFecharProdutos()" aria-label="Fechar divisão por produto">✕</button>' +
+  '</div>';
+
+  var lista = pb.produtos || [];
+  if (!lista.length) {
+    return '<div class="esf-card">' + cabecalho +
+      '<div class="esf-pessoa-equipe">Nenhum card deste tipo está vinculado a um produto no período</div>' +
+    '</div>';
+  }
+
+  var maxHoras = lista[0].horas;
+  var linhas = lista.map(function(p, i) {
+    return '<div class="esf-proj">' +
+      '<div class="esf-proj-pos">' + (i + 1) + '</div>' +
+      '<div class="esf-proj-nome" title="' + esc(p.nome).replace(/"/g, '&quot;') + '">' + esc(p.nome) + '</div>' +
+      '<div class="esf-proj-horas">' + esfHoras(p.horas) + '</div>' +
+      '<div class="esf-proj-barra"><div style="width:' + (maxHoras > 0 ? (p.horas / maxHoras * 100) : 0) + '%;background:' + cor + '"></div></div>' +
+    '</div>';
+  }).join('');
+
+  // O backend corta no topo; o resto vira uma linha só, calculada dos totais.
+  var restoProdutos = pb.total_produtos - lista.length;
+  if (restoProdutos > 0) {
+    var somaTopo = lista.reduce(function(acc, p) { return acc + p.horas; }, 0);
+    var restoHoras = Math.max(pb.horas_somadas - somaTopo, 0);
+    // Sem barra: a linha é a soma de vários produtos, uma barra ao lado das
+    // individuais leria como "o maior de todos".
+    linhas += '<div class="esf-proj esf-prod-outros">' +
+      '<div class="esf-proj-pos">+</div>' +
+      '<div class="esf-proj-nome">Outros ' + restoProdutos + ' produtos</div>' +
+      '<div class="esf-proj-horas">' + esfHoras(restoHoras) + '</div>' +
+    '</div>';
+  }
+
+  // Card com mais de um produto entra com as horas cheias em cada um, então a
+  // soma passa das horas da fatia. Sem esta linha o leitor acha que é erro.
+  var horasBalde = balde ? balde.horas : 0;
+  var nota = 'Soma ' + esfHoras(pb.horas_somadas) + ' contra ' + esfHoras(horasBalde) + ' da fatia: card com mais de um produto conta as horas cheias em cada produto.';
+  if (pb.sem_produto && pb.sem_produto.cards > 0) {
+    nota += ' Fora daqui: ' + pb.sem_produto.cards + ' cards (' + esfHoras(pb.sem_produto.horas) + ') sem produto vinculado.';
+  }
+
+  return '<div class="esf-card">' + cabecalho +
+    '<div class="esf-proj-lista">' + linhas + '</div>' +
+    '<div class="esf-proj-cobertura">' + nota + '</div>' +
+  '</div>';
 }
 
 function esfPessoaHTML(p, destacar) {
@@ -3006,6 +3119,7 @@ function esfPessoaHTML(p, destacar) {
 function renderEsforco(d) {
   var alvo = document.getElementById('esforco-content');
   var badge = document.getElementById('esforco-badge');
+  esforcoDados = d;
   var qs = d.trimestres || [];
   var dt = function(iso) { return iso.split('-').reverse().join('/'); };
   badge.textContent = qs.map(function(q) { return 'Q' + q; }).join(' + ') + ' · ' + dt(d.periodo_inicio) + ' — ' + dt(d.periodo_fim);
@@ -3021,9 +3135,17 @@ function renderEsforco(d) {
     : '';
 
   if (!d.total_cards) {
+    esforcoBucketSelecionado = null;
     alvo.innerHTML = aviso + '<div class="empty-state"><div class="empty-state-icon">🥧</div>' +
       '<div class="empty-state-text">Nenhum card concluído neste período para o filtro atual</div></div>';
     return;
+  }
+
+  // Filtro pode ter zerado a fatia que estava aberta; sem isso o card lateral
+  // reabriria vazio.
+  if (esforcoBucketSelecionado) {
+    var aindaTem = d.buckets.some(function(b) { return b.chave === esforcoBucketSelecionado && b.horas > 0; });
+    if (!aindaTem) esforcoBucketSelecionado = null;
   }
 
   var legenda = d.buckets.map(function(b) {
@@ -3035,12 +3157,20 @@ function renderEsforco(d) {
     ? d.top_projetos.map(function(p, i) {
         return '<div class="esf-proj">' +
           '<div class="esf-proj-pos">' + (i + 1) + '</div>' +
-          '<div class="esf-proj-nome"><span class="esf-proj-chave">' + esc(p.chave) + '</span>' + esc(p.nome) + '</div>' +
+          '<div class="esf-proj-nome" title="' + esc(p.nome).replace(/"/g, '&quot;') + '"><span class="esf-proj-chave">' + esc(p.chave) + '</span>' + esc(p.nome) + '</div>' +
           '<div class="esf-proj-horas">' + esfHoras(p.horas) + '</div>' +
           '<div class="esf-proj-barra"><div style="width:' + (maxProj > 0 ? (p.horas / maxProj * 100) : 0) + '%"></div></div>' +
         '</div>';
       }).join('')
-    : '<div class="esf-pessoa-equipe">Sem projetos no período</div>';
+    : '<div class="esf-pessoa-equipe">Nenhum card do período está vinculado a um projeto</div>';
+
+  // O ranking vive num subconjunto: só cards que sobem até um épico. Sem esta
+  // linha o leitor soma as cinco barras e não fecha com os números grandes.
+  var cob = d.top_projetos_cobertura || {projetos: 0, cards: 0, horas: 0};
+  var cobPct = d.total_horas > 0 ? (cob.horas / d.total_horas * 100) : 0;
+  var coberturaProj = '<div class="esf-proj-cobertura">Ranking sobre ' + esfHoras(cob.horas) + ' de ' + esfHoras(d.total_horas) +
+    ' (' + esfPct(cobPct) + ') · ' + cob.projetos + ' projetos · ' + cob.cards + ' cards. ' +
+    'Cards sem vínculo com projeto não entram neste ranking, mas contam nos demais números.</div>';
 
   var numeros = d.buckets.map(function(b) {
     return '<div class="esf-numero" style="--esf-cor:' + (ESF_CORES[b.chave] || '') + '">' +
@@ -3056,13 +3186,14 @@ function renderEsforco(d) {
     : '<div class="esf-pessoa-equipe">Nenhuma pessoa com cards concluídos no período</div>';
 
   alvo.innerHTML = aviso +
-    '<div class="esf-topo">' +
+    '<div class="esf-topo" id="esf-topo">' +
       '<div class="esf-card"><div class="esf-card-titulo">Horas estimadas por tipo de trabalho</div>' +
         '<div class="esf-pie-wrap">' + esfPieSVG(d.buckets, d.total_horas) + '<div class="esf-legenda">' + legenda + '</div></div>' +
       '</div>' +
       '<div class="esf-card"><div class="esf-card-titulo">Top 5 projetos que mais consumiram horas</div>' +
-        '<div class="esf-proj-lista">' + projetos + '</div>' +
+        '<div class="esf-proj-lista">' + projetos + '</div>' + coberturaProj +
       '</div>' +
+      '<div id="esf-produtos-slot"></div>' +
     '</div>' +
     '<div class="esf-numeros">' + numeros + '</div>' +
     '<div class="esf-pessoas">' + pessoas + '</div>' +
@@ -3071,6 +3202,9 @@ function renderEsforco(d) {
       'Épicos e Projetos ficam de fora por serem contêineres: a estimativa deles agrega a dos filhos.<br>' +
       'Fora deste relatório: <b>' + d.fora_do_escopo.cards + ' cards</b> e <b>' + esfHoras(d.fora_do_escopo.horas) + '</b> de responsáveis sem equipe cadastrada.' +
     '</div>';
+
+  // Mantém a fatia aberta quando o relatório recarrega por troca de filtro.
+  esfPintarDrill();
 }
 
 function loadTimelineFilters() {
