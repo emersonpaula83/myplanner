@@ -334,6 +334,29 @@ func (h *EquipeHandler) AddMembro(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "membro_id inválido")
 		return
 	}
+
+	equipeAtiva, err := h.store.GetEquipeAtivaMembro(r.Context(), membroID)
+	if err != nil {
+		h.logger.Error("failed to check active equipe", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao verificar equipe ativa")
+		return
+	}
+
+	if equipeAtiva != nil {
+		if equipeAtiva.ID == equipeID {
+			respondJSON(w, http.StatusOK, map[string]string{"message": "membro já está nesta equipe"})
+			return
+		}
+		respondJSON(w, http.StatusConflict, domain.TransferConflict{
+			Conflito: true,
+			EquipeAtual: struct {
+				ID   uuid.UUID `json:"id"`
+				Nome string    `json:"nome"`
+			}{ID: equipeAtiva.ID, Nome: equipeAtiva.Nome},
+		})
+		return
+	}
+
 	if err := h.store.AddMembroEquipe(r.Context(), equipeID, membroID); err != nil {
 		h.logger.Error("failed to add membro to equipe", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao adicionar membro")
@@ -359,6 +382,54 @@ func (h *EquipeHandler) RemoveMembro(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]string{"message": "membro removido"})
+}
+
+func (h *EquipeHandler) TransferMembro(w http.ResponseWriter, r *http.Request) {
+	equipeOrigemID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	membroID, err := uuid.Parse(chi.URLParam(r, "membroId"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "membro_id inválido")
+		return
+	}
+
+	var req struct {
+		EquipeDestinoID string `json:"equipe_destino_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	equipeDestinoID, err := uuid.Parse(req.EquipeDestinoID)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "equipe_destino_id inválido")
+		return
+	}
+
+	origem, err := h.store.GetEquipeByID(r.Context(), equipeOrigemID)
+	if err != nil || origem == nil {
+		respondError(w, http.StatusNotFound, "equipe origem não encontrada")
+		return
+	}
+	destino, err := h.store.GetEquipeByID(r.Context(), equipeDestinoID)
+	if err != nil || destino == nil {
+		respondError(w, http.StatusNotFound, "equipe destino não encontrada")
+		return
+	}
+
+	if err := h.store.TransferirMembro(r.Context(), equipeOrigemID, equipeDestinoID, membroID); err != nil {
+		h.logger.Error("failed to transfer membro", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "falha ao transferir membro")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"equipe_origem":  origem.Nome,
+		"equipe_destino": destino.Nome,
+	})
 }
 
 func (h *EquipeHandler) UpdateCargo(w http.ResponseWriter, r *http.Request) {
