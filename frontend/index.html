@@ -1011,6 +1011,61 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .import-ignored-item { font-size: 12px; color: var(--text-tertiary); }
 .inv-badge-novo { position: absolute; top: -4px; right: -4px; background: #16a34a; color: #fff; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 6px; line-height: 1.4; letter-spacing: .3px; }
 .inv-badge-novo-inline { background: #16a34a; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 6px; letter-spacing: .3px; vertical-align: middle; }
+
+/* === RELATÓRIO DE ESFORÇO === */
+.esf-topo { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(260px, 1fr); gap: 16px; align-items: stretch; }
+@media (max-width: 900px) { .esf-topo { grid-template-columns: 1fr; } }
+.esf-card { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: var(--shadow-card); padding: 18px; }
+.esf-card-titulo { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 14px; }
+
+.esf-pie-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.esf-pie { width: 100%; max-width: 300px; height: auto; overflow: visible; }
+.esf-slice { transform-origin: 120px 120px; transition: transform .2s cubic-bezier(.34,1.4,.64,1), filter .2s ease; cursor: pointer; }
+.esf-slice:hover { transform: translate(var(--dx), var(--dy)) scale(1.06); filter: drop-shadow(0 4px 14px var(--glow)) brightness(1.12); }
+.esf-slice-pct { fill: #fff; font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: rgba(0,0,0,.32); stroke-width: 3px; stroke-linejoin: round; }
+.esf-pie-brilho { pointer-events: none; }
+.esf-legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; }
+.esf-legenda-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.esf-legenda-cor { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+.esf-proj-lista { display: flex; flex-direction: column; gap: 10px; }
+.esf-proj { display: grid; grid-template-columns: 20px 1fr auto; gap: 10px; align-items: center; }
+.esf-proj-pos { font-size: 12px; font-weight: 700; color: var(--text-tertiary); }
+.esf-proj-nome { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.esf-proj-chave { font-size: 11px; font-weight: 700; color: var(--text-tertiary); margin-right: 6px; }
+.esf-proj-horas { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.esf-proj-barra { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: var(--stacked-bar-bg); overflow: hidden; }
+.esf-proj-barra > div { height: 100%; background: var(--accent); border-radius: 2px; }
+
+.esf-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
+.esf-numero { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: var(--shadow-card); padding: 20px; border-top: 3px solid var(--esf-cor, var(--accent)); }
+.esf-numero-valor { font-size: 40px; font-weight: 700; line-height: 1.1; letter-spacing: -1.5px; color: var(--text-primary); }
+.esf-numero-rotulo { font-size: 13px; font-weight: 600; color: var(--esf-cor, var(--accent)); margin-top: 4px; }
+.esf-numero-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+
+.esf-pessoas { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.esf-pessoa { display: grid; grid-template-columns: 40px minmax(160px, 1.4fr) auto minmax(180px, 1fr); gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--border-subtle); border-left: 3px solid transparent; border-radius: 10px; padding: 10px 14px; }
+.esf-pessoa.esf-destaque { border-left-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 760px) { .esf-pessoa { grid-template-columns: 40px 1fr; } .esf-pessoa-pcts, .esf-pessoa-horas { grid-column: 2; } }
+.esf-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--chip-bg); }
+.esf-avatar-iniciais { width: 40px; height: 40px; border-radius: 50%; background: var(--chip-bg); color: var(--text-secondary); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.esf-pessoa-nome { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.esf-pessoa-equipe { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+.esf-pessoa-horas { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.esf-pessoa-pcts { display: flex; flex-direction: column; gap: 4px; }
+.esf-pessoa-pct { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+.esf-pessoa-pct b { color: var(--text-primary); min-width: 42px; text-align: right; }
+.esf-pessoa-barra { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: var(--stacked-bar-bg); margin-top: 2px; }
+
+.esf-q-badges { display: flex; gap: 6px; }
+.esf-q-badge { font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--chip-bg); color: var(--chip-text); cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.esf-q-badge:hover { border-color: var(--accent); color: var(--text-primary); }
+.esf-q-badge.ativo { background: var(--accent); border-color: var(--accent); color: #fff; }
+.esf-q-badge.ativo:hover { background: var(--accent-hover); color: #fff; }
+.esf-aviso-lacuna { margin-top: 10px; font-size: 12px; color: var(--amber); }
+
+.esf-rodape { margin-top: 18px; padding: 12px 14px; border: 1px dashed var(--border); border-radius: 10px; font-size: 12px; color: var(--text-tertiary); line-height: 1.6; }
+.esf-rodape b { color: var(--text-secondary); }
 </style>
 </head>
 <body>
@@ -1059,6 +1114,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
         <button class="sidebar-item active" data-page="equipes" title="Equipes" onclick="navigate('equipes')">
           <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 14a4 4 0 0 1 4 4v3"/></svg>
           <span class="sidebar-item-label">Equipes</span>
+        </button>
+        <button class="sidebar-item" data-page="esforco" title="Esforço por Equipe" onclick="navigate('esforco')">
+          <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M12 3v9h9a9 9 0 0 0-9-9z" opacity=".45"/></svg>
+          <span class="sidebar-item-label">Esforço</span>
         </button>
         <button class="sidebar-item" data-page="investimentos" title="Investimentos" onclick="navigate('investimentos')">
           <svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
@@ -1146,6 +1205,29 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
       </div>
       <div id="equipe-content">
         <div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Selecione uma equipe ou pesquise membros</div></div>
+      </div>
+    </div>
+
+    <!-- ESFORÇO POR EQUIPE -->
+    <div class="page" id="page-esforco">
+      <div class="page-header-row">
+        <h1 class="page-title">Esforço por Equipe</h1>
+        <span class="page-badge" id="esforco-badge" style="display:none"></span>
+      </div>
+      <div class="timeline-filters" style="flex-wrap:wrap">
+        <div class="multi-select-wrap" id="esforco-equipe-wrap">
+          <button class="filter-select multi-select-btn" id="esforco-equipe-btn" onclick="toggleMultiSelect('esforco-equipe-dropdown')">Todos os times</button>
+          <div class="multi-select-dropdown" id="esforco-equipe-dropdown" style="display:none"></div>
+        </div>
+        <div class="esf-q-badges" id="esforco-trimestres">
+          <button class="esf-q-badge" data-q="1" onclick="toggleEsforcoTrimestre(1)" title="jan–mar">Q1</button>
+          <button class="esf-q-badge" data-q="2" onclick="toggleEsforcoTrimestre(2)" title="abr–jun">Q2</button>
+          <button class="esf-q-badge" data-q="3" onclick="toggleEsforcoTrimestre(3)" title="jul–set">Q3</button>
+          <button class="esf-q-badge" data-q="4" onclick="toggleEsforcoTrimestre(4)" title="out–dez">Q4</button>
+        </div>
+      </div>
+      <div id="esforco-content">
+        <div class="loading"><div class="spinner"></div></div>
       </div>
     </div>
 
@@ -2235,7 +2317,7 @@ function navigate(page) {
   var projPages = ['projetos', 'alocacao', 'tarefas'];
   var projGroup = document.getElementById('sidebar-group-projetos');
   if (projGroup && projPages.indexOf(page) >= 0) { projGroup.classList.add('open'); }
-  var estruturaPages = ['equipes', 'investimentos'];
+  var estruturaPages = ['equipes', 'esforco', 'investimentos'];
   var estruturaGroup = document.getElementById('sidebar-group-estrutura');
   if (estruturaGroup && estruturaPages.indexOf(page) >= 0) { estruturaGroup.classList.add('open'); }
   if (page === 'usuarios') loadUsuarios();
@@ -2246,6 +2328,7 @@ function navigate(page) {
   if (page === 'alocacao') loadAlocacao();
   if (page === 'tarefas') loadTarefas();
   if (page === 'investimentos') { loadImportSyncConfig(); }
+  if (page === 'esforco') loadEsforco();
 }
 
 function toggleSidebarGroup(name) {
@@ -2273,6 +2356,7 @@ async function loadEquipes() {
       (equipes || []).forEach(e => { sel.innerHTML += '<option value="' + e.id + '">' + esc(e.nome) + '</option>'; });
     });
     populateTimelineEquipes(equipes || []);
+    populateEsforcoEquipes(equipes || []);
   } catch (e) { console.error(e); }
 }
 
@@ -2755,6 +2839,239 @@ document.addEventListener('click', function(e) {
     document.querySelectorAll('.multi-select-dropdown').forEach(d => d.style.display = 'none');
   }
 });
+
+// === RELATÓRIO DE ESFORÇO ===
+var esforcoEquipesSelecionadas = [];
+var esforcoTrimestresSelecionados = [];
+
+// Cores das fatias. Mesma chave devolvida pelo backend.
+var ESF_CORES = { melhorias: 'var(--accent)', manutencao: 'var(--red)', outros: 'var(--blue)' };
+
+function populateEsforcoEquipes(equipes) {
+  var dd = document.getElementById('esforco-equipe-dropdown');
+  if (!dd) return;
+  var html = '<label style="border-bottom:1px solid var(--border-subtle);padding-bottom:6px;margin-bottom:2px"><input type="checkbox" value="__all__" onchange="toggleEsforcoTodas(this)"> <b>Todos os times</b></label>';
+  equipes.forEach(function(e) {
+    html += '<label><input type="checkbox" value="' + e.id + '" onchange="onEsforcoEquipeChange()"> ' + esc(e.nome) + '</label>';
+  });
+  dd.innerHTML = html;
+}
+
+function toggleEsforcoTodas(cb) {
+  var dd = document.getElementById('esforco-equipe-dropdown');
+  dd.querySelectorAll('input[type="checkbox"]').forEach(function(c) { if (c.value !== '__all__') c.checked = cb.checked; });
+  onEsforcoEquipeChange();
+}
+
+function onEsforcoEquipeChange() {
+  var dd = document.getElementById('esforco-equipe-dropdown');
+  var checked = Array.from(dd.querySelectorAll('input[type="checkbox"]:checked')).filter(function(c) { return c.value !== '__all__'; }).map(function(c) { return c.value; });
+  var total = dd.querySelectorAll('input[type="checkbox"]').length - 1;
+  // Marcar todos equivale a não filtrar: o backend trata lista vazia como "todos".
+  if (checked.length === total && total > 0) checked = [];
+  esforcoEquipesSelecionadas = checked;
+  document.getElementById('esforco-equipe-btn').textContent = checked.length === 0 ? 'Todos os times' : checked.length + ' time(s)';
+  var allCb = dd.querySelector('input[value="__all__"]');
+  if (allCb) allCb.checked = checked.length === 0;
+  loadEsforco();
+}
+
+function esfHoras(h) { return Math.round(h || 0).toLocaleString('pt-BR') + 'h'; }
+function esfPct(p) { return (p || 0).toFixed(1).replace('.', ',') + '%'; }
+
+function esfIniciais(nome) {
+  var partes = (nome || '?').trim().split(/\s+/);
+  var a = partes[0] ? partes[0][0] : '?';
+  var b = partes.length > 1 ? partes[partes.length - 1][0] : '';
+  return (a + b).toUpperCase();
+}
+
+function esfAvatarFallback(img, iniciais) {
+  var div = document.createElement('div');
+  div.className = 'esf-avatar-iniciais';
+  div.textContent = iniciais;
+  img.replaceWith(div);
+}
+
+// Alterna um trimestre. Desmarcar o último é bloqueado: relatório sem
+// trimestre nenhum não tem o que mostrar.
+function toggleEsforcoTrimestre(q) {
+  var i = esforcoTrimestresSelecionados.indexOf(q);
+  if (i >= 0) {
+    if (esforcoTrimestresSelecionados.length === 1) return;
+    esforcoTrimestresSelecionados.splice(i, 1);
+  } else {
+    esforcoTrimestresSelecionados.push(q);
+    esforcoTrimestresSelecionados.sort();
+  }
+  pintarEsforcoTrimestres();
+  loadEsforco();
+}
+
+function pintarEsforcoTrimestres() {
+  document.querySelectorAll('#esforco-trimestres .esf-q-badge').forEach(function(b) {
+    var ativo = esforcoTrimestresSelecionados.indexOf(parseInt(b.dataset.q, 10)) >= 0;
+    b.classList.toggle('ativo', ativo);
+    // Único marcado não pode ser desmarcado — deixar isso visível evita clique morto.
+    b.disabled = ativo && esforcoTrimestresSelecionados.length === 1;
+    b.style.cursor = b.disabled ? 'default' : 'pointer';
+  });
+}
+
+async function loadEsforco() {
+  if (esforcoTrimestresSelecionados.length === 0) {
+    esforcoTrimestresSelecionados = [Math.floor(new Date().getMonth() / 3) + 1];
+    pintarEsforcoTrimestres();
+  }
+  var ano = new Date().getFullYear();
+  var params = '?ano=' + ano + '&trimestres=' + esforcoTrimestresSelecionados.join(',');
+  if (esforcoEquipesSelecionadas.length > 0) params += '&equipe_ids=' + encodeURIComponent(esforcoEquipesSelecionadas.join(','));
+
+  var alvo = document.getElementById('esforco-content');
+  alvo.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    var d = await api('/relatorios/esforco' + params);
+    renderEsforco(d);
+  } catch (e) {
+    alvo.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + esc(e.message) + '</div></div>';
+  }
+}
+
+// Desenha a pizza em SVG. Cada fatia é um <g> com --dx/--dy apontando para a
+// bissetriz — o CSS usa isso no :hover para descolar a fatia sem redesenhar nada.
+function esfPieSVG(buckets, total) {
+  var CX = 120, CY = 120, R = 100;
+  var f = function(n) { return Math.round(n * 100) / 100; };
+  var svg = '<svg class="esf-pie" viewBox="0 0 240 240" role="img" aria-label="Percentual de horas por tipo de trabalho">';
+  svg += '<defs><radialGradient id="esf-brilho" cx="34%" cy="26%" r="62%">' +
+         '<stop offset="0%" stop-color="#fff" stop-opacity=".30"/>' +
+         '<stop offset="55%" stop-color="#fff" stop-opacity=".06"/>' +
+         '<stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>';
+
+  var ang = -Math.PI / 2; // começa no topo
+  buckets.forEach(function(b) {
+    var frac = total > 0 ? b.horas / total : 0;
+    if (frac <= 0) return;
+    var sweep = frac * Math.PI * 2;
+    var mid = ang + sweep / 2;
+    var cor = ESF_CORES[b.chave] || 'var(--text-tertiary)';
+    var forma;
+    if (frac >= 0.9999) {
+      forma = '<circle cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="' + cor + '"/>';
+    } else {
+      var x1 = CX + R * Math.cos(ang), y1 = CY + R * Math.sin(ang);
+      var x2 = CX + R * Math.cos(ang + sweep), y2 = CY + R * Math.sin(ang + sweep);
+      forma = '<path d="M' + CX + ' ' + CY + ' L' + f(x1) + ' ' + f(y1) +
+              ' A' + R + ' ' + R + ' 0 ' + (sweep > Math.PI ? 1 : 0) + ' 1 ' + f(x2) + ' ' + f(y2) + ' Z" fill="' + cor + '"/>';
+    }
+    var lx = CX + Math.cos(mid) * R * 0.62, ly = CY + Math.sin(mid) * R * 0.62;
+    var rotulo = frac >= 0.04 ? '<text class="esf-slice-pct" x="' + f(lx) + '" y="' + f(ly) + '">' + esfPct(b.percentual) + '</text>' : '';
+    svg += '<g class="esf-slice" style="--dx:' + f(Math.cos(mid) * 9) + 'px;--dy:' + f(Math.sin(mid) * 9) + 'px;--glow:' + cor + '">' +
+           forma + '<title>' + esc(b.rotulo) + ': ' + esfHoras(b.horas) + ' · ' + b.cards + ' cards</title>' + rotulo + '</g>';
+    ang += sweep;
+  });
+
+  svg += '<circle class="esf-pie-brilho" cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="url(#esf-brilho)"/>';
+  return svg + '</svg>';
+}
+
+function esfPessoaHTML(p, destacar) {
+  // esc() não escapa aspas; dentro de atributo isso precisa do &quot;.
+  var avatar = p.avatar_url
+    ? '<img class="esf-avatar" src="' + esc(p.avatar_url).replace(/"/g, '&quot;') + '" alt="" loading="lazy" onerror="esfAvatarFallback(this, \'' + esfIniciais(p.nome) + '\')">'
+    : '<div class="esf-avatar-iniciais">' + esfIniciais(p.nome) + '</div>';
+
+  var pcts = '', barra = '';
+  if (p.horas > 0) {
+    (p.buckets || []).forEach(function(b) {
+      if (b.chave === 'outros' && b.horas <= 0) return;
+      pcts += '<div class="esf-pessoa-pct"><span class="esf-legenda-cor" style="background:' + (ESF_CORES[b.chave] || '') + '"></span><b>' + esfPct(b.percentual) + '</b> ' + esc(b.rotulo) + '</div>';
+      if (b.percentual > 0) barra += '<div style="width:' + b.percentual + '%;background:' + (ESF_CORES[b.chave] || '') + '"></div>';
+    });
+  } else {
+    // Concluiu cards, mas nenhum tinha estimativa — três zeros pareceriam erro.
+    pcts = '<div class="esf-pessoa-pct">Cards concluídos sem estimativa registrada</div>';
+  }
+
+  return '<div class="esf-pessoa' + (destacar ? ' esf-destaque' : '') + '">' +
+    avatar +
+    '<div><div class="esf-pessoa-nome">' + esc(p.nome) + '</div>' +
+      '<div class="esf-pessoa-equipe">' + esc(p.equipe_nome) + ' · ' + p.cards + ' cards</div>' +
+      '<div class="esf-pessoa-barra">' + barra + '</div></div>' +
+    '<div class="esf-pessoa-horas">' + esfHoras(p.horas) + '</div>' +
+    '<div class="esf-pessoa-pcts">' + pcts + '</div>' +
+  '</div>';
+}
+
+function renderEsforco(d) {
+  var alvo = document.getElementById('esforco-content');
+  var badge = document.getElementById('esforco-badge');
+  var qs = d.trimestres || [];
+  var dt = function(iso) { return iso.split('-').reverse().join('/'); };
+  badge.textContent = qs.map(function(q) { return 'Q' + q; }).join(' + ') + ' · ' + dt(d.periodo_inicio) + ' — ' + dt(d.periodo_fim);
+  badge.style.display = '';
+
+  // Seleção com buraco (ex.: Q1 e Q3): o intervalo acima cobre jan–set, mas Q2
+  // não está somado. Dizer isso, senão o rótulo mente.
+  var faltando = [];
+  for (var q = qs[0]; q <= qs[qs.length - 1]; q++) { if (qs.indexOf(q) < 0) faltando.push('Q' + q); }
+  var aviso = faltando.length
+    ? '<div class="esf-aviso-lacuna">⚠ O intervalo mostrado vai de ' + dt(d.periodo_inicio) + ' a ' + dt(d.periodo_fim) +
+      ', mas ' + faltando.join(' e ') + ' não está somado — só os trimestres marcados entram na conta.</div>'
+    : '';
+
+  if (!d.total_cards) {
+    alvo.innerHTML = aviso + '<div class="empty-state"><div class="empty-state-icon">🥧</div>' +
+      '<div class="empty-state-text">Nenhum card concluído neste período para o filtro atual</div></div>';
+    return;
+  }
+
+  var legenda = d.buckets.map(function(b) {
+    return '<div class="esf-legenda-item"><span class="esf-legenda-cor" style="background:' + (ESF_CORES[b.chave] || '') + '"></span>' + esc(b.rotulo) + '</div>';
+  }).join('');
+
+  var maxProj = d.top_projetos.length ? d.top_projetos[0].horas : 0;
+  var projetos = d.top_projetos.length
+    ? d.top_projetos.map(function(p, i) {
+        return '<div class="esf-proj">' +
+          '<div class="esf-proj-pos">' + (i + 1) + '</div>' +
+          '<div class="esf-proj-nome"><span class="esf-proj-chave">' + esc(p.chave) + '</span>' + esc(p.nome) + '</div>' +
+          '<div class="esf-proj-horas">' + esfHoras(p.horas) + '</div>' +
+          '<div class="esf-proj-barra"><div style="width:' + (maxProj > 0 ? (p.horas / maxProj * 100) : 0) + '%"></div></div>' +
+        '</div>';
+      }).join('')
+    : '<div class="esf-pessoa-equipe">Sem projetos no período</div>';
+
+  var numeros = d.buckets.map(function(b) {
+    return '<div class="esf-numero" style="--esf-cor:' + (ESF_CORES[b.chave] || '') + '">' +
+      '<div class="esf-numero-valor">' + esfHoras(b.horas) + '</div>' +
+      '<div class="esf-numero-rotulo">' + esc(b.rotulo) + '</div>' +
+      '<div class="esf-numero-sub">' + esfPct(b.percentual) + ' do total · ' + b.cards + ' cards concluídos</div>' +
+    '</div>';
+  }).join('');
+
+  var destacar = esforcoEquipesSelecionadas.length > 0;
+  var pessoas = d.pessoas.length
+    ? d.pessoas.map(function(p) { return esfPessoaHTML(p, destacar); }).join('')
+    : '<div class="esf-pessoa-equipe">Nenhuma pessoa com cards concluídos no período</div>';
+
+  alvo.innerHTML = aviso +
+    '<div class="esf-topo">' +
+      '<div class="esf-card"><div class="esf-card-titulo">Horas estimadas por tipo de trabalho</div>' +
+        '<div class="esf-pie-wrap">' + esfPieSVG(d.buckets, d.total_horas) + '<div class="esf-legenda">' + legenda + '</div></div>' +
+      '</div>' +
+      '<div class="esf-card"><div class="esf-card-titulo">Top 5 projetos que mais consumiram horas</div>' +
+        '<div class="esf-proj-lista">' + projetos + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="esf-numeros">' + numeros + '</div>' +
+    '<div class="esf-pessoas">' + pessoas + '</div>' +
+    '<div class="esf-rodape">' +
+      'Horas vêm de <b>estimativa original</b> do card (<code>estimativa_tempo</code>), não de apontamento — o apontamento existe em apenas 10% dos cards. ' +
+      'Épicos e Projetos ficam de fora por serem contêineres: a estimativa deles agrega a dos filhos.<br>' +
+      'Fora deste relatório: <b>' + d.fora_do_escopo.cards + ' cards</b> e <b>' + esfHoras(d.fora_do_escopo.horas) + '</b> de responsáveis sem equipe cadastrada.' +
+    '</div>';
+}
 
 function loadTimelineFilters() {
   const sel = document.getElementById('timeline-ano'); const year = new Date().getFullYear(); sel.innerHTML = '';

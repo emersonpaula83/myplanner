@@ -88,6 +88,9 @@ func main() {
 	usuarioHandler := handler.NewUsuarioHandler(usuarioRepo, logger, cfg.Auth.AdminEmail)
 	equipeHandler := handler.NewEquipeHandler(equipeRepo, logger)
 
+	relatorioEsforcoRepo := repository.NewRelatorioEsforcoRepository(pool)
+	relatorioEsforcoHandler := handler.NewRelatorioEsforcoHandler(relatorioEsforcoRepo, logger)
+
 	timelineRepo := repository.NewTimelineRepository(pool)
 
 	var analyzer service.AnalisadorCapacidade
@@ -253,6 +256,8 @@ func main() {
 			r.Delete("/equipes/{id}/membros/{membroId}", equipeHandler.RemoveMembro)
 			r.Post("/equipes/{id}/membros/{membroId}/transferir", equipeHandler.TransferMembro)
 			r.Post("/membros/{id}/merito-promocao", equipeHandler.MeritoPromocao)
+
+			r.Get("/relatorios/esforco", relatorioEsforcoHandler.Get)
 
 			// Investimentos
 			r.Get("/equipes/{id}/investimentos", investHandler.GetDashboard)
