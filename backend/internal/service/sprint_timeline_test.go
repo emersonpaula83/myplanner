@@ -1,10 +1,75 @@
 package service
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/emersonpaula83/myplanner/backend/internal/repository"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
+
+func sprintTimelineItemDeTeste(nome, estado string, inicio, fim time.Time) repository.SprintListItem {
+	return repository.SprintListItem{
+		ID:         uuid.New(),
+		Nome:       nome,
+		Estado:     &estado,
+		DataInicio: &inicio,
+		DataFim:    &fim,
+	}
+}
+
+// Sprint concluída não entra na timeline: o relatório existe para planejar o
+// que vem, e sprint fechada só empurra o que importa para fora da tela.
+func TestGetSprintsTimeline_ExcluiSprintsConcluidas(t *testing.T) {
+	dia := func(mes, d int) time.Time { return time.Date(2026, time.Month(mes), d, 0, 0, 0, 0, time.UTC) }
+	sprints := []repository.SprintListItem{
+		sprintTimelineItemDeTeste("Sprint fechada", "closed", dia(1, 5), dia(1, 19)),
+		sprintTimelineItemDeTeste("Sprint ativa", "active", dia(2, 2), dia(2, 16)),
+		sprintTimelineItemDeTeste("Sprint futura", "future", dia(3, 2), dia(3, 16)),
+	}
+	membro := repository.MembroInfo{ID: uuid.New(), Nome: "Fulano"}
+
+	repo := &mockSprintRepoStore{
+		getEquipeBoardIDFn: func(context.Context, uuid.UUID) (*int, error) { return nil, nil },
+		listSprintsIncludeEmptyFn: func(context.Context, *uuid.UUID, *string, *int) ([]repository.SprintListItem, error) {
+			return sprints, nil
+		},
+		getAllMembrosEquipeFn: func(context.Context, uuid.UUID) ([]repository.MembroInfo, error) {
+			return []repository.MembroInfo{membro}, nil
+		},
+		getFeriadosNoPeriodoFn: func(context.Context, time.Time, time.Time) ([]repository.FeriadoRecord, error) {
+			return nil, nil
+		},
+		getAusenciasNoPeriodoFn: func(context.Context, []uuid.UUID, time.Time, time.Time) ([]repository.AusenciaRecord, error) {
+			return nil, nil
+		},
+		getHorasAlocadasPorSprintFn: func(context.Context, []uuid.UUID, []uuid.UUID) (map[uuid.UUID]float64, error) {
+			return map[uuid.UUID]float64{}, nil
+		},
+	}
+
+	itens, err := NewSprintService(repo, zap.NewNop()).GetSprintsTimeline(context.Background(), uuid.New(), 2026)
+	if err != nil {
+		t.Fatalf("GetSprintsTimeline: %v", err)
+	}
+
+	nomes := make([]string, len(itens))
+	for i, it := range itens {
+		nomes[i] = it.SprintNome
+	}
+	if len(itens) != 2 {
+		t.Fatalf("esperava 2 sprints na timeline, veio %d: %v", len(itens), nomes)
+	}
+	for _, n := range nomes {
+		if n == "Sprint fechada" {
+			t.Errorf("sprint concluída apareceu na timeline: %v", nomes)
+		}
+	}
+}
 
 func TestGetSprintsTimeline_NoDominantProjectHeuristic(t *testing.T) {
 	// Verify the dominant project heuristic was removed from the source code.

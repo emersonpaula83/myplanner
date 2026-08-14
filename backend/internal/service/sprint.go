@@ -833,6 +833,11 @@ func (s *SprintService) GetSprintsTimeline(ctx context.Context, equipeID uuid.UU
 		if sp.DataFim.Before(anoInicio) || sp.DataInicio.After(anoFim) {
 			continue
 		}
+		// Sprint concluída fica de fora: a timeline serve para planejar o que
+		// ainda vem, e o histórico fechado só empurra isso para fora da tela.
+		if sp.Estado != nil && *sp.Estado == "closed" {
+			continue
+		}
 		sprints = append(sprints, sp)
 	}
 
