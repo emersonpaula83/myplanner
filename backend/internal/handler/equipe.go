@@ -520,6 +520,13 @@ func (h *EquipeHandler) GetMembroProdutos(w http.ResponseWriter, r *http.Request
 }
 
 func (h *EquipeHandler) MeritoPromocao(w http.ResponseWriter, r *http.Request) {
+	// Alterar salário sem poder vê-lo seria alterar às cegas — e seria o
+	// caminho aberto para quem monta a requisição na mão.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		respondError(w, http.StatusForbidden, "destrave os valores salariais para alterar salário")
+		return
+	}
+
 	membroID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "id inválido")

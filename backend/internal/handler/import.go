@@ -101,6 +101,13 @@ func semSalario(changes []string) []string {
 }
 
 func (h *ImportHandler) Confirmar(w http.ResponseWriter, r *http.Request) {
+	// Alterar salário sem poder vê-lo seria alterar às cegas — e seria o
+	// caminho aberto para quem monta a requisição na mão.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		respondError(w, http.StatusForbidden, "destrave os valores salariais para alterar salário")
+		return
+	}
+
 	var req domain.ConfirmImportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "corpo inválido")
