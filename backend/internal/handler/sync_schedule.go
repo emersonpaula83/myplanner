@@ -1,24 +1,32 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"regexp"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/emersonpaula83/myplanner/backend/internal/repository"
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 	"go.uber.org/zap"
 )
 
 var timeRegex = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
 
+type SyncScheduleStore interface {
+	GetByFonte(ctx context.Context, fonteID uuid.UUID) (*domain.SyncSchedule, error)
+	Upsert(ctx context.Context, fonteID uuid.UUID, projectKeys []string, horarios []string) (*domain.SyncSchedule, error)
+	Delete(ctx context.Context, fonteID uuid.UUID) error
+	SetAtivo(ctx context.Context, id uuid.UUID, ativo bool) error
+}
+
 type SyncScheduleHandler struct {
-	repo   *repository.SyncScheduleRepository
+	repo   SyncScheduleStore
 	logger *zap.Logger
 }
 
-func NewSyncScheduleHandler(repo *repository.SyncScheduleRepository, logger *zap.Logger) *SyncScheduleHandler {
+func NewSyncScheduleHandler(repo SyncScheduleStore, logger *zap.Logger) *SyncScheduleHandler {
 	return &SyncScheduleHandler{repo: repo, logger: logger}
 }
 

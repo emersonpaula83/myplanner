@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,6 +65,17 @@ func TestAuthJWT_InvalidToken(t *testing.T) {
 
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", rr.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestUserCargoFromContext(t *testing.T) {
+	ctx := context.WithValue(context.Background(), userCargoKey, "admin")
+	if got := UserCargoFromContext(ctx); got != "admin" {
+		t.Errorf("expected 'admin', got %q", got)
+	}
+
+	if got := UserCargoFromContext(context.Background()); got != "" {
+		t.Errorf("expected empty, got %q", got)
 	}
 }
 

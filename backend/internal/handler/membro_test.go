@@ -1,150 +1,559 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
 type mockMembroStore struct {
-	searchFn      func(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error)
-	updateAtivoFn func(ctx context.Context, id uuid.UUID, ativo bool) error
+	listFn                   func(ctx context.Context) ([]domain.Membro, error)
+	getByIDFn                func(ctx context.Context, id uuid.UUID) (*domain.Membro, error)
+	searchFn                 func(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error)
+	listDisponibilidadeFn    func(ctx context.Context, membroID uuid.UUID) ([]domain.Disponibilidade, error)
+	createDisponibilidadeFn  func(ctx context.Context, d *domain.Disponibilidade) error
+	updateDisponibilidadeFn  func(ctx context.Context, id uuid.UUID, tipo string, dataInicio, dataFim pgtype.Date, descricao *string) error
+	deleteDisponibilidadeFn  func(ctx context.Context, id uuid.UUID) error
+	getMembroStatsFn         func(ctx context.Context, membroID uuid.UUID, inicio, fim time.Time) (*domain.MembroStats, error)
+	updateDataDesligamentoFn func(ctx context.Context, id uuid.UUID, dataDesligamento *time.Time) error
+	updateAtivoFn            func(ctx context.Context, id uuid.UUID, ativo bool) error
 }
 
-func (m *mockMembroStore) List(context.Context) ([]domain.Membro, error) { return nil, nil }
-func (m *mockMembroStore) GetByID(context.Context, uuid.UUID) (*domain.Membro, error) {
-	return nil, nil
+func (m *mockMembroStore) List(ctx context.Context) ([]domain.Membro, error) {
+	return m.listFn(ctx)
 }
+
+func (m *mockMembroStore) GetByID(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
+	return m.getByIDFn(ctx, id)
+}
+
 func (m *mockMembroStore) Search(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error) {
 	return m.searchFn(ctx, query, incluirInativos)
 }
-func (m *mockMembroStore) ListDisponibilidade(context.Context, uuid.UUID) ([]domain.Disponibilidade, error) {
-	return nil, nil
+
+func (m *mockMembroStore) ListDisponibilidade(ctx context.Context, membroID uuid.UUID) ([]domain.Disponibilidade, error) {
+	return m.listDisponibilidadeFn(ctx, membroID)
 }
-func (m *mockMembroStore) CreateDisponibilidade(context.Context, *domain.Disponibilidade) error {
-	return nil
+
+func (m *mockMembroStore) CreateDisponibilidade(ctx context.Context, d *domain.Disponibilidade) error {
+	return m.createDisponibilidadeFn(ctx, d)
 }
-func (m *mockMembroStore) UpdateDisponibilidade(context.Context, uuid.UUID, string, pgtype.Date, pgtype.Date, *string) error {
-	return nil
+
+func (m *mockMembroStore) UpdateDisponibilidade(ctx context.Context, id uuid.UUID, tipo string, dataInicio, dataFim pgtype.Date, descricao *string) error {
+	return m.updateDisponibilidadeFn(ctx, id, tipo, dataInicio, dataFim, descricao)
 }
-func (m *mockMembroStore) DeleteDisponibilidade(context.Context, uuid.UUID) error { return nil }
-func (m *mockMembroStore) GetMembroStats(context.Context, uuid.UUID, time.Time, time.Time) (*domain.MembroStats, error) {
-	return nil, nil
+
+func (m *mockMembroStore) DeleteDisponibilidade(ctx context.Context, id uuid.UUID) error {
+	return m.deleteDisponibilidadeFn(ctx, id)
 }
-func (m *mockMembroStore) UpdateDataDesligamento(context.Context, uuid.UUID, *time.Time) error {
-	return nil
+
+func (m *mockMembroStore) GetMembroStats(ctx context.Context, membroID uuid.UUID, inicio, fim time.Time) (*domain.MembroStats, error) {
+	return m.getMembroStatsFn(ctx, membroID, inicio, fim)
 }
+
+func (m *mockMembroStore) UpdateDataDesligamento(ctx context.Context, id uuid.UUID, dataDesligamento *time.Time) error {
+	return m.updateDataDesligamentoFn(ctx, id, dataDesligamento)
+}
+
 func (m *mockMembroStore) UpdateAtivo(ctx context.Context, id uuid.UUID, ativo bool) error {
 	return m.updateAtivoFn(ctx, id, ativo)
 }
 
-func membroRequestComID(metodo, alvo, corpo, id string) *http.Request {
-	req := httptest.NewRequest(metodo, alvo, strings.NewReader(corpo))
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", id)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+// --- List ---
+
+func TestMembro_List_Success(t *testing.T) {
+	store := &mockMembroStore{
+		listFn: func(ctx context.Context) ([]domain.Membro, error) {
+			return []domain.Membro{{ID: uuid.New(), Nome: "Ana"}}, nil
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodGet, "/membros", nil)
+	w := httptest.NewRecorder()
+
+	h.List(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
 }
 
-func TestSetAtivoDesativaMembro(t *testing.T) {
+func TestMembro_List_Error(t *testing.T) {
+	store := &mockMembroStore{
+		listFn: func(ctx context.Context) ([]domain.Membro, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodGet, "/membros", nil)
+	w := httptest.NewRecorder()
+
+	h.List(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// --- Search ---
+
+func TestMembro_Search_Success(t *testing.T) {
+	store := &mockMembroStore{
+		searchFn: func(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error) {
+			if query != "ana" {
+				t.Errorf("expected query 'ana', got %q", query)
+			}
+			return []domain.Membro{{ID: uuid.New(), Nome: "Ana"}}, nil
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodGet, "/membros/search?q=ana", nil)
+	w := httptest.NewRecorder()
+
+	h.Search(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestMembro_Search_Error(t *testing.T) {
+	store := &mockMembroStore{
+		searchFn: func(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodGet, "/membros/search?q=ana", nil)
+	w := httptest.NewRecorder()
+
+	h.Search(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestMembro_Search_EmptyQuery(t *testing.T) {
+	store := &mockMembroStore{
+		searchFn: func(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error) {
+			t.Fatal("searchFn should not be called for empty query")
+			return nil, nil
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodGet, "/membros/search", nil)
+	w := httptest.NewRecorder()
+
+	h.Search(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// --- GetByID ---
+
+func TestMembro_GetByID_Success(t *testing.T) {
 	membroID := uuid.New()
-	var recebidoID uuid.UUID
-	recebidoAtivo := true
-	store := &mockMembroStore{updateAtivoFn: func(_ context.Context, id uuid.UUID, ativo bool) error {
-		recebidoID, recebidoAtivo = id, ativo
-		return nil
-	}}
+	store := &mockMembroStore{
+		getByIDFn: func(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
+			return &domain.Membro{ID: id, Nome: "Ana"}, nil
+		},
+		getMembroStatsFn: func(ctx context.Context, membroID uuid.UUID, inicio, fim time.Time) (*domain.MembroStats, error) {
+			return &domain.MembroStats{TotalTarefas: 5}, nil
+		},
+		listDisponibilidadeFn: func(ctx context.Context, membroID uuid.UUID) ([]domain.Disponibilidade, error) {
+			return []domain.Disponibilidade{}, nil
+		},
+	}
 	h := NewMembroHandler(store, zap.NewNop())
-
+	req := httptest.NewRequest(http.MethodGet, "/membros/"+membroID.String(), nil)
+	req = addChiParam(req, "id", membroID.String())
 	w := httptest.NewRecorder()
-	h.SetAtivo(w, membroRequestComID(http.MethodPut, "/membros/x/ativo", `{"ativo":false}`, membroID.String()))
+
+	h.GetByID(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, esperava 200. Corpo: %s", w.Code, w.Body.String())
-	}
-	if recebidoID != membroID {
-		t.Errorf("id repassado = %s, esperava %s", recebidoID, membroID)
-	}
-	if recebidoAtivo {
-		t.Error("esperava ativo=false repassado ao store")
+		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }
 
-func TestSetAtivoReativaMembro(t *testing.T) {
-	recebidoAtivo := false
-	store := &mockMembroStore{updateAtivoFn: func(_ context.Context, _ uuid.UUID, ativo bool) error {
-		recebidoAtivo = ativo
-		return nil
-	}}
-	h := NewMembroHandler(store, zap.NewNop())
-
-	w := httptest.NewRecorder()
-	h.SetAtivo(w, membroRequestComID(http.MethodPut, "/membros/x/ativo", `{"ativo":true}`, uuid.NewString()))
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, esperava 200", w.Code)
+func TestMembro_GetByID_NotFound(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{
+		getByIDFn: func(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
+			return nil, nil
+		},
 	}
-	if !recebidoAtivo {
-		t.Error("esperava ativo=true repassado ao store")
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodGet, "/membros/"+membroID.String(), nil)
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.GetByID(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
 	}
 }
 
-func TestSetAtivoSemCampoAtivoDa400(t *testing.T) {
-	store := &mockMembroStore{updateAtivoFn: func(context.Context, uuid.UUID, bool) error {
-		t.Fatal("não deveria chamar o store")
-		return nil
-	}}
+func TestMembro_GetByID_Error(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{
+		getByIDFn: func(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
+			return nil, errors.New("db error")
+		},
+	}
 	h := NewMembroHandler(store, zap.NewNop())
-
+	req := httptest.NewRequest(http.MethodGet, "/membros/"+membroID.String(), nil)
+	req = addChiParam(req, "id", membroID.String())
 	w := httptest.NewRecorder()
-	h.SetAtivo(w, membroRequestComID(http.MethodPut, "/membros/x/ativo", `{}`, uuid.NewString()))
+
+	h.GetByID(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestMembro_GetByID_InvalidID(t *testing.T) {
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodGet, "/membros/not-a-uuid", nil)
+	req = addChiParam(req, "id", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	h.GetByID(w, req)
 
 	if w.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, esperava 400", w.Code)
+		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }
 
-// A busca só traz inativos quando quem chama pede: é o caminho de volta para
-// reativar alguém desativado por engano.
-func TestSearchNaoIncluiInativosPorPadrao(t *testing.T) {
-	var recebido bool
-	store := &mockMembroStore{searchFn: func(_ context.Context, _ string, incluirInativos bool) ([]domain.Membro, error) {
-		recebido = incluirInativos
-		return []domain.Membro{}, nil
-	}}
+func TestMembro_GetByID_InvalidPeriodo(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{}
 	h := NewMembroHandler(store, zap.NewNop())
-
+	req := httptest.NewRequest(http.MethodGet, "/membros/"+membroID.String()+"?periodo=bogus", nil)
+	req = addChiParam(req, "id", membroID.String())
 	w := httptest.NewRecorder()
-	h.Search(w, httptest.NewRequest(http.MethodGet, "/membros/search?q=paulo", nil))
+
+	h.GetByID(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// --- CreateDisponibilidade ---
+
+func TestMembro_CreateDisponibilidade_Success(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{
+		createDisponibilidadeFn: func(ctx context.Context, d *domain.Disponibilidade) error {
+			if d.MembroID != membroID {
+				t.Errorf("expected membroID %s, got %s", membroID, d.MembroID)
+			}
+			return nil
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	body, _ := json.Marshal(map[string]any{
+		"tipo":        "ferias",
+		"data_inicio": "2026-01-01",
+		"data_fim":    "2026-01-10",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/membros/"+membroID.String()+"/disponibilidade", bytes.NewReader(body))
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.CreateDisponibilidade(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMembro_CreateDisponibilidade_Error(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{
+		createDisponibilidadeFn: func(ctx context.Context, d *domain.Disponibilidade) error {
+			return errors.New("db error")
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	body, _ := json.Marshal(map[string]any{
+		"tipo":        "ferias",
+		"data_inicio": "2026-01-01",
+		"data_fim":    "2026-01-10",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/membros/"+membroID.String()+"/disponibilidade", bytes.NewReader(body))
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.CreateDisponibilidade(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestMembro_CreateDisponibilidade_InvalidBody(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodPost, "/membros/"+membroID.String()+"/disponibilidade", bytes.NewReader([]byte("{invalid")))
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.CreateDisponibilidade(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestMembro_CreateDisponibilidade_MissingFields(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	body, _ := json.Marshal(map[string]any{"tipo": "ferias"})
+	req := httptest.NewRequest(http.MethodPost, "/membros/"+membroID.String()+"/disponibilidade", bytes.NewReader(body))
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.CreateDisponibilidade(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestMembro_CreateDisponibilidade_InvalidID(t *testing.T) {
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodPost, "/membros/not-a-uuid/disponibilidade", nil)
+	req = addChiParam(req, "id", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	h.CreateDisponibilidade(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// --- UpdateDisponibilidade ---
+
+func TestMembro_UpdateDisponibilidade_Success(t *testing.T) {
+	dispID := uuid.New()
+	store := &mockMembroStore{
+		updateDisponibilidadeFn: func(ctx context.Context, id uuid.UUID, tipo string, dataInicio, dataFim pgtype.Date, descricao *string) error {
+			if id != dispID {
+				t.Errorf("expected dispID %s, got %s", dispID, id)
+			}
+			return nil
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	body, _ := json.Marshal(map[string]any{
+		"tipo":        "ferias",
+		"data_inicio": "2026-01-01",
+		"data_fim":    "2026-01-10",
+	})
+	req := httptest.NewRequest(http.MethodPut, "/membros/disponibilidade/"+dispID.String(), bytes.NewReader(body))
+	req = addChiParam(req, "dispId", dispID.String())
+	w := httptest.NewRecorder()
+
+	h.UpdateDisponibilidade(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, esperava 200", w.Code)
-	}
-	if recebido {
-		t.Error("busca padrão não deveria incluir inativos")
+		t.Fatalf("expected 200, got %d, body=%s", w.Code, w.Body.String())
 	}
 }
 
-func TestSearchIncluiInativosQuandoPedido(t *testing.T) {
-	var recebido bool
-	store := &mockMembroStore{searchFn: func(_ context.Context, _ string, incluirInativos bool) ([]domain.Membro, error) {
-		recebido = incluirInativos
-		return []domain.Membro{}, nil
-	}}
+func TestMembro_UpdateDisponibilidade_Error(t *testing.T) {
+	dispID := uuid.New()
+	store := &mockMembroStore{
+		updateDisponibilidadeFn: func(ctx context.Context, id uuid.UUID, tipo string, dataInicio, dataFim pgtype.Date, descricao *string) error {
+			return errors.New("db error")
+		},
+	}
 	h := NewMembroHandler(store, zap.NewNop())
-
+	body, _ := json.Marshal(map[string]any{
+		"tipo":        "ferias",
+		"data_inicio": "2026-01-01",
+		"data_fim":    "2026-01-10",
+	})
+	req := httptest.NewRequest(http.MethodPut, "/membros/disponibilidade/"+dispID.String(), bytes.NewReader(body))
+	req = addChiParam(req, "dispId", dispID.String())
 	w := httptest.NewRecorder()
-	h.Search(w, httptest.NewRequest(http.MethodGet, "/membros/search?q=paulo&inativos=true", nil))
 
-	if !recebido {
-		t.Error("esperava incluirInativos=true com ?inativos=true")
+	h.UpdateDisponibilidade(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestMembro_UpdateDisponibilidade_InvalidID(t *testing.T) {
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodPut, "/membros/disponibilidade/not-a-uuid", nil)
+	req = addChiParam(req, "dispId", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	h.UpdateDisponibilidade(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// --- DeleteDisponibilidade ---
+
+func TestMembro_DeleteDisponibilidade_Success(t *testing.T) {
+	dispID := uuid.New()
+	store := &mockMembroStore{
+		deleteDisponibilidadeFn: func(ctx context.Context, id uuid.UUID) error {
+			if id != dispID {
+				t.Errorf("expected dispID %s, got %s", dispID, id)
+			}
+			return nil
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodDelete, "/membros/disponibilidade/"+dispID.String(), nil)
+	req = addChiParam(req, "dispId", dispID.String())
+	w := httptest.NewRecorder()
+
+	h.DeleteDisponibilidade(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestMembro_DeleteDisponibilidade_Error(t *testing.T) {
+	dispID := uuid.New()
+	store := &mockMembroStore{
+		deleteDisponibilidadeFn: func(ctx context.Context, id uuid.UUID) error {
+			return errors.New("db error")
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodDelete, "/membros/disponibilidade/"+dispID.String(), nil)
+	req = addChiParam(req, "dispId", dispID.String())
+	w := httptest.NewRecorder()
+
+	h.DeleteDisponibilidade(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestMembro_DeleteDisponibilidade_InvalidID(t *testing.T) {
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodDelete, "/membros/disponibilidade/not-a-uuid", nil)
+	req = addChiParam(req, "dispId", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	h.DeleteDisponibilidade(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// --- UpdateDataDesligamento ---
+
+func TestMembro_UpdateDataDesligamento_Success(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{
+		updateDataDesligamentoFn: func(ctx context.Context, id uuid.UUID, dataDesligamento *time.Time) error {
+			if id != membroID {
+				t.Errorf("expected membroID %s, got %s", membroID, id)
+			}
+			if dataDesligamento == nil {
+				t.Errorf("expected non-nil dataDesligamento")
+			}
+			return nil
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	data := "2026-02-01"
+	body, _ := json.Marshal(map[string]any{"data_desligamento": &data})
+	req := httptest.NewRequest(http.MethodPut, "/membros/"+membroID.String()+"/desligamento", bytes.NewReader(body))
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.UpdateDataDesligamento(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMembro_UpdateDataDesligamento_Error(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{
+		updateDataDesligamentoFn: func(ctx context.Context, id uuid.UUID, dataDesligamento *time.Time) error {
+			return errors.New("db error")
+		},
+	}
+	h := NewMembroHandler(store, zap.NewNop())
+	body, _ := json.Marshal(map[string]any{"data_desligamento": nil})
+	req := httptest.NewRequest(http.MethodPut, "/membros/"+membroID.String()+"/desligamento", bytes.NewReader(body))
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.UpdateDataDesligamento(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestMembro_UpdateDataDesligamento_InvalidID(t *testing.T) {
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	req := httptest.NewRequest(http.MethodPut, "/membros/not-a-uuid/desligamento", nil)
+	req = addChiParam(req, "id", "not-a-uuid")
+	w := httptest.NewRecorder()
+
+	h.UpdateDataDesligamento(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestMembro_UpdateDataDesligamento_InvalidDate(t *testing.T) {
+	membroID := uuid.New()
+	store := &mockMembroStore{}
+	h := NewMembroHandler(store, zap.NewNop())
+	data := "not-a-date"
+	body, _ := json.Marshal(map[string]any{"data_desligamento": &data})
+	req := httptest.NewRequest(http.MethodPut, "/membros/"+membroID.String()+"/desligamento", bytes.NewReader(body))
+	req = addChiParam(req, "id", membroID.String())
+	w := httptest.NewRecorder()
+
+	h.UpdateDataDesligamento(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }

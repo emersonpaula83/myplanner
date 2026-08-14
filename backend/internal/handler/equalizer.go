@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -11,12 +12,17 @@ import (
 	"go.uber.org/zap"
 )
 
+type EqualizerServiceInterface interface {
+	Calculate(ctx context.Context, sprintID uuid.UUID, equipeID *uuid.UUID) (*service.EqualizerResult, error)
+	Apply(ctx context.Context, req service.ApplyRequest) (*service.ApplyResult, error)
+}
+
 type EqualizerHandler struct {
-	svc    *service.EqualizerService
+	svc    EqualizerServiceInterface
 	logger *zap.Logger
 }
 
-func NewEqualizerHandler(svc *service.EqualizerService, logger *zap.Logger) *EqualizerHandler {
+func NewEqualizerHandler(svc EqualizerServiceInterface, logger *zap.Logger) *EqualizerHandler {
 	return &EqualizerHandler{svc: svc, logger: logger}
 }
 

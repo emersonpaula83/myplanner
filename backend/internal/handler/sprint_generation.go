@@ -1,23 +1,31 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/emersonpaula83/myplanner/backend/internal/jira"
 	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"go.uber.org/zap"
 )
 
+type SprintGenServiceInterface interface {
+	GetBoardsForEquipe(ctx context.Context, equipeID uuid.UUID) ([]jira.JiraBoard, error)
+	PreviewSprints(ctx context.Context, equipeID uuid.UUID, boardID int, startDate time.Time) (*service.PreviewResult, error)
+	GenerateSprints(ctx context.Context, equipeID uuid.UUID, boardID int, startDate time.Time) (*service.GenerateResult, error)
+}
+
 type SprintGenerationHandler struct {
-	svc    *service.SprintGenerationService
+	svc    SprintGenServiceInterface
 	logger *zap.Logger
 }
 
-func NewSprintGenerationHandler(svc *service.SprintGenerationService, logger *zap.Logger) *SprintGenerationHandler {
+func NewSprintGenerationHandler(svc SprintGenServiceInterface, logger *zap.Logger) *SprintGenerationHandler {
 	return &SprintGenerationHandler{svc: svc, logger: logger}
 }
 

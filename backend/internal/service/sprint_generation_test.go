@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/emersonpaula83/myplanner/backend/internal/domain"
 	"github.com/emersonpaula83/myplanner/backend/internal/jira"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -148,11 +151,12 @@ func TestPreviewSprints_UsesJiraAPI(t *testing.T) {
 	ed1 := "2026-07-18T21:30:00.000-0300"
 	sd2 := "2026-07-21T11:30:00.000-0300"
 	ed2 := "2026-08-01T21:30:00.000-0300"
-	mockClient := &mockJiraClient{
-		sprints: []jira.JiraSprint{
+	mockClient := newDefaultMockJiraClient()
+	mockClient.getBoardSprintsFn = func(ctx context.Context, boardID int) ([]jira.JiraSprint, error) {
+		return []jira.JiraSprint{
 			{ID: 1, Name: "RM Dev 07/07 - 18/07 [2026]", StartDate: &sd1, EndDate: &ed1},
 			{ID: 2, Name: "RM Dev 21/07 - 01/08 [2026]", StartDate: &sd2, EndDate: &ed2},
-		},
+		}, nil
 	}
 
 	svc := &SprintGenerationService{
@@ -225,11 +229,268 @@ func TestGenerateSprintSlots_AlwaysMonToFri(t *testing.T) {
 	}
 }
 
+func TestNextMonday(t *testing.T) {
+	tests := []struct {
+		name  string
+		input time.Time
+		want  time.Time
+	}{
+		{
+			name:  "already Monday",
+			input: time.Date(2026, 8, 3, 0, 0, 0, 0, saoPaulo),
+			want:  time.Date(2026, 8, 3, 0, 0, 0, 0, saoPaulo),
+		},
+		{
+			name:  "Wednesday to next Monday",
+			input: time.Date(2026, 8, 5, 0, 0, 0, 0, saoPaulo),
+			want:  time.Date(2026, 8, 10, 0, 0, 0, 0, saoPaulo),
+		},
+		{
+			name:  "Sunday to next Monday",
+			input: time.Date(2026, 8, 2, 0, 0, 0, 0, saoPaulo),
+			want:  time.Date(2026, 8, 3, 0, 0, 0, 0, saoPaulo),
+		},
+		{
+			name:  "Saturday to next Monday",
+			input: time.Date(2026, 8, 1, 0, 0, 0, 0, saoPaulo),
+			want:  time.Date(2026, 8, 3, 0, 0, 0, 0, saoPaulo),
+		},
+		{
+			name:  "Friday to next Monday",
+			input: time.Date(2026, 8, 7, 0, 0, 0, 0, saoPaulo),
+			want:  time.Date(2026, 8, 10, 0, 0, 0, 0, saoPaulo),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := nextMonday(tc.input)
+			if !got.Equal(tc.want) {
+				t.Errorf("nextMonday(%v) = %v, want %v", tc.input, got, tc.want)
+			}
+			if got.Weekday() != time.Monday {
+				t.Errorf("nextMonday(%v) weekday = %v, want Monday", tc.input, got.Weekday())
+			}
+		})
+	}
+}
+
+func TestFormatSprintName(t *testing.T) {
+	start := time.Date(2026, 8, 3, 8, 30, 0, 0, saoPaulo)
+	end := time.Date(2026, 8, 14, 18, 30, 0, 0, saoPaulo)
+
+	got := formatSprintName("RM Dev", start, end, 2026)
+	want := "RM Dev 03/08 - 14/08 [2026]"
+	if got != want {
+		t.Errorf("formatSprintName() = %q, want %q", got, want)
+	}
+}
+
+func TestParseJiraDate(t *testing.T) {
+	rfc3339 := "2026-08-03T08:30:00Z"
+	custom := "2026-08-03T08:30:00.000-0300"
+	dateOnly := "2026-08-03"
+	invalid := "not-a-date"
+	empty := ""
+
+	tests := []struct {
+		name    string
+		input   *string
+		wantNil bool
+	}{
+		{"nil input", nil, true},
+		{"empty string", &empty, true},
+		{"RFC3339", &rfc3339, false},
+		{"custom Jira format", &custom, false},
+		{"date only", &dateOnly, false},
+		{"invalid", &invalid, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseJiraDate(tc.input)
+			if tc.wantNil {
+				if got != nil {
+					t.Errorf("parseJiraDate(%v) = %v, want nil", tc.input, got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("parseJiraDate(%v) = nil, want non-nil", tc.input)
+			}
+			if got.Year() != 2026 || got.Month() != time.August || got.Day() != 3 {
+				t.Errorf("parseJiraDate(%v) = %v, want date 2026-08-03", *tc.input, got)
+			}
+		})
+	}
+}
+
+func TestModeString(t *testing.T) {
+	t.Run("single entry", func(t *testing.T) {
+		counts := map[string]int{"a": 1}
+		got := modeString(counts)
+		if got != "a" {
+			t.Errorf("modeString() = %q, want %q", got, "a")
+		}
+	})
+
+	t.Run("multiple entries, one dominant", func(t *testing.T) {
+		counts := map[string]int{"a": 1, "b": 3, "c": 2}
+		got := modeString(counts)
+		if got != "b" {
+			t.Errorf("modeString() = %q, want %q", got, "b")
+		}
+	})
+}
+
+func TestModeInt(t *testing.T) {
+	t.Run("single entry", func(t *testing.T) {
+		counts := map[int]int{12: 1}
+		got := modeInt(counts)
+		if got != 12 {
+			t.Errorf("modeInt() = %d, want %d", got, 12)
+		}
+	})
+
+	t.Run("multiple entries, one dominant", func(t *testing.T) {
+		counts := map[int]int{10: 1, 12: 4, 14: 2}
+		got := modeInt(counts)
+		if got != 12 {
+			t.Errorf("modeInt() = %d, want %d", got, 12)
+		}
+	})
+}
+
+func TestFilterExistingSlots(t *testing.T) {
+	slots := []sprintSlot{
+		{
+			start: time.Date(2026, 8, 3, 8, 30, 0, 0, saoPaulo),
+			end:   time.Date(2026, 8, 14, 18, 30, 0, 0, saoPaulo),
+		},
+		{
+			start: time.Date(2026, 8, 17, 8, 30, 0, 0, saoPaulo),
+			end:   time.Date(2026, 8, 28, 18, 30, 0, 0, saoPaulo),
+		},
+	}
+
+	t.Run("no overlaps", func(t *testing.T) {
+		sd := "2026-01-05T08:30:00.000-0300"
+		ed := "2026-01-16T18:30:00.000-0300"
+		existing := []jira.JiraSprint{
+			{ID: 1, Name: "RM Dev 05/01 - 16/01 [2026]", StartDate: &sd, EndDate: &ed},
+		}
+
+		missing, ignored := filterExistingSlots(slots, existing)
+		if ignored != 0 {
+			t.Errorf("ignored = %d, want 0", ignored)
+		}
+		if len(missing) != len(slots) {
+			t.Errorf("missing = %d slots, want %d (all)", len(missing), len(slots))
+		}
+	})
+
+	t.Run("some overlaps are filtered", func(t *testing.T) {
+		// Overlaps the first slot (2026-08-03 .. 2026-08-14).
+		sd := "2026-08-05T08:30:00.000-0300"
+		ed := "2026-08-16T18:30:00.000-0300"
+		existing := []jira.JiraSprint{
+			{ID: 1, Name: "RM Dev 05/08 - 16/08 [2026]", StartDate: &sd, EndDate: &ed},
+		}
+
+		missing, ignored := filterExistingSlots(slots, existing)
+		if ignored != 1 {
+			t.Errorf("ignored = %d, want 1", ignored)
+		}
+		if len(missing) != 1 {
+			t.Fatalf("missing = %d slots, want 1", len(missing))
+		}
+		if !missing[0].start.Equal(slots[1].start) {
+			t.Errorf("missing slot start = %v, want %v (second slot survives)", missing[0].start, slots[1].start)
+		}
+	})
+
+	t.Run("existing sprint with unparseable dates is ignored, not treated as overlap", func(t *testing.T) {
+		existing := []jira.JiraSprint{
+			{ID: 1, Name: "No dates", StartDate: nil, EndDate: nil},
+		}
+
+		missing, ignored := filterExistingSlots(slots, existing)
+		if ignored != 0 {
+			t.Errorf("ignored = %d, want 0", ignored)
+		}
+		if len(missing) != len(slots) {
+			t.Errorf("missing = %d slots, want %d (all)", len(missing), len(slots))
+		}
+	})
+}
+
+func TestGetFonteDadosForEquipe(t *testing.T) {
+	equipeID := uuid.New()
+
+	t.Run("GetMembrosEquipe error", func(t *testing.T) {
+		svc := &SprintGenerationService{
+			equipeRepo: &mockEquipeStore{
+				getMembrosEquipeFn: func(ctx context.Context, id uuid.UUID) ([]domain.Membro, error) {
+					return nil, errors.New("db error")
+				},
+			},
+			logger: zap.NewNop(),
+		}
+
+		_, err := svc.getFonteDadosForEquipe(context.Background(), equipeID)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("empty members returns error", func(t *testing.T) {
+		svc := &SprintGenerationService{
+			equipeRepo: &mockEquipeStore{
+				getMembrosEquipeFn: func(ctx context.Context, id uuid.UUID) ([]domain.Membro, error) {
+					return []domain.Membro{}, nil
+				},
+			},
+			logger: zap.NewNop(),
+		}
+
+		_, err := svc.getFonteDadosForEquipe(context.Background(), equipeID)
+		if err == nil {
+			t.Fatal("expected error for empty members, got nil")
+		}
+	})
+
+	t.Run("happy path returns first member's FonteDadosID", func(t *testing.T) {
+		wantFonteID := uuid.New()
+		svc := &SprintGenerationService{
+			equipeRepo: &mockEquipeStore{
+				getMembrosEquipeFn: func(ctx context.Context, id uuid.UUID) ([]domain.Membro, error) {
+					if id != equipeID {
+						t.Errorf("equipeID passed = %v, want %v", id, equipeID)
+					}
+					return []domain.Membro{
+						{ID: uuid.New(), FonteDadosID: wantFonteID},
+						{ID: uuid.New(), FonteDadosID: uuid.New()},
+					}, nil
+				},
+			},
+			logger: zap.NewNop(),
+		}
+
+		got, err := svc.getFonteDadosForEquipe(context.Background(), equipeID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != wantFonteID {
+			t.Errorf("getFonteDadosForEquipe() = %v, want %v", got, wantFonteID)
+		}
+	})
+}
+
 func TestDetectSprintPattern_IgnoresNonMondayStarts(t *testing.T) {
 	// Mix of correct (Mon start) and manually edited (non-Mon start) sprints
-	sdMon := "2026-07-07T08:30:00.000-0300" // Monday
-	edFri := "2026-07-18T18:30:00.000-0300" // Friday, 12 days
-	sdSat := "2026-07-11T11:30:00.000-0300" // Saturday (manual edit)
+	sdMon := "2026-07-07T08:30:00.000-0300"  // Monday
+	edFri := "2026-07-18T18:30:00.000-0300"  // Friday, 12 days
+	sdSat := "2026-07-11T11:30:00.000-0300"  // Saturday (manual edit)
 	edFriB := "2026-07-24T21:30:00.000-0300" // Friday, 14 days
 	sprints := []jira.JiraSprint{
 		{ID: 1, Name: "RM Dev 07/07 - 18/07 [2026]", StartDate: &sdMon, EndDate: &edFri},
@@ -241,5 +502,12 @@ func TestDetectSprintPattern_IgnoresNonMondayStarts(t *testing.T) {
 	}
 	if days != 12 {
 		t.Errorf("days = %d, want 12 (should ignore non-Monday sprint)", days)
+	}
+}
+
+func TestNewSprintGenerationService(t *testing.T) {
+	svc := NewSprintGenerationService(nil, nil, nil, nil, nil, nil, nil, 10, zap.NewNop())
+	if svc == nil {
+		t.Fatal("expected non-nil service")
 	}
 }

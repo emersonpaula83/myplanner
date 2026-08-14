@@ -1,22 +1,35 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
+	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
+type AllocationServiceInterface interface {
+	ListProjectAllocations(ctx context.Context, equipeID uuid.UUID, produtoNomes []string, statusFilter string) ([]service.ProjectAllocation, error)
+	GetProjectDetail(ctx context.Context, epicID, equipeID uuid.UUID) (*service.ProjectDetail, error)
+	AllocateTask(ctx context.Context, req service.AllocateTaskRequest) (*service.AllocateTaskResult, error)
+	SyncProjectTasks(ctx context.Context, epicID uuid.UUID) (int, error)
+	GetAvailableSprints(ctx context.Context, equipeID uuid.UUID) ([]service.SprintOption, error)
+	CloseProject(ctx context.Context, epicID uuid.UUID, req service.CloseProjectRequest, encerradoPor string) error
+	ReopenProject(ctx context.Context, epicID uuid.UUID) error
+	GetFilteredProducts(ctx context.Context) ([]repository.ProdutoRow, error)
+}
+
 type AllocationHandler struct {
-	svc    *service.AllocationService
+	svc    AllocationServiceInterface
 	logger *zap.Logger
 }
 
-func NewAllocationHandler(svc *service.AllocationService, logger *zap.Logger) *AllocationHandler {
+func NewAllocationHandler(svc AllocationServiceInterface, logger *zap.Logger) *AllocationHandler {
 	return &AllocationHandler{svc: svc, logger: logger}
 }
 
