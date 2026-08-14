@@ -289,6 +289,7 @@ func main() {
 			r.Put("/membros/{id}/disponibilidade/{dispId}", membroHandler.UpdateDisponibilidade)
 			r.Delete("/membros/{id}/disponibilidade/{dispId}", membroHandler.DeleteDisponibilidade)
 			r.Put("/membros/{id}/desligamento", membroHandler.UpdateDataDesligamento)
+			r.Put("/membros/{id}/ativo", membroHandler.SetAtivo)
 
 			r.Get("/skills", skillHandler.List)
 			r.Post("/skills", skillHandler.Create)

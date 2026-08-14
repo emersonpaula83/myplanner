@@ -2495,6 +2495,9 @@ function renderEquipeEmpty(equipeId) {
       '<input class="equipe-search" id="equipe-member-search" placeholder="Pesquisar membro para adicionar..." oninput="searchMembroToAdd(\'' + equipeId + '\')" />' +
       '<div class="equipe-search-results" id="equipe-search-results"></div>' +
     '</div>' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-tertiary);margin:-8px 0 16px">' +
+      '<input type="checkbox" id="equipe-search-inativos" onchange="searchMembroToAdd(\'' + equipeId + '\')"> incluir membros desativados' +
+    '</label>' +
     '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-text">Nenhum membro associado a esta equipe</div><div class="empty-state-sub">Use a busca acima para adicionar membros</div></div></div>';
 }
 
@@ -2508,7 +2511,9 @@ async function searchMembroToAdd(equipeId) {
   clearTimeout(_searchTimeout);
   _searchTimeout = setTimeout(async () => {
     try {
-      const membros = await api('/membros/search?q=' + encodeURIComponent(q));
+      const inativosEl = document.getElementById('equipe-search-inativos');
+      const incluirInativos = !!(inativosEl && inativosEl.checked);
+      const membros = await api('/membros/search?q=' + encodeURIComponent(q) + (incluirInativos ? '&inativos=true' : ''));
       if (!membros || membros.length === 0) {
         resultsEl.innerHTML = '<div style="padding:14px;font-size:13px;color:var(--text-tertiary);text-align:center">Nenhum membro encontrado</div>';
         resultsEl.classList.add('open');
@@ -2516,6 +2521,15 @@ async function searchMembroToAdd(equipeId) {
       }
       let html = '';
       membros.forEach(m => {
+        // Membro desativado não entra em equipe: o que ele oferece é a volta.
+        if (m.ativo === false) {
+          html += '<div class="search-result-item" style="opacity:.6">' +
+            '<div class="member-avatar" style="background:' + stringColor(m.nome) + ';width:30px;height:30px;font-size:11px">' + initials(m.nome) + '</div>' +
+            '<div style="flex:1"><div class="sr-name">' + esc(m.nome) + ' <span style="font-size:11px;color:var(--text-tertiary)">desativado</span></div>' +
+            '<div class="sr-email">' + esc(m.email || '') + '</div></div>' +
+            '<button class="btn-sm" onclick="event.stopPropagation();reativarMembroBusca(\'' + equipeId + '\',\'' + m.id + '\')">Reativar</button></div>';
+          return;
+        }
         html += '<div class="search-result-item" onclick="addMembroToEquipe(\'' + equipeId + '\',\'' + m.id + '\',this)">' +
           '<div class="member-avatar" style="background:' + stringColor(m.nome) + ';width:30px;height:30px;font-size:11px">' + initials(m.nome) + '</div>' +
           '<div><div class="sr-name">' + esc(m.nome) + '</div><div class="sr-email">' + esc(m.email || '') + '</div></div></div>';
@@ -2524,6 +2538,13 @@ async function searchMembroToAdd(equipeId) {
       resultsEl.classList.add('open');
     } catch (e) { console.error(e); }
   }, 300);
+}
+
+async function reativarMembroBusca(equipeId, membroId) {
+  try {
+    await api('/membros/' + membroId + '/ativo', { method: 'PUT', body: JSON.stringify({ ativo: true }) });
+    searchMembroToAdd(equipeId);
+  } catch (e) { alert('Erro ao reativar: ' + e.message); }
 }
 
 async function addMembroToEquipe(equipeId, membroId, el) {
@@ -2790,6 +2811,9 @@ function renderEquipeResumo(r, equipeId, activePeriod) {
       '<input class="equipe-search" id="equipe-member-search" placeholder="Pesquisar membro para adicionar..." oninput="searchMembroToAdd(\'' + equipeId + '\')" />' +
       '<div class="equipe-search-results" id="equipe-search-results"></div>' +
     '</div>' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-tertiary);margin:-8px 0 16px">' +
+      '<input type="checkbox" id="equipe-search-inativos" onchange="searchMembroToAdd(\'' + equipeId + '\')"> incluir membros desativados' +
+    '</label>' +
     '<div class="equipe-board-row fade-in" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--text-secondary)">' +
       '<label style="white-space:nowrap">Board ID (Jira):</label>' +
       '<input type="number" id="equipe-board-id" value="' + (r.board_id != null ? r.board_id : '') + '" placeholder="Auto-detectado no sync" style="width:120px;padding:4px 8px;border:1px solid var(--border-subtle);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:13px" />' +
@@ -5308,6 +5332,11 @@ async function loadMembroDetail(membroId, periodo) {
         '<input class="form-input date-br" type="text" id="membro-desligamento" placeholder="dd/mm/aaaa" maxlength="10" value="' + (m.data_desligamento ? fmtDateBR(m.data_desligamento.substring(0,10)) : '') + '" style="width:160px;padding:5px 10px;font-size:12px">' +
         '<button class="btn-sm" onclick="salvarDesligamento(\'' + membroId + '\')">Salvar</button>' +
         (m.data_desligamento ? '<button class="btn-sm danger" onclick="limparDesligamento(\'' + membroId + '\')">Limpar</button>' : '') +
+        '<span style="flex:1"></span>' +
+        (m.ativo
+          ? '<button class="btn-sm danger" onclick="setMembroAtivo(\'' + membroId + '\', false)" title="Tira das listas e da busca; tarefas e histórico ficam onde estão">Desativar membro</button>'
+          : '<span style="font-size:12px;color:var(--text-tertiary);margin-right:8px">Membro desativado</span>' +
+            '<button class="btn-sm" onclick="setMembroAtivo(\'' + membroId + '\', true)">Reativar</button>') +
       '</div>' +
       '<div class="cargo-section" id="membro-cargo-section"></div>' +
       '<div class="skill-section" id="membro-skills-section"></div>' +
@@ -6485,6 +6514,16 @@ async function salvarDesligamento(membroId) {
   var dt = parseDateBR(dtRaw);
   try {
     await api('/membros/' + membroId + '/desligamento', { method: 'PUT', body: JSON.stringify({ data_desligamento: dt }) });
+    loadMembroDetail(membroId, currentMembroPeriod);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+// Desativar é para registro duplicado do JIRA: a mesma pessoa com duas contas
+// vira dois membros e o que não está mais em uso precisa sumir das listas.
+// Não mexe em tarefas nem em histórico — só tira de vista.
+async function setMembroAtivo(membroId, ativo) {
+  if (!ativo && !confirm('Desativar este membro?\n\nEle some das listas, da busca e do casamento automático do import de planilha. Tarefas e histórico continuam onde estão.')) return;
+  try {
+    await api('/membros/' + membroId + '/ativo', { method: 'PUT', body: JSON.stringify({ ativo: ativo }) });
     loadMembroDetail(membroId, currentMembroPeriod);
   } catch(e) { alert('Erro: ' + e.message); }
 }

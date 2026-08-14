@@ -188,15 +188,18 @@ func (r *MembroRepository) UpdateTeam(ctx context.Context, id uuid.UUID, team st
 	return nil
 }
 
-func (r *MembroRepository) Search(ctx context.Context, query string) ([]domain.Membro, error) {
+// Search traz só membros ativos por padrão. incluirInativos é o caminho de
+// volta: um membro desativado some de toda listagem, então sem isso não haveria
+// como reativá-lo pela interface.
+func (r *MembroRepository) Search(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error) {
 	pattern := "%" + query + "%"
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, fonte_dados_id, jira_account_id, nome, email, avatar_url, team, ativo, data_desligamento, cargo, salario, data_admissao, banco_horas, matricula, ultimo_aumento, gestor_id, created_at, updated_at
 		FROM membros
-		WHERE ativo = true AND (nome ILIKE $1 OR email ILIKE $1)
-		ORDER BY nome
+		WHERE (ativo = true OR $2) AND (nome ILIKE $1 OR email ILIKE $1)
+		ORDER BY ativo DESC, nome
 		LIMIT 50
-	`, pattern)
+	`, pattern, incluirInativos)
 	if err != nil {
 		return nil, fmt.Errorf("searching membros: %w", err)
 	}
@@ -219,6 +222,26 @@ func (r *MembroRepository) UpdateDataDesligamento(ctx context.Context, id uuid.U
 	`, id, dataDesligamento)
 	if err != nil {
 		return fmt.Errorf("updating data_desligamento: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("membro %s not found", id)
+	}
+	return nil
+}
+
+// UpdateAtivo liga e desliga o membro das listagens. desativado_em guarda que a
+// desativação foi manual — é o que impede o sync de reativar o registro quando
+// a conta reaparece no JIRA.
+func (r *MembroRepository) UpdateAtivo(ctx context.Context, id uuid.UUID, ativo bool) error {
+	result, err := r.pool.Exec(ctx, `
+		UPDATE membros
+		SET ativo = $2,
+		    desativado_em = CASE WHEN $2 THEN NULL ELSE NOW() END,
+		    updated_at = NOW()
+		WHERE id = $1
+	`, id, ativo)
+	if err != nil {
+		return fmt.Errorf("updating ativo: %w", err)
 	}
 	if result.RowsAffected() == 0 {
 		return fmt.Errorf("membro %s not found", id)
