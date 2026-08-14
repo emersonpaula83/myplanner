@@ -2652,7 +2652,10 @@ var meritoState = {};
 
 async function openMeritoModal(membroId) {
   // Registrar mérito mexe em salário: o backend recusa com a cortina fechada.
-  if (!salariosDesbloqueados()) { openSalarioModal(); return; }
+  if (!salariosDesbloqueados()) {
+    openSalarioModal(function() { openMeritoModal(membroId); });
+    return;
+  }
   var cached = equipeMembrosCache[membroId] || {};
   meritoState = { membroId: membroId, nome: cached.nome || '', cargo: cached.cargo || '', salario: null, tipo: 'merito' };
   document.getElementById('merito-modal-title').textContent = 'Mérito/Promoção' + (cached.nome ? ' — ' + cached.nome : '');
@@ -8350,7 +8353,12 @@ function botaoCortina() {
     : '<button class="btn-cadeado" type="button" onclick="openSalarioModal()" title="Destravar valores">🔒</button>';
 }
 
-function openSalarioModal() {
+// aoDestravar é a ação que ficou pendente esperando a senha — quem clicou em ⭐
+// com a cortina fechada espera cair no modal de mérito, não numa tela em branco.
+var salarioAoDestravar = null;
+
+function openSalarioModal(aoDestravar) {
+  salarioAoDestravar = typeof aoDestravar === 'function' ? aoDestravar : null;
   document.getElementById('salario-erro').style.display = 'none';
   document.getElementById('salario-senha').value = '';
   document.getElementById('salario-modal').classList.add('open');
@@ -8358,6 +8366,7 @@ function openSalarioModal() {
 }
 
 function closeSalarioModal() {
+  salarioAoDestravar = null;
   document.getElementById('salario-modal').classList.remove('open');
 }
 
@@ -8384,7 +8393,10 @@ async function confirmarSenhaSalario() {
     }
     token = data.token;
     localStorage.setItem('myplanner_token', token);
+    // Capturar antes de fechar: closeSalarioModal descarta a ação pendente.
+    var pendente = salarioAoDestravar;
     closeSalarioModal();
+    if (pendente) { pendente(); return; }
     recarregarTelaAtual();
   } catch (e) {
     erroEl.textContent = e.message || 'Não foi possível destravar';
@@ -8405,17 +8417,21 @@ async function travarSalarios() {
 }
 
 // Recarrega a tela aberta para os valores virem do servidor com o token novo.
+// O modal de import vem primeiro: ele abre por cima da tela de investimentos,
+// então invCurrentEquipeId costuma estar preenchido e roubaria o recarregamento,
+// deixando a prévia mascarada mesmo depois de destravar.
 function recarregarTelaAtual() {
+  var importAberto = document.getElementById('import-resolve-modal').classList.contains('open');
+  if (importAberto && typeof importMatchResult !== 'undefined' && importMatchResult) {
+    refreshImportPreview();
+    return;
+  }
   if (typeof invCurrentEquipeId !== 'undefined' && invCurrentEquipeId) {
     loadInvestimentos(invCurrentEquipeId);
     return;
   }
   if (typeof currentMembroId !== 'undefined' && currentMembroId) {
     loadMembroDetail(currentMembroId, currentMembroPeriod);
-    return;
-  }
-  if (typeof importMatchResult !== 'undefined' && importMatchResult) {
-    refreshImportPreview();
   }
 }
 
