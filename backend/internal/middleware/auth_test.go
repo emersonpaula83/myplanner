@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/auth"
@@ -83,5 +85,60 @@ func TestAuthJWT_WrongScheme(t *testing.T) {
 
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", rr.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestAuthJWTPropagaClaimDeSalarios(t *testing.T) {
+	ts := auth.NewTokenService("segredo-de-teste", 24)
+	expiraEm := time.Now().Add(2 * time.Hour).Truncate(time.Second)
+	token, err := ts.GenerateTokenComExpiracao(uuid.New(), "user@myplanner.local", "gerente", true, expiraEm)
+	if err != nil {
+		t.Fatalf("gerando token: %v", err)
+	}
+
+	var pode bool
+	var expira time.Time
+	handler := AuthJWT(ts)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pode = PodeVerSalarios(r.Context())
+		expira = TokenExpiraEm(r.Context())
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/qualquer", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	if !pode {
+		t.Error("PodeVerSalarios = false para token destravado")
+	}
+	if !expira.Equal(expiraEm) {
+		t.Errorf("TokenExpiraEm = %v, esperava %v", expira, expiraEm)
+	}
+}
+
+func TestAuthJWTTokenDeLoginNaoDestravaSalarios(t *testing.T) {
+	ts := auth.NewTokenService("segredo-de-teste", 24)
+	token, err := ts.GenerateToken(uuid.New(), "user@myplanner.local", "coordenador")
+	if err != nil {
+		t.Fatalf("gerando token: %v", err)
+	}
+
+	pode := true
+	handler := AuthJWT(ts)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pode = PodeVerSalarios(r.Context())
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/qualquer", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	if pode {
+		t.Error("token de login destravou salários")
+	}
+}
+
+// Contexto sem middleware (ex.: chamada interna) nunca pode liberar valor.
+func TestPodeVerSalariosPadraoEhFalso(t *testing.T) {
+	if PodeVerSalarios(context.Background()) {
+		t.Error("contexto vazio liberou salários")
 	}
 }
