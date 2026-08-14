@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"go.uber.org/zap"
 )
 
@@ -313,6 +314,11 @@ func (h *EquipeHandler) GetMembros(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("failed to get membros equipe", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "failed to get team members")
 		return
+	}
+	if !middleware.PodeVerSalarios(r.Context()) {
+		for i := range membros {
+			membros[i].Salario = nil
+		}
 	}
 	respondJSON(w, http.StatusOK, membros)
 }

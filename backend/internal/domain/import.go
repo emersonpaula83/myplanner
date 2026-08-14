@@ -25,10 +25,12 @@ type ImportParseResult struct {
 	Ignorados []ImportIgnorado
 }
 
+// omitempty em Salario: quando o preview vem travado, o handler zera este
+// ponteiro, e a chave precisa sumir do JSON — não virar "salario":null.
 type ImportDados struct {
 	Cargo         *string    `json:"cargo"`
 	Matricula     *string    `json:"matricula"`
-	Salario       *float64   `json:"salario"`
+	Salario       *float64   `json:"salario,omitempty"`
 	DataAdmissao  *string    `json:"data_admissao"`
 	UltimoAumento *string    `json:"ultimo_aumento"`
 	GestorNome    string     `json:"gestor_nome"`
