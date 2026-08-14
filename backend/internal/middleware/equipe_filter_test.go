@@ -174,3 +174,55 @@ func TestEquipeFilter_AdminFetcherError(t *testing.T) {
 		t.Errorf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
 	}
 }
+
+func TestContextWithEquipeIDs(t *testing.T) {
+	ids := []uuid.UUID{uuid.New(), uuid.New()}
+	ctx := ContextWithEquipeIDs(context.Background(), ids)
+
+	got := EquipeIDsFromContext(ctx)
+	if len(got) != len(ids) {
+		t.Fatalf("expected %d equipe IDs, got %d", len(ids), len(got))
+	}
+	for i, id := range ids {
+		if got[i] != id {
+			t.Errorf("index %d: expected %s, got %s", i, id, got[i])
+		}
+	}
+}
+
+func TestValidateEquipeAccess(t *testing.T) {
+	allowedID := uuid.New()
+	otherID := uuid.New()
+
+	t.Run("no alcada configured", func(t *testing.T) {
+		ctx := context.Background()
+		err := ValidateEquipeAccess(ctx, []uuid.UUID{allowedID})
+		if err == nil {
+			t.Fatal("expected error when no alçada configured")
+		}
+	})
+
+	t.Run("requested ID allowed", func(t *testing.T) {
+		ctx := ContextWithEquipeIDs(context.Background(), []uuid.UUID{allowedID, otherID})
+		err := ValidateEquipeAccess(ctx, []uuid.UUID{allowedID})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("requested ID not allowed", func(t *testing.T) {
+		ctx := ContextWithEquipeIDs(context.Background(), []uuid.UUID{allowedID})
+		err := ValidateEquipeAccess(ctx, []uuid.UUID{otherID})
+		if err == nil {
+			t.Fatal("expected error for disallowed equipe ID")
+		}
+	})
+
+	t.Run("empty requested IDs always pass when alcada exists", func(t *testing.T) {
+		ctx := ContextWithEquipeIDs(context.Background(), []uuid.UUID{allowedID})
+		err := ValidateEquipeAccess(ctx, nil)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}

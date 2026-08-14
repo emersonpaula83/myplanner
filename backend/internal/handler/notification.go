@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -13,13 +14,23 @@ import (
 	"github.com/emersonpaula83/myplanner/backend/internal/service"
 )
 
+type DestinatarioStore interface {
+	ListByEquipe(ctx context.Context, equipeID uuid.UUID) ([]repository.Destinatario, error)
+	Create(ctx context.Context, equipeID uuid.UUID, tipo, valor string, nome *string) (*repository.Destinatario, error)
+	Delete(ctx context.Context, id uuid.UUID, equipeID uuid.UUID) error
+}
+
+type NotifServiceInterface interface {
+	EnviarReview(ctx context.Context, sprintID, equipeID uuid.UUID, destIDs []uuid.UUID) ([]service.EnvioResultado, error)
+}
+
 type NotificationHandler struct {
-	destRepo *repository.DestinatarioRepository
-	notifSvc *service.NotificationService
+	destRepo DestinatarioStore
+	notifSvc NotifServiceInterface
 	logger   *zap.Logger
 }
 
-func NewNotificationHandler(destRepo *repository.DestinatarioRepository, notifSvc *service.NotificationService, logger *zap.Logger) *NotificationHandler {
+func NewNotificationHandler(destRepo DestinatarioStore, notifSvc NotifServiceInterface, logger *zap.Logger) *NotificationHandler {
 	return &NotificationHandler{destRepo: destRepo, notifSvc: notifSvc, logger: logger}
 }
 

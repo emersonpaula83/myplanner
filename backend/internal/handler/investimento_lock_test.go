@@ -15,43 +15,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// São dois stores: InvestimentoStore (dashboard, gastos, alocações) e
-// MembroFinanceiroStore (escrita e históricos). NewInvestimentoHandler recebe
-// os dois, nesta ordem, mais o logger.
-type mockInvestimentoStore struct {
-	getDashboardFn     func(ctx context.Context, equipeID uuid.UUID) (*domain.InvestimentoDashboard, error)
-	getGastosMensaisFn func(ctx context.Context, equipeID uuid.UUID, ano int) (*domain.GastosMensaisResponse, error)
-}
+// Os mocks mockInvestimentoStore e mockMembroFinanceiroStore vivem em
+// investimento_test.go — mesmo pacote, uma definição só.
 
-func (m *mockInvestimentoStore) GetDashboard(ctx context.Context, equipeID uuid.UUID) (*domain.InvestimentoDashboard, error) {
-	return m.getDashboardFn(ctx, equipeID)
-}
-func (m *mockInvestimentoStore) GetGastosMensais(ctx context.Context, equipeID uuid.UUID, ano int) (*domain.GastosMensaisResponse, error) {
-	return m.getGastosMensaisFn(ctx, equipeID, ano)
-}
-func (m *mockInvestimentoStore) GetAlocacoesProjetos(context.Context, uuid.UUID) (*domain.AlocacoesProjetosResponse, error) {
-	return nil, nil
-}
-
-type mockMembroFinanceiroStore struct {
-	updateSalarioFn       func(ctx context.Context, id uuid.UUID, valor float64) error
-	getHistoricoSalarioFn func(ctx context.Context, membroID uuid.UUID) ([]domain.SalarioHistorico, error)
-}
-
-func (m *mockMembroFinanceiroStore) UpdateSalario(ctx context.Context, id uuid.UUID, valor float64) error {
-	return m.updateSalarioFn(ctx, id, valor)
-}
-func (m *mockMembroFinanceiroStore) UpdateBancoHoras(context.Context, uuid.UUID, float64) error {
-	return nil
-}
-func (m *mockMembroFinanceiroStore) UpdateDataAdmissao(context.Context, uuid.UUID, *time.Time) error {
-	return nil
-}
-func (m *mockMembroFinanceiroStore) GetHistoricoSalario(ctx context.Context, membroID uuid.UUID) ([]domain.SalarioHistorico, error) {
-	return m.getHistoricoSalarioFn(ctx, membroID)
-}
-func (m *mockMembroFinanceiroStore) GetHistoricoBancoHoras(context.Context, uuid.UUID) ([]domain.BancoHorasHistorico, error) {
-	return nil, nil
+// comCortinaAberta marca a requisição como podendo ver salários. As rotas que
+// escrevem salário recusam com 403 sem isso, então os testes que exercitam a
+// regra de negócio dessas rotas precisam passar por aqui.
+func comCortinaAberta(r *http.Request) *http.Request {
+	return r.WithContext(mw.ContextDestravadoParaTeste(r.Context()))
 }
 
 func requestComContexto(metodo, alvo, corpo, paramNome, paramValor string, destravado bool) *http.Request {

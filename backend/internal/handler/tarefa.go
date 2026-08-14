@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -11,12 +12,17 @@ import (
 	"go.uber.org/zap"
 )
 
+type TarefaStore interface {
+	ListTarefas(ctx context.Context, f repository.TarefaListFilter) (*repository.TarefaListResult, error)
+	HardDeleteTarefa(ctx context.Context, id uuid.UUID) error
+}
+
 type TarefaHandler struct {
-	repo   *repository.TarefaRepository
+	repo   TarefaStore
 	logger *zap.Logger
 }
 
-func NewTarefaHandler(repo *repository.TarefaRepository, logger *zap.Logger) *TarefaHandler {
+func NewTarefaHandler(repo TarefaStore, logger *zap.Logger) *TarefaHandler {
 	return &TarefaHandler{repo: repo, logger: logger}
 }
 

@@ -69,6 +69,17 @@ func TestAuthJWT_InvalidToken(t *testing.T) {
 	}
 }
 
+func TestUserCargoFromContext(t *testing.T) {
+	ctx := context.WithValue(context.Background(), userCargoKey, "admin")
+	if got := UserCargoFromContext(ctx); got != "admin" {
+		t.Errorf("expected 'admin', got %q", got)
+	}
+
+	if got := UserCargoFromContext(context.Background()); got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
 func TestAuthJWT_WrongScheme(t *testing.T) {
 	ts := auth.NewTokenService("test-secret-key-minimum-32-chars!!", 24)
 	token, _ := ts.GenerateToken(uuid.New(), "test@example.com", "gerente")
