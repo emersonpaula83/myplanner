@@ -11,6 +11,9 @@ import (
 type Claims struct {
 	Email string `json:"email"`
 	Cargo string `json:"cargo"`
+	// Salarios diz se este token pode ver valores salariais. Fica no token
+	// porque o desbloqueio dura o que a sessão durar — sem estado no servidor.
+	Salarios bool `json:"salarios,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -35,6 +38,25 @@ func (ts *TokenService) GenerateToken(userID uuid.UUID, email, cargo string) (st
 			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ts.expiration)),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(ts.secret)
+}
+
+// GenerateTokenComExpiracao emite um token com expiração ditada por quem chama.
+// É o que permite destravar salários sem renovar a sessão: o token novo herda o
+// prazo que restava do antigo.
+func (ts *TokenService) GenerateTokenComExpiracao(userID uuid.UUID, email, cargo string, salarios bool, expiraEm time.Time) (string, error) {
+	claims := Claims{
+		Email:    email,
+		Cargo:    cargo,
+		Salarios: salarios,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID.String(),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(expiraEm),
 		},
 	}
 

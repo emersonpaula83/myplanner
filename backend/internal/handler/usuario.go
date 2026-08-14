@@ -19,6 +19,7 @@ var cargosValidos = map[string]bool{
 	"coordenador":      true,
 	"gerente":          true,
 	"gerente_projetos": true,
+	"diretor":          true,
 }
 
 type UsuarioHandler struct {
@@ -66,7 +67,7 @@ func (h *UsuarioHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !cargosValidos[req.Cargo] {
-		respondError(w, http.StatusBadRequest, "cargo inválido: deve ser coordenador, gerente ou gerente_projetos")
+		respondError(w, http.StatusBadRequest, "cargo inválido: deve ser coordenador, gerente, gerente_projetos ou diretor")
 		return
 	}
 
@@ -136,7 +137,7 @@ func (h *UsuarioHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.Cargo != nil && !cargosValidos[*req.Cargo] {
-		respondError(w, http.StatusBadRequest, "cargo inválido: deve ser coordenador, gerente ou gerente_projetos")
+		respondError(w, http.StatusBadRequest, "cargo inválido: deve ser coordenador, gerente, gerente_projetos ou diretor")
 		return
 	}
 
