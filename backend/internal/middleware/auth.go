@@ -90,6 +90,16 @@ func TokenExpiraEm(ctx context.Context) time.Time {
 	return exp
 }
 
+// ContextParaTeste monta o contexto que AuthJWT injetaria. Existe para os
+// testes de handler não precisarem assinar um JWT só para exercitar a regra.
+func ContextParaTeste(ctx context.Context, userID uuid.UUID, email, cargo string, expiraEm time.Time) context.Context {
+	ctx = context.WithValue(ctx, userIDKey, userID)
+	ctx = context.WithValue(ctx, userEmailKey, email)
+	ctx = context.WithValue(ctx, userCargoKey, cargo)
+	ctx = context.WithValue(ctx, tokenExpKey, expiraEm)
+	return ctx
+}
+
 func respondUnauthorized(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)

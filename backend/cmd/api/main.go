@@ -85,6 +85,7 @@ func main() {
 
 	fonteDadosHandler := handler.NewFonteDadosHandler(fonteDadosRepo, logger)
 	authHandler := handler.NewAuthHandler(usuarioRepo, tokenService, logger)
+	salarioLockHandler := handler.NewSalarioLockHandler(usuarioRepo, tokenService, cfg.Auth.AdminEmail, logger)
 	usuarioHandler := handler.NewUsuarioHandler(usuarioRepo, logger, cfg.Auth.AdminEmail)
 	equipeHandler := handler.NewEquipeHandler(equipeRepo, logger)
 
@@ -256,6 +257,9 @@ func main() {
 			r.Delete("/equipes/{id}/membros/{membroId}", equipeHandler.RemoveMembro)
 			r.Post("/equipes/{id}/membros/{membroId}/transferir", equipeHandler.TransferMembro)
 			r.Post("/membros/{id}/merito-promocao", equipeHandler.MeritoPromocao)
+
+			r.Post("/auth/desbloquear-salarios", salarioLockHandler.Desbloquear)
+			r.Post("/auth/travar-salarios", salarioLockHandler.Travar)
 
 			r.Get("/relatorios/esforco", relatorioEsforcoHandler.Get)
 
