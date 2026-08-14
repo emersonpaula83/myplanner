@@ -48,12 +48,59 @@ type EsforcoBucket struct {
 	Percentual float64 `json:"percentual"`
 }
 
+// EsforcoProjeto é um épico — o que este sistema chama de projeto. Chave é o
+// número do ticket (CLOUD-682) e Nome é o apelido, com o resumo como fallback
+// porque hoje nenhum épico tem apelido preenchido.
 type EsforcoProjeto struct {
 	ProjetoID uuid.UUID `json:"projeto_id"`
 	Chave     string    `json:"chave"`
 	Nome      string    `json:"nome"`
 	Cards     int       `json:"cards"`
 	Horas     float64   `json:"horas"`
+}
+
+// EsforcoCobertura diz sobre quanto do relatório o Top 5 foi calculado. A
+// maioria dos cards não tem épico, então o ranking vive num subconjunto e
+// somar as cinco linhas não fecha com os números grandes.
+type EsforcoCobertura struct {
+	Projetos int     `json:"projetos"`
+	Cards    int     `json:"cards"`
+	Horas    float64 `json:"horas"`
+}
+
+// esforcoTopProdutos limita quantos produtos vão no JSON por balde. Há ~80
+// produtos ativos; o gráfico lateral mostra os maiores e agrega o resto numa
+// linha "Outros", calculada a partir dos totais de EsforcoProdutos.
+const esforcoTopProdutos = 8
+
+// EsforcoProduto é um componente do JIRA (tabela produtos). Um card pode ter
+// vários, e as horas entram cheias em cada um — decisão de produto para
+// responder "quanto esse produto consumiu". Consequência: somar os produtos
+// passa das horas do balde. Ver EsforcoProdutos.HorasSomadas.
+type EsforcoProduto struct {
+	ProdutoID uuid.UUID `json:"produto_id"`
+	Nome      string    `json:"nome"`
+	Cards     int       `json:"cards"`
+	Horas     float64   `json:"horas"`
+}
+
+type EsforcoContagem struct {
+	Cards int     `json:"cards"`
+	Horas float64 `json:"horas"`
+}
+
+// EsforcoProdutos é o recorte por produto de um balde da pizza. Produtos traz
+// só o topo; TotalProdutos e HorasSomadas cobrem todos, para o frontend montar
+// a linha "Outros" e o aviso de dupla contagem sem uma segunda chamada.
+//
+// Não há total de cards aqui de propósito: somar os cards dos produtos conta
+// duas vezes o card que tem dois produtos, e um campo chamado "cards" com esse
+// valor mentiria.
+type EsforcoProdutos struct {
+	Produtos      []EsforcoProduto `json:"produtos"`
+	TotalProdutos int              `json:"total_produtos"`
+	HorasSomadas  float64          `json:"horas_somadas"`
+	SemProduto    EsforcoContagem  `json:"sem_produto"`
 }
 
 type EsforcoPessoa struct {
@@ -76,16 +123,23 @@ type EsforcoForaEscopo struct {
 }
 
 type RelatorioEsforco struct {
-	Ano           int               `json:"ano"`
-	Trimestres    []int             `json:"trimestres"`
-	PeriodoInicio string            `json:"periodo_inicio"`
-	PeriodoFim    string            `json:"periodo_fim"`
-	TotalCards    int               `json:"total_cards"`
-	TotalHoras    float64           `json:"total_horas"`
-	Buckets       []EsforcoBucket   `json:"buckets"`
-	TopProjetos   []EsforcoProjeto  `json:"top_projetos"`
-	Pessoas       []EsforcoPessoa   `json:"pessoas"`
-	ForaDoEscopo  EsforcoForaEscopo `json:"fora_do_escopo"`
+	Ano                  int               `json:"ano"`
+	Trimestres           []int             `json:"trimestres"`
+	PeriodoInicio        string            `json:"periodo_inicio"`
+	PeriodoFim           string            `json:"periodo_fim"`
+	TotalCards           int               `json:"total_cards"`
+	TotalHoras           float64           `json:"total_horas"`
+	Buckets              []EsforcoBucket   `json:"buckets"`
+	TopProjetos          []EsforcoProjeto  `json:"top_projetos"`
+	TopProjetosCobertura EsforcoCobertura  `json:"top_projetos_cobertura"`
+	Pessoas              []EsforcoPessoa   `json:"pessoas"`
+	ForaDoEscopo         EsforcoForaEscopo `json:"fora_do_escopo"`
+
+	// ProdutosPorBucket é o drill-down da pizza: clicar numa fatia abre o
+	// recorte por produto daquele balde. Vem junto do relatório porque são só
+	// três baldes — não vale um endpoint separado e o clique fica instantâneo.
+	// Chave = chave do balde (melhorias|manutencao|outros); os três sempre vêm.
+	ProdutosPorBucket map[string]EsforcoProdutos `json:"produtos_por_bucket"`
 }
 
 // cteBase monta o recorte comum a todas as consultas do relatório:
@@ -100,8 +154,10 @@ type RelatorioEsforco struct {
 //
 // O JOIN com periodo não duplica card: trimestres são intervalos disjuntos,
 // então cada data_resolvido casa com no máximo uma linha de periodo.
+// RECURSIVE está no topo porque topProjetos anexa um CTE recursivo depois de
+// `escopo`; as demais consultas não recursam e não são afetadas pela palavra.
 const cteBase = `
-WITH periodo AS (
+WITH RECURSIVE periodo AS (
     SELECT make_date($1::int, (q - 1) * 3 + 1, 1) AS ini,
            (make_date($1::int, (q - 1) * 3 + 1, 1) + INTERVAL '3 months')::date AS fim
     FROM unnest($2::int[]) AS q
@@ -109,6 +165,7 @@ WITH periodo AS (
 base AS (
     SELECT t.id,
            t.projeto_id,
+           t.parent_id,
            t.responsavel_id,
            COALESCE(t.estimativa_tempo, 0)::numeric / 3600 AS horas,
            CASE
@@ -161,13 +218,16 @@ func (r *RelatorioEsforcoRepository) Get(ctx context.Context, f RelatorioEsforco
 	}
 	aplicarPercentuais(rel.Buckets, rel.TotalHoras)
 
-	if rel.TopProjetos, err = r.topProjetos(ctx, f, equipeIDs); err != nil {
+	if rel.TopProjetos, rel.TopProjetosCobertura, err = r.topProjetos(ctx, f, equipeIDs); err != nil {
 		return nil, err
 	}
 	if rel.Pessoas, err = r.pessoas(ctx, f, equipeIDs); err != nil {
 		return nil, err
 	}
 	if rel.ForaDoEscopo, err = r.foraDoEscopo(ctx, f, equipeIDs); err != nil {
+		return nil, err
+	}
+	if rel.ProdutosPorBucket, err = r.produtosPorBucket(ctx, f, equipeIDs); err != nil {
 		return nil, err
 	}
 
@@ -202,33 +262,70 @@ func (r *RelatorioEsforcoRepository) buckets(ctx context.Context, f RelatorioEsf
 	return montarBuckets(porChave), nil
 }
 
-func (r *RelatorioEsforcoRepository) topProjetos(ctx context.Context, f RelatorioEsforcoFiltro, equipeIDs []uuid.UUID) ([]EsforcoProjeto, error) {
+// topProjetos ranqueia por PROJETO no sentido do sistema: tarefa de tipo
+// 'Épico' (é o que GET /projetos lista, ver repository/timeline.go ListarEpicos).
+// A tabela `projetos` guarda o projeto do JIRA, que espelha a equipe — ranquear
+// por ela devolveria a lista de times.
+//
+// Cada card sobe por parent_id até achar um épico. A subida para no primeiro
+// épico e o teto de 5 níveis protege contra ciclo, então um card gera no
+// máximo uma linha: não há como contar horas em dobro.
+//
+// Devolve também a cobertura do ranking, porque a maioria dos cards não tem
+// pai nenhum e a soma do Top 5 não fecha com o total do relatório.
+func (r *RelatorioEsforcoRepository) topProjetos(ctx context.Context, f RelatorioEsforcoFiltro, equipeIDs []uuid.UUID) ([]EsforcoProjeto, EsforcoCobertura, error) {
+	var cob EsforcoCobertura
+
 	rows, err := r.pool.Query(ctx, cteBase+`
-		SELECT p.id, p.chave, p.nome, count(*), COALESCE(sum(e.horas), 0)::float8 AS horas
-		FROM escopo e
-		JOIN projetos p ON p.id = e.projeto_id
-		GROUP BY p.id, p.chave, p.nome
-		ORDER BY horas DESC
+		, sobe(tarefa_id, horas, atual, nivel) AS (
+			SELECT e.id, e.horas, e.parent_id, 1
+			FROM escopo e
+			WHERE e.parent_id IS NOT NULL
+			UNION ALL
+			SELECT s.tarefa_id, s.horas, t.parent_id, s.nivel + 1
+			FROM sobe s
+			JOIN tarefas t ON t.id = s.atual
+			WHERE t.tipo <> 'Épico'
+			  AND t.parent_id IS NOT NULL
+			  AND s.nivel < 5
+		),
+		agrupado AS (
+			SELECT ep.id,
+			       ep.numero_ticket,
+			       COALESCE(NULLIF(ep.apelido, ''), ep.resumo) AS nome,
+			       count(*) AS cards,
+			       COALESCE(sum(s.horas), 0)::float8 AS horas
+			FROM sobe s
+			JOIN tarefas ep ON ep.id = s.atual AND ep.tipo = 'Épico'
+			GROUP BY ep.id, ep.numero_ticket, COALESCE(NULLIF(ep.apelido, ''), ep.resumo)
+		)
+		SELECT id, numero_ticket, nome, cards, horas,
+		       (SELECT count(*) FROM agrupado),
+		       (SELECT COALESCE(sum(cards), 0) FROM agrupado),
+		       (SELECT COALESCE(sum(horas), 0)::float8 FROM agrupado)
+		FROM agrupado
+		ORDER BY horas DESC, nome
 		LIMIT 5
 	`, f.Ano, f.Trimestres, equipeIDs)
 	if err != nil {
-		return nil, fmt.Errorf("agregando top projetos: %w", err)
+		return nil, cob, fmt.Errorf("agregando top projetos: %w", err)
 	}
 	defer rows.Close()
 
 	projetos := []EsforcoProjeto{}
 	for rows.Next() {
 		var p EsforcoProjeto
-		if err := rows.Scan(&p.ProjetoID, &p.Chave, &p.Nome, &p.Cards, &p.Horas); err != nil {
-			return nil, fmt.Errorf("lendo top projeto: %w", err)
+		if err := rows.Scan(&p.ProjetoID, &p.Chave, &p.Nome, &p.Cards, &p.Horas,
+			&cob.Projetos, &cob.Cards, &cob.Horas); err != nil {
+			return nil, cob, fmt.Errorf("lendo top projeto: %w", err)
 		}
 		projetos = append(projetos, p)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterando top projetos: %w", err)
+		return nil, cob, fmt.Errorf("iterando top projetos: %w", err)
 	}
 
-	return projetos, nil
+	return projetos, cob, nil
 }
 
 func (r *RelatorioEsforcoRepository) pessoas(ctx context.Context, f RelatorioEsforcoFiltro, equipeIDs []uuid.UUID) ([]EsforcoPessoa, error) {
@@ -295,6 +392,98 @@ func (r *RelatorioEsforcoRepository) pessoas(ctx context.Context, f RelatorioEsf
 
 	ordenarPessoasPorHoras(pessoas)
 	return pessoas, nil
+}
+
+// produtoLinha é uma linha crua da consulta de produtos. ProdutoID nulo é o
+// card que não tem nenhum produto vinculado — vem do LEFT JOIN.
+type produtoLinha struct {
+	Bucket    string
+	ProdutoID *uuid.UUID
+	Nome      string
+	Cards     int
+	Horas     float64
+}
+
+// produtosPorBucket quebra cada balde da pizza por produto (JIRA Component).
+//
+// O LEFT JOIN traz numa passada só os cards com produto e os sem: card com N
+// produtos gera N linhas e entra com as horas cheias em cada uma, card sem
+// produto gera uma linha com produto_id nulo. Por isso a soma dos produtos
+// passa das horas do balde (~11% no histórico) — o frontend avisa disso.
+func (r *RelatorioEsforcoRepository) produtosPorBucket(ctx context.Context, f RelatorioEsforcoFiltro, equipeIDs []uuid.UUID) (map[string]EsforcoProdutos, error) {
+	rows, err := r.pool.Query(ctx, cteBase+`
+		SELECT e.bucket, p.id, COALESCE(p.nome, ''),
+		       count(*), COALESCE(sum(e.horas), 0)::float8
+		FROM escopo e
+		LEFT JOIN tarefa_produtos tp ON tp.tarefa_id = e.id
+		LEFT JOIN produtos p ON p.id = tp.produto_id
+		GROUP BY e.bucket, p.id, p.nome
+	`, f.Ano, f.Trimestres, equipeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("agregando esforço por produto: %w", err)
+	}
+	defer rows.Close()
+
+	linhas := []produtoLinha{}
+	for rows.Next() {
+		var l produtoLinha
+		if err := rows.Scan(&l.Bucket, &l.ProdutoID, &l.Nome, &l.Cards, &l.Horas); err != nil {
+			return nil, fmt.Errorf("lendo esforço por produto: %w", err)
+		}
+		linhas = append(linhas, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterando esforço por produto: %w", err)
+	}
+
+	return montarProdutosPorBucket(linhas), nil
+}
+
+// montarProdutosPorBucket agrupa as linhas cruas por balde, ordena por horas e
+// corta no topo, guardando os totais completos. Sempre devolve os três baldes:
+// o frontend indexa pela chave da fatia clicada.
+func montarProdutosPorBucket(linhas []produtoLinha) map[string]EsforcoProdutos {
+	porBucket := map[string]EsforcoProdutos{}
+	for _, def := range bucketsOrdenados {
+		porBucket[def.Chave] = EsforcoProdutos{Produtos: []EsforcoProduto{}}
+	}
+
+	for _, l := range linhas {
+		b, ok := porBucket[l.Bucket]
+		if !ok {
+			continue
+		}
+		if l.ProdutoID == nil {
+			b.SemProduto.Cards += l.Cards
+			b.SemProduto.Horas += l.Horas
+			porBucket[l.Bucket] = b
+			continue
+		}
+		b.Produtos = append(b.Produtos, EsforcoProduto{
+			ProdutoID: *l.ProdutoID,
+			Nome:      l.Nome,
+			Cards:     l.Cards,
+			Horas:     l.Horas,
+		})
+		b.TotalProdutos++
+		b.HorasSomadas += l.Horas
+		porBucket[l.Bucket] = b
+	}
+
+	for chave, b := range porBucket {
+		sort.Slice(b.Produtos, func(i, j int) bool {
+			if b.Produtos[i].Horas != b.Produtos[j].Horas {
+				return b.Produtos[i].Horas > b.Produtos[j].Horas
+			}
+			return b.Produtos[i].Nome < b.Produtos[j].Nome
+		})
+		if len(b.Produtos) > esforcoTopProdutos {
+			b.Produtos = b.Produtos[:esforcoTopProdutos]
+		}
+		porBucket[chave] = b
+	}
+
+	return porBucket
 }
 
 func (r *RelatorioEsforcoRepository) foraDoEscopo(ctx context.Context, f RelatorioEsforcoFiltro, equipeIDs []uuid.UUID) (EsforcoForaEscopo, error) {
