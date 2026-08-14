@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -56,6 +57,14 @@ func (h *InvestimentoHandler) GetDashboard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Travado, o valor não sai do servidor: é o que impede de lê-lo no F12.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		dashboard.Sumario.CustoMensalTotal = nil
+		for i := range dashboard.Membros {
+			dashboard.Membros[i].Salario = nil
+		}
+	}
+
 	respondJSON(w, http.StatusOK, dashboard)
 }
 
@@ -83,10 +92,24 @@ func (h *InvestimentoHandler) GetGastosMensais(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Travado, o valor não sai do servidor: é o que impede de lê-lo no F12.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		for i := range result.Meses {
+			result.Meses[i].CustoTotal = nil
+		}
+	}
+
 	respondJSON(w, http.StatusOK, result)
 }
 
 func (h *InvestimentoHandler) UpdateSalario(w http.ResponseWriter, r *http.Request) {
+	// Alterar salário sem poder vê-lo seria alterar às cegas — e seria o
+	// caminho aberto para quem monta a requisição na mão.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		respondError(w, http.StatusForbidden, "destrave os valores salariais para alterar salário")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "id inválido")
@@ -198,6 +221,11 @@ func (h *InvestimentoHandler) GetHistoricoSalario(w http.ResponseWriter, r *http
 		return
 	}
 	if historico == nil {
+		historico = []domain.SalarioHistorico{}
+	}
+	// Travado, a lista vem vazia: cada item carregaria um salário no corpo da
+	// resposta, e isso é justamente o que o F12 não pode enxergar.
+	if !middleware.PodeVerSalarios(r.Context()) {
 		historico = []domain.SalarioHistorico{}
 	}
 

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"go.uber.org/zap"
 )
 
@@ -35,6 +36,18 @@ func NewMembroHandler(store MembroStore, logger *zap.Logger) *MembroHandler {
 	return &MembroHandler{store: store, logger: logger}
 }
 
+// limparSalarios zera o salário quando a requisição não pode ver dinheiro. O
+// campo é *float64 com omitempty, então nil faz a chave sumir do JSON.
+func limparSalarios(ctx context.Context, membros []domain.Membro) []domain.Membro {
+	if middleware.PodeVerSalarios(ctx) {
+		return membros
+	}
+	for i := range membros {
+		membros[i].Salario = nil
+	}
+	return membros
+}
+
 func (h *MembroHandler) List(w http.ResponseWriter, r *http.Request) {
 	membros, err := h.store.List(r.Context())
 	if err != nil {
@@ -42,7 +55,7 @@ func (h *MembroHandler) List(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "falha ao listar membros")
 		return
 	}
-	respondJSON(w, http.StatusOK, membros)
+	respondJSON(w, http.StatusOK, limparSalarios(r.Context(), membros))
 }
 
 func (h *MembroHandler) Search(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +71,7 @@ func (h *MembroHandler) Search(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "falha ao buscar membros")
 		return
 	}
-	respondJSON(w, http.StatusOK, membros)
+	respondJSON(w, http.StatusOK, limparSalarios(r.Context(), membros))
 }
 
 // SetAtivo tira o membro das listagens, ou o traz de volta. Usado para registro
@@ -129,6 +142,10 @@ func (h *MembroHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Error("failed to list disponibilidade", zap.Error(err))
 		disponibilidade = make([]domain.Disponibilidade, 0)
+	}
+
+	if !middleware.PodeVerSalarios(r.Context()) {
+		membro.Salario = nil
 	}
 
 	respondJSON(w, http.StatusOK, map[string]any{

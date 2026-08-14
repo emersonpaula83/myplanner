@@ -978,6 +978,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 .inv-table .inv-member-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .inv-chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: var(--chip-bg); color: var(--chip-text); margin: 1px 2px; }
 .inv-salary-null { color: var(--text-tertiary); font-style: italic; }
+.valor-travado { letter-spacing: 2px; color: var(--text-tertiary); }
+.btn-cadeado { background: none; border: none; cursor: pointer; font-size: 14px; padding: 0 4px; line-height: 1; }
+.btn-cadeado:hover { opacity: .75; }
 .inv-modal-box { background: var(--modal-bg); border-radius: 14px; padding: 28px; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
 .inv-modal-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
 .inv-modal-avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; color: #fff; overflow: hidden; flex-shrink: 0; }
@@ -1469,6 +1472,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
           <option value="coordenador">Coordenador</option>
           <option value="gerente">Gerente</option>
           <option value="gerente_projetos">Gerente de Projetos</option>
+          <option value="diretor">Diretor</option>
         </select>
       </div>
       <div class="form-group" id="usuario-senha-group"><label class="form-label">Senha</label><input class="form-input" type="password" id="usuario-senha" minlength="8" placeholder="Mínimo 8 caracteres"></div>
@@ -1598,6 +1602,19 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
   <div class="modal" style="max-width:480px">
     <div class="modal-title" id="merito-modal-title">Mérito/Promoção</div>
     <div id="merito-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="salario-modal" onclick="if(event.target===this)closeSalarioModal()">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-title">🔒 Valores salariais</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Digite sua senha para ver os valores nesta sessão.</div>
+    <input class="form-input" type="password" id="salario-senha" placeholder="Sua senha" onkeydown="if(event.key==='Enter')confirmarSenhaSalario()" />
+    <div id="salario-erro" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" type="button" onclick="closeSalarioModal()">Cancelar</button>
+      <button class="btn-add" type="button" id="salario-confirmar" onclick="confirmarSenhaSalario()">Destravar</button>
+    </div>
   </div>
 </div>
 
@@ -2634,6 +2651,11 @@ async function openTransferDropdown(equipeId, membroId, btn) {
 var meritoState = {};
 
 async function openMeritoModal(membroId) {
+  // Registrar mérito mexe em salário: o backend recusa com a cortina fechada.
+  if (!salariosDesbloqueados()) {
+    openSalarioModal(function() { openMeritoModal(membroId); });
+    return;
+  }
   var cached = equipeMembrosCache[membroId] || {};
   meritoState = { membroId: membroId, nome: cached.nome || '', cargo: cached.cargo || '', salario: null, tipo: 'merito' };
   document.getElementById('merito-modal-title').textContent = 'Mérito/Promoção' + (cached.nome ? ' — ' + cached.nome : '');
@@ -2678,7 +2700,7 @@ function renderMeritoForm() {
   html += '<input class="form-input" type="date" id="merito-data" value="' + new Date().toISOString().slice(0,10) + '" /></div>';
 
   html += '<div class="form-group"><label class="form-label">Salário Atual</label>';
-  html += '<input class="form-input" type="text" readonly value="' + (s.salario != null ? formatSalarioBR(s.salario) : 'Não definido') + '" style="opacity:.7" /></div>';
+  html += '<input class="form-input" type="text" readonly value="' + valorSalarioTexto(s.salario, 'Não definido') + '" style="opacity:.7" /></div>';
 
   html += '<div class="form-group"><label class="form-label">Novo Salário</label>';
   html += '<div style="display:flex;gap:8px;align-items:center">';
@@ -2748,8 +2770,8 @@ function renderMeritoConfirmacao(resp) {
     html += '<tr><td style="padding:8px">Cargo</td><td style="padding:8px;text-align:center">' + (a.cargo ? cargoLabelMap(a.cargo) : '—') + '</td><td style="padding:8px;text-align:center;font-weight:600;color:var(--accent)">' + (d.cargo ? cargoLabelMap(d.cargo) : '—') + '</td></tr>';
   }
 
-  var salAntes = a.salario != null ? formatSalarioBR(a.salario) : '—';
-  var salDepois = d.salario != null ? formatSalarioBR(d.salario) : '—';
+  var salAntes = valorSalario(a.salario, '—');
+  var salDepois = valorSalario(d.salario, '—');
   var pctAumento = (a.salario && d.salario) ? ((d.salario - a.salario) / a.salario * 100).toFixed(1) : null;
   html += '<tr><td style="padding:8px">Salário</td><td style="padding:8px;text-align:center">' + salAntes + '</td><td style="padding:8px;text-align:center;font-weight:600;color:var(--accent)">' + salDepois + '</td></tr>';
   if (pctAumento != null) {
@@ -8294,6 +8316,125 @@ function formatSalarioBR(valor) {
   return 'R$ ' + valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0});
 }
 
+// === CORTINA DE SALÁRIOS ===
+// O desbloqueio vive numa claim do token; enquanto travado o backend nem manda
+// o número, então aqui não existe valor escondido para o F12 achar.
+function salariosDesbloqueados() {
+  if (!token) return false;
+  try {
+    var payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.salarios === true;
+  } catch (e) { return false; }
+}
+
+// valorSalario é o único lugar que decide entre mostrar e mascarar. Devolve
+// markup, então só serve onde a string vai crua para innerHTML.
+function valorSalario(v, vazio) {
+  if (!salariosDesbloqueados()) {
+    return '<span class="valor-travado">•••••</span>' +
+      '<button class="btn-cadeado" type="button" onclick="event.stopPropagation();openSalarioModal()" title="Destravar valores">🔒</button>';
+  }
+  if (v == null) return vazio || '—';
+  return formatSalarioBR(v);
+}
+
+// valorSalarioTexto é a mesma decisão sem markup, para os pontos que passam por
+// esc() ou entram dentro de um atributo HTML — ali a tag apareceria como texto
+// ou quebraria o atributo.
+function valorSalarioTexto(v, vazio) {
+  if (!salariosDesbloqueados()) return '•••••';
+  if (v == null) return vazio || '—';
+  return formatSalarioBR(v);
+}
+
+function botaoCortina() {
+  return salariosDesbloqueados()
+    ? '<button class="btn-cadeado" type="button" onclick="travarSalarios()" title="Esconder valores">🔓</button>'
+    : '<button class="btn-cadeado" type="button" onclick="openSalarioModal()" title="Destravar valores">🔒</button>';
+}
+
+// aoDestravar é a ação que ficou pendente esperando a senha — quem clicou em ⭐
+// com a cortina fechada espera cair no modal de mérito, não numa tela em branco.
+var salarioAoDestravar = null;
+
+function openSalarioModal(aoDestravar) {
+  salarioAoDestravar = typeof aoDestravar === 'function' ? aoDestravar : null;
+  document.getElementById('salario-erro').style.display = 'none';
+  document.getElementById('salario-senha').value = '';
+  document.getElementById('salario-modal').classList.add('open');
+  document.getElementById('salario-senha').focus();
+}
+
+function closeSalarioModal() {
+  salarioAoDestravar = null;
+  document.getElementById('salario-modal').classList.remove('open');
+}
+
+async function confirmarSenhaSalario() {
+  var senha = document.getElementById('salario-senha').value;
+  var erroEl = document.getElementById('salario-erro');
+  var btn = document.getElementById('salario-confirmar');
+  if (!senha) { erroEl.textContent = 'Informe sua senha'; erroEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  try {
+    // Sem passar por api(): lá o 401 significa sessão expirada e chama logout().
+    // Aqui 401 é só senha errada — deslogar por um erro de digitação seria cruel.
+    var resp = await fetch(API + '/auth/desbloquear-salarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ senha: senha })
+    });
+    var data = await resp.json().catch(function() { return null; });
+    if (!resp.ok) {
+      erroEl.textContent = (data && data.error) || 'Não foi possível destravar';
+      erroEl.style.display = 'block';
+      return;
+    }
+    token = data.token;
+    localStorage.setItem('myplanner_token', token);
+    // Capturar antes de fechar: closeSalarioModal descarta a ação pendente.
+    var pendente = salarioAoDestravar;
+    closeSalarioModal();
+    if (pendente) { pendente(); return; }
+    recarregarTelaAtual();
+  } catch (e) {
+    erroEl.textContent = e.message || 'Não foi possível destravar';
+    erroEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function travarSalarios() {
+  try {
+    var resp = await api('/auth/travar-salarios', { method: 'POST' });
+    if (!resp || !resp.token) return;
+    token = resp.token;
+    localStorage.setItem('myplanner_token', token);
+    recarregarTelaAtual();
+  } catch (e) { alert('Erro ao travar: ' + e.message); }
+}
+
+// Recarrega a tela aberta para os valores virem do servidor com o token novo.
+// O modal de import vem primeiro: ele abre por cima da tela de investimentos,
+// então invCurrentEquipeId costuma estar preenchido e roubaria o recarregamento,
+// deixando a prévia mascarada mesmo depois de destravar.
+function recarregarTelaAtual() {
+  var importAberto = document.getElementById('import-resolve-modal').classList.contains('open');
+  if (importAberto && typeof importMatchResult !== 'undefined' && importMatchResult) {
+    refreshImportPreview();
+    return;
+  }
+  if (typeof invCurrentEquipeId !== 'undefined' && invCurrentEquipeId) {
+    loadInvestimentos(invCurrentEquipeId);
+    return;
+  }
+  if (typeof currentMembroId !== 'undefined' && currentMembroId) {
+    loadMembroDetail(currentMembroId, currentMembroPeriod);
+  }
+}
+
 function formatTempoCasa(meses) {
   if (!meses || meses <= 0) return '—';
   var anos = Math.floor(meses / 12);
@@ -8347,14 +8488,14 @@ function renderInvestimentosDashboard(data) {
   var html = '<div class="fade-in">';
 
   // Team header
-  html += '<div class="inv-team-header"><h2 class="inv-team-name">' + esc(eq.nome) + '</h2></div>';
+  html += '<div class="inv-team-header" style="display:flex;align-items:center;gap:6px"><h2 class="inv-team-name">' + esc(eq.nome) + '</h2>' + botaoCortina() + '</div>';
 
   // Dashboard grid: stat cards (left) + chart (right)
   html += '<div class="inv-dashboard-grid">';
 
   // Stat cards
   html += '<div class="inv-stat-cards">';
-  html += '<div class="inv-stat-card"><div class="inv-stat-value">' + formatSalarioBR(sum.custo_mensal_total) + '</div><div class="inv-stat-label">Investimento / Mês</div></div>';
+  html += '<div class="inv-stat-card"><div class="inv-stat-value">' + valorSalario(sum.custo_mensal_total) + '</div><div class="inv-stat-label">Investimento / Mês</div></div>';
   html += '<div class="inv-stat-card"><div class="inv-stat-value">' + sum.total_membros + '</div><div class="inv-stat-label">Membros Ativos</div></div>';
   html += '<div class="inv-stat-card"><div class="inv-stat-value">' + formatTempoCasa(sum.tempo_casa_medio_meses) + '</div><div class="inv-stat-label">Tempo Médio de Casa</div></div>';
   html += '<div class="inv-stat-card"><div class="inv-stat-value">' + (sum.banco_horas_total || 0).toLocaleString('pt-BR') + 'h</div><div class="inv-stat-label">Banco de Horas Total</div></div>';
@@ -8515,6 +8656,13 @@ function drawInvLineChart(container, points, opts) {
 async function loadInvGastosMensais(equipeId, custoAtual) {
   var chartEl = document.getElementById('inv-gastos-chart');
   if (!chartEl) return;
+  // Travado o backend não manda custo algum: desenhar a linha só produziria
+  // zeros, que parecem gasto real zero. Melhor a cortina explícita.
+  if (!salariosDesbloqueados()) {
+    chartEl.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:24px">' +
+      '<div class="valor-travado" style="font-size:20px">•••••</div>' + botaoCortina() + '</div>';
+    return;
+  }
   try {
     var data = await api('/equipes/' + equipeId + '/investimentos/gastos-mensais');
     var meses = data.meses || [];
@@ -8537,8 +8685,8 @@ async function loadInvGastosMensais(equipeId, custoAtual) {
     });
 
     drawInvLineChart(chartEl, points, {
-      formatY: function(v) { return 'R$ ' + (v / 1000).toFixed(0) + 'k'; },
-      formatTooltip: function(v) { return formatSalarioBR(v); }
+      formatY: function(v) { return salariosDesbloqueados() ? 'R$ ' + (v / 1000).toFixed(0) + 'k' : '•••'; },
+      formatTooltip: function(v) { return salariosDesbloqueados() ? formatSalarioBR(v) : '•••••'; }
     });
   } catch (err) {
     chartEl.innerHTML = '<div style="color:var(--text-tertiary);text-align:center;padding:20px">Erro ao carregar gráfico</div>';
@@ -8562,9 +8710,9 @@ function renderInvMembrosTable(membros) {
       ? '<img src="' + esc(m.avatar_url) + '" alt="">'
       : initials(m.nome);
 
-    var salarioHtml = m.salario != null
-      ? formatSalarioBR(m.salario)
-      : '<span class="inv-salary-null">Não definido</span>';
+    var salarioHtml = salariosDesbloqueados()
+      ? (m.salario != null ? formatSalarioBR(m.salario) : '<span class="inv-salary-null">Não definido</span>')
+      : valorSalario(m.salario);
 
     var tempoHtml = m.data_admissao ? formatTempoCasa(m.tempo_casa_meses) : '<span class="inv-salary-null">—</span>';
 
@@ -8675,8 +8823,8 @@ async function openInvestimentoModal(membroId) {
       });
       drawInvLineChart(document.getElementById('inv-hist-salario'), salarioPoints, {
         w: 300, h: 150, leftPad: 60,
-        formatY: function(v) { return 'R$ ' + (v / 1000).toFixed(1) + 'k'; },
-        formatTooltip: function(v) { return formatSalarioBR(v); }
+        formatY: function(v) { return salariosDesbloqueados() ? 'R$ ' + (v / 1000).toFixed(1) + 'k' : '•••'; },
+        formatTooltip: function(v) { return salariosDesbloqueados() ? formatSalarioBR(v) : '•••••'; }
       });
     } else {
       document.getElementById('inv-hist-salario').innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:16px;font-size:12px">Sem histórico</div>';
@@ -8982,8 +9130,8 @@ function renderImportPreviewTable() {
     if (critical.length > 0) {
       var details = [];
       if (critical.indexOf('salario') >= 0) {
-        var oldSal = membro.salario != null ? formatSalarioBR(membro.salario) : 'Não definido';
-        var newSal = l.dados.salario != null ? formatSalarioBR(l.dados.salario) : '—';
+        var oldSal = valorSalarioTexto(membro.salario, 'Não definido');
+        var newSal = valorSalarioTexto(l.dados.salario, '—');
         details.push('Salário: ' + oldSal + ' → ' + newSal);
       }
       if (critical.indexOf('cargo') >= 0) {
@@ -9025,9 +9173,9 @@ function renderImportPreviewTable() {
       cargoLabel = cargoSlugLabel(membro.cargo) + ' → ' + cargoLabel;
     }
 
-    var salario = l.dados.salario != null ? formatSalarioBR(l.dados.salario) : '—';
-    if (ch.indexOf('salario') >= 0 && membro && membro.salario != null) {
-      salario = formatSalarioBR(membro.salario) + ' → ' + salario;
+    var salario = valorSalarioTexto(l.dados.salario, '—');
+    if (ch.indexOf('salario') >= 0 && membro && (membro.salario != null || !salariosDesbloqueados())) {
+      salario = valorSalarioTexto(membro.salario, '—') + ' → ' + salario;
     }
 
     var admissao = l.dados.data_admissao ? fmtDateBR(l.dados.data_admissao) : '—';
@@ -9048,6 +9196,10 @@ function renderImportPreviewTable() {
   });
 
   html += '</tbody></table></div>';
+  if (!salariosDesbloqueados()) {
+    html += '<div style="margin-top:12px;background:var(--amber-soft, rgba(245,158,11,0.1));border:1px solid var(--amber, #f59e0b);border-radius:8px;padding:12px 16px;font-size:13px">' +
+      'Destrave os valores para revisar os salários antes de importar. ' + botaoCortina() + '</div>';
+  }
   return html;
 }
 
@@ -9060,6 +9212,7 @@ function isDataAdmissaoFutura(dataAdmissao) {
 }
 
 async function confirmImportSubmit() {
+  if (!salariosDesbloqueados()) { openSalarioModal(); return; }
   var linhas = buildImportResolvedLinhas().filter(function(l) { return !l.ignorar; });
   if (linhas.length === 0) {
     alert('Nenhum membro para importar.');

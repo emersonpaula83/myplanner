@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"go.uber.org/zap"
 )
 
@@ -71,10 +72,42 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if !middleware.PodeVerSalarios(r.Context()) {
+		limparSalariosDoPreview(result)
+	}
 	respondJSON(w, http.StatusOK, result)
 }
 
+// limparSalariosDoPreview tira valor salarial do preview do import, inclusive o
+// marcador "salario" em changes — ele sozinho já denunciaria que o valor mudou.
+func limparSalariosDoPreview(result *domain.ImportMatchResult) {
+	for i := range result.Matched {
+		result.Matched[i].Dados.Salario = nil
+		result.Matched[i].Changes = semSalario(result.Matched[i].Changes)
+	}
+	for i := range result.UnmatchedMembros {
+		result.UnmatchedMembros[i].Dados.Salario = nil
+	}
+}
+
+func semSalario(changes []string) []string {
+	out := make([]string, 0, len(changes))
+	for _, c := range changes {
+		if c != "salario" {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 func (h *ImportHandler) Confirmar(w http.ResponseWriter, r *http.Request) {
+	// Alterar salário sem poder vê-lo seria alterar às cegas — e seria o
+	// caminho aberto para quem monta a requisição na mão.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		respondError(w, http.StatusForbidden, "destrave os valores salariais para alterar salário")
+		return
+	}
+
 	var req domain.ConfirmImportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "corpo inválido")
@@ -109,6 +142,9 @@ func (h *ImportHandler) Sync(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if !middleware.PodeVerSalarios(r.Context()) {
+		limparSalariosDoPreview(result)
 	}
 	respondJSON(w, http.StatusOK, result)
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/auth"
@@ -16,6 +17,8 @@ const (
 	userIDKey    contextKey = "user_id"
 	userEmailKey contextKey = "user_email"
 	userCargoKey contextKey = "user_cargo"
+	salariosKey  contextKey = "salarios_desbloqueados"
+	tokenExpKey  contextKey = "token_expira_em"
 )
 
 func AuthJWT(tokenService *auth.TokenService) func(http.Handler) http.Handler {
@@ -48,6 +51,10 @@ func AuthJWT(tokenService *auth.TokenService) func(http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), userIDKey, userID)
 			ctx = context.WithValue(ctx, userEmailKey, claims.Email)
 			ctx = context.WithValue(ctx, userCargoKey, claims.Cargo)
+			ctx = context.WithValue(ctx, salariosKey, claims.Salarios)
+			if claims.ExpiresAt != nil {
+				ctx = context.WithValue(ctx, tokenExpKey, claims.ExpiresAt.Time)
+			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -67,6 +74,35 @@ func UserEmailFromContext(ctx context.Context) string {
 func UserCargoFromContext(ctx context.Context) string {
 	cargo, _ := ctx.Value(userCargoKey).(string)
 	return cargo
+}
+
+// PodeVerSalarios diz se a requisição pode receber valores salariais. Falso por
+// padrão: contexto sem a claim (chamada interna, token de login) nunca libera.
+func PodeVerSalarios(ctx context.Context) bool {
+	pode, _ := ctx.Value(salariosKey).(bool)
+	return pode
+}
+
+// TokenExpiraEm devolve o fim da sessão atual. Destravar salários reemite o
+// token com esta mesma expiração, para não renovar a sessão de brinde.
+func TokenExpiraEm(ctx context.Context) time.Time {
+	exp, _ := ctx.Value(tokenExpKey).(time.Time)
+	return exp
+}
+
+// ContextParaTeste monta o contexto que AuthJWT injetaria. Existe para os
+// testes de handler não precisarem assinar um JWT só para exercitar a regra.
+func ContextParaTeste(ctx context.Context, userID uuid.UUID, email, cargo string, expiraEm time.Time) context.Context {
+	ctx = context.WithValue(ctx, userIDKey, userID)
+	ctx = context.WithValue(ctx, userEmailKey, email)
+	ctx = context.WithValue(ctx, userCargoKey, cargo)
+	ctx = context.WithValue(ctx, tokenExpKey, expiraEm)
+	return ctx
+}
+
+// ContextDestravadoParaTeste marca o contexto como podendo ver salários.
+func ContextDestravadoParaTeste(ctx context.Context) context.Context {
+	return context.WithValue(ctx, salariosKey, true)
 }
 
 func respondUnauthorized(w http.ResponseWriter, msg string) {

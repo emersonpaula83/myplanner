@@ -8,10 +8,22 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	mw "github.com/emersonpaula83/myplanner/backend/internal/middleware"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
+
+// requestConfirmarDestravada monta o contexto que Confirmar exige desde a
+// Task 6: sem a claim de salários destravada, a rota nem chega a ler o corpo.
+func requestConfirmarDestravada(body string) *http.Request {
+	req := httptest.NewRequest("POST", "/api/v1/investimentos/import/confirmar", bytes.NewBufferString(body))
+	ctx := mw.ContextParaTeste(req.Context(), uuid.New(), "chefe@myplanner.local", "gerente", time.Now().Add(time.Hour))
+	ctx = mw.ContextDestravadoParaTeste(ctx)
+	return req.WithContext(ctx)
+}
 
 type mockImportStore struct {
 	matchPlanilhaFn       func(ctx context.Context, csvContent string) (*domain.ImportMatchResult, error)
@@ -149,7 +161,7 @@ func TestConfirmar_Success(t *testing.T) {
 	h := newTestImportHandler(store)
 
 	body := `{"linhas":[{"linha":1,"membro_id":"11111111-1111-1111-1111-111111111111","ignorar":false,"dados":{"salario":6480.00}}],"tipo":"csv"}`
-	req := httptest.NewRequest("POST", "/api/v1/investimentos/import/confirmar", bytes.NewBufferString(body))
+	req := requestConfirmarDestravada(body)
 	rr := httptest.NewRecorder()
 	h.Confirmar(rr, req)
 
@@ -162,7 +174,7 @@ func TestConfirmar_EmptyLinhas_BadRequest(t *testing.T) {
 	store := &mockImportStore{}
 	h := newTestImportHandler(store)
 
-	req := httptest.NewRequest("POST", "/api/v1/investimentos/import/confirmar", bytes.NewBufferString(`{"linhas":[]}`))
+	req := requestConfirmarDestravada(`{"linhas":[]}`)
 	rr := httptest.NewRecorder()
 	h.Confirmar(rr, req)
 

@@ -16,12 +16,22 @@ import (
 )
 
 type mockMembroStore struct {
+	listFn        func(ctx context.Context) ([]domain.Membro, error)
+	getByIDFn     func(ctx context.Context, id uuid.UUID) (*domain.Membro, error)
 	searchFn      func(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error)
 	updateAtivoFn func(ctx context.Context, id uuid.UUID, ativo bool) error
 }
 
-func (m *mockMembroStore) List(context.Context) ([]domain.Membro, error) { return nil, nil }
-func (m *mockMembroStore) GetByID(context.Context, uuid.UUID) (*domain.Membro, error) {
+func (m *mockMembroStore) List(ctx context.Context) ([]domain.Membro, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx)
+	}
+	return nil, nil
+}
+func (m *mockMembroStore) GetByID(ctx context.Context, id uuid.UUID) (*domain.Membro, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, id)
+	}
 	return nil, nil
 }
 func (m *mockMembroStore) Search(ctx context.Context, query string, incluirInativos bool) ([]domain.Membro, error) {

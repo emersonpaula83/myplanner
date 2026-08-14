@@ -9,7 +9,7 @@ import (
 type SalarioHistorico struct {
 	ID           uuid.UUID `json:"id"`
 	MembroID     uuid.UUID `json:"membro_id"`
-	Valor        float64   `json:"valor"`
+	Valor        *float64  `json:"valor,omitempty"`
 	DataVigencia time.Time `json:"data_vigencia"`
 	CreatedAt    time.Time `json:"created_at"`
 }
@@ -34,27 +34,31 @@ type EquipeInfo struct {
 }
 
 type InvestimentoSumario struct {
-	CustoMensalTotal    float64 `json:"custo_mensal_total"`
-	TotalMembros        int     `json:"total_membros"`
-	TempoCasaMedioMeses int     `json:"tempo_casa_medio_meses"`
-	BancoHorasTotal     float64 `json:"banco_horas_total"`
+	// Ponteiro com omitempty: travado, a chave some do JSON. Zerar seria mentir
+	// — "R$ 0,00" é um valor, e o frontend não distinguiria de custo real zero.
+	CustoMensalTotal    *float64 `json:"custo_mensal_total,omitempty"`
+	TotalMembros        int      `json:"total_membros"`
+	TempoCasaMedioMeses int      `json:"tempo_casa_medio_meses"`
+	BancoHorasTotal     float64  `json:"banco_horas_total"`
 }
 
 type MembroInvestimento struct {
-	ID             uuid.UUID `json:"id"`
-	Nome           string    `json:"nome"`
-	AvatarURL      *string   `json:"avatar_url"`
-	Salario        *float64  `json:"salario"`
-	DataAdmissao   *string   `json:"data_admissao"`
-	TempoCasaMeses int       `json:"tempo_casa_meses"`
-	BancoHoras     *float64  `json:"banco_horas"`
-	Cargo          *string   `json:"cargo"`
-	TopProdutos    []string  `json:"top_produtos"`
+	ID        uuid.UUID `json:"id"`
+	Nome      string    `json:"nome"`
+	AvatarURL *string   `json:"avatar_url"`
+	// omitempty: travado, o handler zera este ponteiro e a chave precisa sumir
+	// do JSON — "salario":null ainda vaza a existência do campo no F12.
+	Salario        *float64 `json:"salario,omitempty"`
+	DataAdmissao   *string  `json:"data_admissao"`
+	TempoCasaMeses int      `json:"tempo_casa_meses"`
+	BancoHoras     *float64 `json:"banco_horas"`
+	Cargo          *string  `json:"cargo"`
+	TopProdutos    []string `json:"top_produtos"`
 }
 
 type GastoMensal struct {
-	Mes        int     `json:"mes"`
-	CustoTotal float64 `json:"custo_total"`
+	Mes        int      `json:"mes"`
+	CustoTotal *float64 `json:"custo_total,omitempty"`
 }
 
 type GastosMensaisResponse struct {

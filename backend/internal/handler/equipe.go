@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"go.uber.org/zap"
 )
 
@@ -314,6 +315,11 @@ func (h *EquipeHandler) GetMembros(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to get team members")
 		return
 	}
+	if !middleware.PodeVerSalarios(r.Context()) {
+		for i := range membros {
+			membros[i].Salario = nil
+		}
+	}
 	respondJSON(w, http.StatusOK, membros)
 }
 
@@ -514,6 +520,13 @@ func (h *EquipeHandler) GetMembroProdutos(w http.ResponseWriter, r *http.Request
 }
 
 func (h *EquipeHandler) MeritoPromocao(w http.ResponseWriter, r *http.Request) {
+	// Alterar salário sem poder vê-lo seria alterar às cegas — e seria o
+	// caminho aberto para quem monta a requisição na mão.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		respondError(w, http.StatusForbidden, "destrave os valores salariais para alterar salário")
+		return
+	}
+
 	membroID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "id inválido")

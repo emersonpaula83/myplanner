@@ -77,3 +77,44 @@ func TestValidateToken_Malformed(t *testing.T) {
 		t.Fatal("ValidateToken should fail with malformed token")
 	}
 }
+
+func TestTokenSemClaimDeSalariosValidaComoFalso(t *testing.T) {
+	ts := NewTokenService("segredo-de-teste", 24)
+	token, err := ts.GenerateToken(uuid.New(), "user@myplanner.local", "coordenador")
+	if err != nil {
+		t.Fatalf("gerando token: %v", err)
+	}
+
+	claims, err := ts.ValidateToken(token)
+	if err != nil {
+		t.Fatalf("validando token: %v", err)
+	}
+	// omitempty não pode virar true por acidente: login nunca destrava salário.
+	if claims.Salarios {
+		t.Error("token de login veio com salarios=true")
+	}
+}
+
+func TestGenerateTokenComExpiracaoPreservaClaimEExpiracao(t *testing.T) {
+	ts := NewTokenService("segredo-de-teste", 24)
+	expiraEm := time.Now().Add(37 * time.Minute).Truncate(time.Second)
+
+	token, err := ts.GenerateTokenComExpiracao(uuid.New(), "user@myplanner.local", "gerente", true, expiraEm)
+	if err != nil {
+		t.Fatalf("gerando token: %v", err)
+	}
+
+	claims, err := ts.ValidateToken(token)
+	if err != nil {
+		t.Fatalf("validando token: %v", err)
+	}
+	if !claims.Salarios {
+		t.Error("esperava salarios=true no token destravado")
+	}
+	if !claims.ExpiresAt.Time.Equal(expiraEm) {
+		t.Errorf("expiração = %v, esperava %v — destravar não pode estender a sessão", claims.ExpiresAt.Time, expiraEm)
+	}
+	if claims.Cargo != "gerente" || claims.Email != "user@myplanner.local" {
+		t.Errorf("claims perderam identidade: %+v", claims)
+	}
+}

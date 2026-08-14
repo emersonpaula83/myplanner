@@ -77,7 +77,7 @@ func TestUsuarioHandler_Create_InvalidCargo(t *testing.T) {
 	store := &mockUsuarioStore{}
 	h := NewUsuarioHandler(store, zap.NewNop(), "admin@myplanner.local")
 
-	body := `{"nome_completo":"João","apelido":"joao","email":"joao@totvs.com","senha":"MinhaS3nh@","cargo":"diretor"}`
+	body := `{"nome_completo":"João","apelido":"joao","email":"joao@totvs.com","senha":"MinhaS3nh@","cargo":"presidente"}`
 	req := httptest.NewRequest("POST", "/api/v1/usuarios", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
 
