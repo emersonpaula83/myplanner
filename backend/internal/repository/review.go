@@ -347,6 +347,29 @@ func (r *ReviewRepository) GetSprintSnapshot(ctx context.Context, sprintID uuid.
 	if err != nil {
 		return nil, err
 	}
+
+	var v2 SprintSnapshotV2
+	if err := json.Unmarshal(raw, &v2); err == nil && v2.Version >= 2 {
+		tasks := make([]ReviewTaskRow, len(v2.Tarefas))
+		for i, t := range v2.Tarefas {
+			tasks[i] = ReviewTaskRow{
+				ID:              t.ID,
+				NumeroTicket:    t.NumeroTicket,
+				Resumo:          t.Resumo,
+				Tipo:            t.Tipo,
+				TipoDemanda:     t.TipoDemanda,
+				Status:          t.Status,
+				ParentID:        t.ParentID,
+				RelatorNome:     t.RelatorNome,
+				NaoPlanejada:    t.NaoPlanejada,
+				EstimativaTempo: t.EstimativaTempo,
+				Produtos:        t.Produtos,
+				ProdutoIDs:      t.ProdutoIDs,
+			}
+		}
+		return tasks, nil
+	}
+
 	var tasks []ReviewTaskRow
 	if err := json.Unmarshal(raw, &tasks); err != nil {
 		return nil, fmt.Errorf("unmarshaling snapshot: %w", err)

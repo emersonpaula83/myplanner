@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -126,7 +127,83 @@ func (r *SyncRepository) UpsertSprint(ctx context.Context, fonteDadosID uuid.UUI
 	return id, nil
 }
 
+type SnapshotTask struct {
+	ID              uuid.UUID   `json:"id"`
+	NumeroTicket    string      `json:"numero_ticket"`
+	Resumo          string      `json:"resumo"`
+	Tipo            string      `json:"tipo"`
+	TipoDemanda     string      `json:"tipo_demanda"`
+	Status          string      `json:"status"`
+	ParentID        *uuid.UUID  `json:"parent_id"`
+	RelatorNome     *string     `json:"relator_nome"`
+	NaoPlanejada    bool        `json:"nao_planejada"`
+	EstimativaTempo *int        `json:"estimativa_tempo"`
+	Produtos        []string    `json:"produtos"`
+	ProdutoIDs      []uuid.UUID `json:"produto_ids"`
+}
+
+type SnapshotMembroCapacity struct {
+	MembroID        uuid.UUID `json:"membro_id"`
+	Nome            string    `json:"nome"`
+	HorasAlocadas   float64   `json:"horas_alocadas"`
+	HorasExecutadas float64   `json:"horas_executadas"`
+	HorasDisponiveis float64  `json:"horas_disponiveis"`
+}
+
+type SnapshotCapacity struct {
+	DiasUteis              int                      `json:"dias_uteis"`
+	HorasTotalSprint       float64                  `json:"horas_total_sprint"`
+	HorasAlocadas          float64                  `json:"horas_alocadas"`
+	HorasExecutadas        float64                  `json:"horas_executadas"`
+	HorasPendentesExecucao float64                  `json:"horas_pendentes_execucao"`
+	TotalMembros           int                      `json:"total_membros"`
+	Membros                []SnapshotMembroCapacity  `json:"membros"`
+}
+
+type SnapshotBurndownPoint struct {
+	Data  string  `json:"data"`
+	Horas float64 `json:"horas"`
+}
+
+type SnapshotBurndown struct {
+	HorasTotal     float64                 `json:"horas_total"`
+	LinhaIdeal     []SnapshotBurndownPoint `json:"linha_ideal"`
+	LinhaReal      []SnapshotBurndownPoint `json:"linha_real"`
+	LinhaUnplanned []SnapshotBurndownPoint `json:"linha_nao_planejadas"`
+}
+
+type SprintSnapshotV2 struct {
+	Version    int                `json:"version"`
+	Tarefas    []SnapshotTask     `json:"tarefas"`
+	Capacidade *SnapshotCapacity  `json:"capacidade,omitempty"`
+	Burndown   *SnapshotBurndown  `json:"burndown,omitempty"`
+}
+
 func (r *SyncRepository) captureSprintSnapshot(ctx context.Context, sprintID uuid.UUID) {
+	tasks := r.captureSnapshotTasks(ctx, sprintID)
+	capacity := r.captureSnapshotCapacity(ctx, sprintID)
+	burndown := r.captureSnapshotBurndown(ctx, sprintID)
+
+	snapshot := SprintSnapshotV2{
+		Version:    2,
+		Tarefas:    tasks,
+		Capacidade: capacity,
+		Burndown:   burndown,
+	}
+
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return
+	}
+
+	r.pool.Exec(ctx, `
+		INSERT INTO sprint_review_snapshots (sprint_id, snapshot_json)
+		VALUES ($1, $2)
+		ON CONFLICT (sprint_id) DO NOTHING
+	`, sprintID, data)
+}
+
+func (r *SyncRepository) captureSnapshotTasks(ctx context.Context, sprintID uuid.UUID) []SnapshotTask {
 	rows, err := r.pool.Query(ctx, `
 		SELECT t.id, t.numero_ticket, t.resumo, t.tipo,
 		       COALESCE(t.tipo_demanda,
@@ -157,48 +234,269 @@ func (r *SyncRepository) captureSprintSnapshot(ctx context.Context, sprintID uui
 		ORDER BY t.numero_ticket
 	`, sprintID)
 	if err != nil {
-		return
+		return []SnapshotTask{}
 	}
 	defer rows.Close()
 
-	type snapshotTask struct {
-		ID              uuid.UUID   `json:"id"`
-		NumeroTicket    string      `json:"numero_ticket"`
-		Resumo          string      `json:"resumo"`
-		Tipo            string      `json:"tipo"`
-		TipoDemanda     string      `json:"tipo_demanda"`
-		Status          string      `json:"status"`
-		ParentID        *uuid.UUID  `json:"parent_id"`
-		RelatorNome     *string     `json:"relator_nome"`
-		NaoPlanejada    bool        `json:"nao_planejada"`
-		EstimativaTempo *int        `json:"estimativa_tempo"`
-		Produtos        []string    `json:"produtos"`
-		ProdutoIDs      []uuid.UUID `json:"produto_ids"`
-	}
-
-	tasks := make([]snapshotTask, 0)
+	tasks := make([]SnapshotTask, 0)
 	for rows.Next() {
-		var t snapshotTask
+		var t SnapshotTask
 		if err := rows.Scan(
 			&t.ID, &t.NumeroTicket, &t.Resumo, &t.Tipo, &t.TipoDemanda,
 			&t.Status, &t.ParentID, &t.RelatorNome, &t.NaoPlanejada,
 			&t.EstimativaTempo, &t.Produtos, &t.ProdutoIDs,
 		); err != nil {
-			return
+			return tasks
 		}
 		tasks = append(tasks, t)
 	}
+	return tasks
+}
 
-	data, err := json.Marshal(tasks)
-	if err != nil {
-		return
+func (r *SyncRepository) captureSnapshotCapacity(ctx context.Context, sprintID uuid.UUID) *SnapshotCapacity {
+	var dataInicio, dataFim *time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT data_inicio, data_fim FROM sprints WHERE id = $1
+	`, sprintID).Scan(&dataInicio, &dataFim)
+	if err != nil || dataInicio == nil || dataFim == nil {
+		return nil
 	}
 
-	r.pool.Exec(ctx, `
-		INSERT INTO sprint_review_snapshots (sprint_id, snapshot_json)
-		VALUES ($1, $2)
-		ON CONFLICT (sprint_id) DO NOTHING
-	`, sprintID, data)
+	var feriadoCount int
+	r.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM feriados
+		WHERE data BETWEEN $1 AND $2
+		  AND EXTRACT(DOW FROM data) NOT IN (0, 6)
+	`, dataInicio, dataFim).Scan(&feriadoCount)
+
+	diasUteis := 0
+	for d := *dataInicio; !d.After(*dataFim); d = d.AddDate(0, 0, 1) {
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+			diasUteis++
+		}
+	}
+	diasUteis -= feriadoCount
+
+	statusExecutado := map[string]bool{
+		"Code Review": true, "Teste": true, "Validação do Solicitante": true, "Deploy": true, "Concluído": true,
+	}
+	statusPendente := map[string]bool{
+		"Backlog": true, "Desenvolvimento": true, "Em Desenvolvimento": true, "A Fazer": true,
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT COALESCE(t.responsavel_id, '00000000-0000-0000-0000-000000000000'),
+		       COALESCE(m.nome, 'Sem responsável'),
+		       t.status,
+		       COALESCE(t.estimativa_tempo, 0)
+		FROM tarefas t
+		LEFT JOIN membros m ON m.id = t.responsavel_id
+		WHERE t.sprint_id = $1
+		  AND t.status NOT IN ('Cancelado', 'Rejeitada')
+	`, sprintID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	type membroAcc struct {
+		nome      string
+		alocadas  float64
+		executadas float64
+	}
+	membrosMap := make(map[uuid.UUID]*membroAcc)
+
+	var totalAlocadas, totalExecutadas, totalPendentes float64
+
+	for rows.Next() {
+		var membroID uuid.UUID
+		var nome, status string
+		var segundos int
+		if err := rows.Scan(&membroID, &nome, &status, &segundos); err != nil {
+			continue
+		}
+		horas := float64(segundos) / 3600.0
+
+		if _, ok := membrosMap[membroID]; !ok {
+			membrosMap[membroID] = &membroAcc{nome: nome}
+		}
+		acc := membrosMap[membroID]
+
+		if statusExecutado[status] {
+			acc.executadas += horas
+			totalExecutadas += horas
+		} else {
+			acc.alocadas += horas
+			totalAlocadas += horas
+			if statusPendente[status] {
+				totalPendentes += horas
+			}
+		}
+	}
+
+	horasPorDia := 6.0
+	horasTotalSprint := float64(diasUteis) * horasPorDia * float64(len(membrosMap))
+
+	membros := make([]SnapshotMembroCapacity, 0, len(membrosMap))
+	for id, acc := range membrosMap {
+		membros = append(membros, SnapshotMembroCapacity{
+			MembroID:         id,
+			Nome:             acc.nome,
+			HorasAlocadas:    math.Round(acc.alocadas*10) / 10,
+			HorasExecutadas:  math.Round(acc.executadas*10) / 10,
+			HorasDisponiveis: math.Round(float64(diasUteis)*horasPorDia*10) / 10,
+		})
+	}
+
+	return &SnapshotCapacity{
+		DiasUteis:              diasUteis,
+		HorasTotalSprint:       math.Round(horasTotalSprint*10) / 10,
+		HorasAlocadas:          math.Round(totalAlocadas*10) / 10,
+		HorasExecutadas:        math.Round(totalExecutadas*10) / 10,
+		HorasPendentesExecucao: math.Round(totalPendentes*10) / 10,
+		TotalMembros:           len(membrosMap),
+		Membros:                membros,
+	}
+}
+
+func (r *SyncRepository) captureSnapshotBurndown(ctx context.Context, sprintID uuid.UUID) *SnapshotBurndown {
+	var dataInicio, dataFim *time.Time
+	var sprintNome string
+	err := r.pool.QueryRow(ctx, `
+		SELECT nome, data_inicio, data_fim FROM sprints WHERE id = $1
+	`, sprintID).Scan(&sprintNome, &dataInicio, &dataFim)
+	if err != nil || dataInicio == nil || dataFim == nil {
+		return nil
+	}
+
+	var feriadoDates []time.Time
+	fRows, err := r.pool.Query(ctx, `
+		SELECT data FROM feriados WHERE data BETWEEN $1 AND $2
+	`, dataInicio, dataFim)
+	if err == nil {
+		defer fRows.Close()
+		for fRows.Next() {
+			var d time.Time
+			if fRows.Scan(&d) == nil {
+				if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+					feriadoDates = append(feriadoDates, d)
+				}
+			}
+		}
+	}
+	feriadoSet := make(map[string]bool)
+	for _, d := range feriadoDates {
+		feriadoSet[d.Format("2006-01-02")] = true
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT COALESCE(t.estimativa_tempo, 0), t.data_resolvido, t.data_entrada_sprint, t.status
+		FROM tarefas t
+		WHERE t.sprint_id = $1 AND t.status NOT IN ('Cancelado', 'Rejeitada')
+	`, sprintID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	type burndownTask struct {
+		estimativa        int
+		dataResolvido     *time.Time
+		dataEntradaSprint *time.Time
+		status            string
+	}
+	var tarefas []burndownTask
+	for rows.Next() {
+		var bt burndownTask
+		if err := rows.Scan(&bt.estimativa, &bt.dataResolvido, &bt.dataEntradaSprint, &bt.status); err != nil {
+			continue
+		}
+		tarefas = append(tarefas, bt)
+	}
+
+	var diasUteis []string
+	for d := *dataInicio; !d.After(*dataFim); d = d.AddDate(0, 0, 1) {
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday && !feriadoSet[d.Format("2006-01-02")] {
+			diasUteis = append(diasUteis, d.Format("2006-01-02"))
+		}
+	}
+	if len(diasUteis) == 0 {
+		return nil
+	}
+
+	var horasIniciais float64
+	for _, t := range tarefas {
+		if t.dataEntradaSprint != nil && !t.dataEntradaSprint.After(*dataInicio) {
+			horasIniciais += float64(t.estimativa) / 3600.0
+		}
+	}
+
+	linhaIdeal := make([]SnapshotBurndownPoint, len(diasUteis))
+	decremento := horasIniciais / float64(len(diasUteis))
+	for i, d := range diasUteis {
+		linhaIdeal[i] = SnapshotBurndownPoint{
+			Data:  d,
+			Horas: math.Round((horasIniciais-decremento*float64(i))*10) / 10,
+		}
+	}
+
+	statusDesconto80 := map[string]bool{
+		"Teste": true, "Validação do Solicitante": true, "Deploy": true,
+	}
+
+	linhaReal := make([]SnapshotBurndownPoint, len(diasUteis))
+	horasRestantes := horasIniciais
+	now := time.Now()
+	for i, d := range diasUteis {
+		dDate, _ := time.Parse("2006-01-02", d)
+		if dDate.After(now) {
+			linhaReal = linhaReal[:i]
+			break
+		}
+		for _, t := range tarefas {
+			if t.dataEntradaSprint != nil && !t.dataEntradaSprint.After(*dataInicio) {
+				if t.dataResolvido != nil && t.dataResolvido.Format("2006-01-02") == d {
+					horasRestantes -= float64(t.estimativa) / 3600.0
+				}
+			}
+		}
+		horas := horasRestantes
+		for _, t := range tarefas {
+			if t.dataResolvido == nil && statusDesconto80[t.status] {
+				if t.dataEntradaSprint != nil && !t.dataEntradaSprint.After(*dataInicio) {
+					horas -= float64(t.estimativa) / 3600.0 * 0.8
+				}
+			}
+		}
+		linhaReal[i] = SnapshotBurndownPoint{
+			Data:  d,
+			Horas: math.Round(horas*10) / 10,
+		}
+	}
+
+	linhaUnplanned := make([]SnapshotBurndownPoint, len(diasUteis))
+	horasNaoPlanejadas := 0.0
+	for i, d := range diasUteis {
+		for _, t := range tarefas {
+			if t.dataEntradaSprint != nil {
+				entradaStr := t.dataEntradaSprint.Format("2006-01-02")
+				if entradaStr == d && t.dataEntradaSprint.After(*dataInicio) {
+					horasNaoPlanejadas += float64(t.estimativa) / 3600.0
+				}
+			}
+		}
+		linhaUnplanned[i] = SnapshotBurndownPoint{
+			Data:  d,
+			Horas: math.Round(horasNaoPlanejadas*10) / 10,
+		}
+	}
+
+	return &SnapshotBurndown{
+		HorasTotal:     math.Round(horasIniciais*10) / 10,
+		LinhaIdeal:     linhaIdeal,
+		LinhaReal:      linhaReal,
+		LinhaUnplanned: linhaUnplanned,
+	}
 }
 
 func (r *SyncRepository) GetDistinctBoardProjects(ctx context.Context, fonteDadosID uuid.UUID) (map[int]uuid.UUID, error) {
