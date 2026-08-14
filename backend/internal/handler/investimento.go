@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/domain"
+	"github.com/emersonpaula83/myplanner/backend/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -56,6 +57,14 @@ func (h *InvestimentoHandler) GetDashboard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Travado, o valor não sai do servidor: é o que impede de lê-lo no F12.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		dashboard.Sumario.CustoMensalTotal = nil
+		for i := range dashboard.Membros {
+			dashboard.Membros[i].Salario = nil
+		}
+	}
+
 	respondJSON(w, http.StatusOK, dashboard)
 }
 
@@ -81,6 +90,13 @@ func (h *InvestimentoHandler) GetGastosMensais(w http.ResponseWriter, r *http.Re
 		h.logger.Error("failed to get gastos mensais", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "falha ao carregar gastos mensais")
 		return
+	}
+
+	// Travado, o valor não sai do servidor: é o que impede de lê-lo no F12.
+	if !middleware.PodeVerSalarios(r.Context()) {
+		for i := range result.Meses {
+			result.Meses[i].CustoTotal = nil
+		}
 	}
 
 	respondJSON(w, http.StatusOK, result)
@@ -198,6 +214,11 @@ func (h *InvestimentoHandler) GetHistoricoSalario(w http.ResponseWriter, r *http
 		return
 	}
 	if historico == nil {
+		historico = []domain.SalarioHistorico{}
+	}
+	// Travado, a lista vem vazia: cada item carregaria um salário no corpo da
+	// resposta, e isso é justamente o que o F12 não pode enxergar.
+	if !middleware.PodeVerSalarios(r.Context()) {
 		historico = []domain.SalarioHistorico{}
 	}
 

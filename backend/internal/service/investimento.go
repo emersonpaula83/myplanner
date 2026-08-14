@@ -104,10 +104,11 @@ func (s *InvestimentoService) GetDashboard(ctx context.Context, equipeID uuid.UU
 		tempoMedio = sum / len(temposCasa)
 	}
 
+	custoTotalRef := custoTotal
 	return &domain.InvestimentoDashboard{
 		Equipe: domain.EquipeInfo{ID: equipeID, Nome: equipe.Nome},
 		Sumario: domain.InvestimentoSumario{
-			CustoMensalTotal:    custoTotal,
+			CustoMensalTotal:    &custoTotalRef,
 			TotalMembros:        len(membros),
 			TempoCasaMedioMeses: tempoMedio,
 			BancoHorasTotal:     bancoHorasTotal,
@@ -137,9 +138,12 @@ func (s *InvestimentoService) GetGastosMensais(ctx context.Context, equipeID uui
 			}
 		}
 
+		// Variável nova a cada volta: senão todos os meses apontariam para o
+		// mesmo endereço e mostrariam o custo do último mês do laço.
+		custoMesRef := math.Round(custoMes*100) / 100
 		meses = append(meses, domain.GastoMensal{
 			Mes:        mes,
-			CustoTotal: math.Round(custoMes*100) / 100,
+			CustoTotal: &custoMesRef,
 		})
 	}
 

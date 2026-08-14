@@ -100,6 +100,11 @@ func ContextParaTeste(ctx context.Context, userID uuid.UUID, email, cargo string
 	return ctx
 }
 
+// ContextDestravadoParaTeste marca o contexto como podendo ver salários.
+func ContextDestravadoParaTeste(ctx context.Context) context.Context {
+	return context.WithValue(ctx, salariosKey, true)
+}
+
 func respondUnauthorized(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
