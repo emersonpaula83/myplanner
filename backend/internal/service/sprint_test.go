@@ -396,6 +396,85 @@ func TestGetCapacity_HappyPath(t *testing.T) {
 	}
 }
 
+func TestGetCapacity_RejeitadaExcluded(t *testing.T) {
+	ctx := context.Background()
+	sprintID := uuid.New()
+	projetoID := uuid.New()
+	fonteDadosID := uuid.New()
+	membroID := uuid.New()
+
+	inicio := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
+	fim := time.Date(2026, 1, 9, 0, 0, 0, 0, time.UTC)
+
+	repo := &mockSprintRepoStore{
+		getByIDFn: func(ctx context.Context, id uuid.UUID) (*domain.Sprint, error) {
+			return &domain.Sprint{
+				ID: sprintID, FonteDadosID: fonteDadosID, ProjetoID: &projetoID,
+				Nome: "Sprint R", DataInicio: &inicio, DataFim: &fim,
+			}, nil
+		},
+		getProjetoChaveFn: func(ctx context.Context, pid uuid.UUID) (string, error) {
+			return "PROJ", nil
+		},
+		getFeriadosNoPeriodoFn: func(ctx context.Context, i, f time.Time) ([]repository.FeriadoRecord, error) {
+			return nil, nil
+		},
+		getMembrosFromSprintFn: func(ctx context.Context, sid uuid.UUID) ([]repository.MembroInfo, error) {
+			return []repository.MembroInfo{{ID: membroID, Nome: "Dev"}}, nil
+		},
+		getTarefasDetailBySprintFn: func(ctx context.Context, sid uuid.UUID) ([]repository.TarefaDetail, error) {
+			return []repository.TarefaDetail{
+				{
+					ID: uuid.New(), NumeroTicket: "P-1", Resumo: "Valid",
+					Tipo: "Story", Status: "Desenvolvimento", Segundos: 4 * 3600,
+					ProjetoID: projetoID, ProjetoChave: "PROJ", ProjetoNome: "P",
+					ResponsavelID: membroID,
+				},
+				{
+					ID: uuid.New(), NumeroTicket: "P-2", Resumo: "Rejeitada Task",
+					Tipo: "Bug", Status: "Rejeitada", Segundos: 8 * 3600,
+					ProjetoID: projetoID, ProjetoChave: "PROJ", ProjetoNome: "P",
+					ResponsavelID: membroID,
+				},
+				{
+					ID: uuid.New(), NumeroTicket: "P-3", Resumo: "Cancelada Task",
+					Tipo: "Bug", Status: "Cancelado", Segundos: 2 * 3600,
+					ProjetoID: projetoID, ProjetoChave: "PROJ", ProjetoNome: "P",
+					ResponsavelID: membroID,
+				},
+			}, nil
+		},
+		getAusenciasNoPeriodoFn: func(ctx context.Context, mids []uuid.UUID, i, f time.Time) ([]repository.AusenciaRecord, error) {
+			return nil, nil
+		},
+	}
+
+	svc := NewSprintService(repo, zap.NewNop())
+	result, err := svc.GetCapacity(ctx, sprintID, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Membros) != 1 {
+		t.Fatalf("expected 1 membro, got %d", len(result.Membros))
+	}
+	mc := result.Membros[0]
+
+	// Only the "Desenvolvimento" task (4h) should count. Rejeitada and Cancelado excluded.
+	if len(mc.Tarefas) != 1 {
+		t.Fatalf("expected 1 tarefa (Rejeitada+Cancelado excluded), got %d", len(mc.Tarefas))
+	}
+	if mc.Tarefas[0].Status == "Rejeitada" || mc.Tarefas[0].Status == "Cancelado" {
+		t.Errorf("excluded status appeared in Tarefas: %s", mc.Tarefas[0].Status)
+	}
+	if !floatsClose(mc.HorasAlocadas, 4.0) {
+		t.Errorf("expected HorasAlocadas 4.0 (only valid task), got %v", mc.HorasAlocadas)
+	}
+	if !floatsClose(result.HorasAlocadas, 4.0) {
+		t.Errorf("expected total HorasAlocadas 4.0, got %v", result.HorasAlocadas)
+	}
+}
+
 func TestGetUnplannedAnalysis(t *testing.T) {
 	ctx := context.Background()
 	sprintID := uuid.New()

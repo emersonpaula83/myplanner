@@ -237,7 +237,7 @@ func (s *SprintService) GetCapacity(ctx context.Context, sprintID uuid.UUID, equ
 	horasPendentesMembro := make(map[uuid.UUID]float64)
 	tarefasPorMembro := make(map[uuid.UUID][]TarefaCapacityDetail)
 	for _, t := range tarefasDetail {
-		if t.Status == "Cancelado" {
+		if t.Status == "Cancelado" || t.Status == "Rejeitada" {
 			continue
 		}
 		horas := float64(t.Segundos) / 3600.0

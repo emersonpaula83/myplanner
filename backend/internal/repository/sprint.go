@@ -312,7 +312,7 @@ func (r *SprintRepository) GetEqualizerTarefas(ctx context.Context, sprintID, me
 		  AND t.responsavel_id = $2
 		  AND t.status NOT IN (
 			'Code Review', 'Teste', 'Validação do Solicitante', 'Deploy', 'Concluído',
-			'Em Desenvolvimento', 'Desenvolvimento', 'Cancelado'
+			'Em Desenvolvimento', 'Desenvolvimento', 'Cancelado', 'Rejeitada'
 		  )
 		  AND COALESCE(t.estimativa_tempo, 0) > 0
 		ORDER BY t.estimativa_tempo DESC
@@ -828,7 +828,7 @@ func (r *SprintRepository) GetHorasAlocadasPorSprint(ctx context.Context, sprint
 		FROM tarefas t
 		WHERE t.sprint_id = ANY($1)
 		  AND (t.responsavel_id = ANY($2) OR t.responsavel_id IS NULL)
-		  AND t.status != 'Cancelado'
+		  AND t.status NOT IN ('Cancelado', 'Rejeitada')
 		GROUP BY t.sprint_id
 	`, sprintIDs, membroIDs)
 	if err != nil {
@@ -859,7 +859,7 @@ func (r *SprintRepository) GetBurndownTarefas(ctx context.Context, sprintID uuid
 	query := `
 		SELECT COALESCE(t.estimativa_tempo, 0), t.data_resolvido, t.data_entrada_sprint, t.status
 		FROM tarefas t
-		WHERE t.sprint_id = $1 AND t.status != 'Cancelado'
+		WHERE t.sprint_id = $1 AND t.status NOT IN ('Cancelado', 'Rejeitada')
 	`
 	args := []any{sprintID}
 	if equipeID != nil {
@@ -914,7 +914,7 @@ func (r *SprintRepository) GetTimelineDetailTarefas(ctx context.Context, sprintI
 		WHERE t.sprint_id = $1
 		  AND t.responsavel_id IN (SELECT membro_id FROM equipe_membros WHERE equipe_id = $2 AND data_saida IS NULL)
 		  AND t.tipo NOT IN ('Épico', 'Projeto')
-		  AND t.status != 'Cancelado'
+		  AND t.status NOT IN ('Cancelado', 'Rejeitada')
 		ORDER BY t.numero_ticket
 	`, sprintID, equipeID)
 	if err != nil {
