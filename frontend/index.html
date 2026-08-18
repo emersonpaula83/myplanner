@@ -3822,14 +3822,7 @@ async function openSprintCapacity(sprintID) {
     html += '<div class="sprint-tabs">';
     html += '<div class="sprint-tab active" onclick="showSprintTab(\'acompanhamento\')">Acompanhamento</div>';
     html += '<div class="sprint-tab" onclick="showSprintTab(\'review\')">Review</div>';
-    var sprintEstado = data.sprint.estado || 'future';
-    if (sprintEstado === 'active') {
-      // TODO: restaurar check de 3 dias antes de produção
-      // var daysLeft = (new Date(data.sprint.data_fim) - new Date()) / (1000*60*60*24);
-      // if (daysLeft <= 3) {
-      html += '<div class="sprint-tab planning-highlight" onclick="showSprintTab(\'planning\')">Planning</div>';
-      // }
-    }
+    html += '<div class="sprint-tab planning-highlight" onclick="showSprintTab(\'planning\')">Planning</div>';
     html += '</div>';
     html += '<div id="sprint-tab-acompanhamento">';
     html += '<div class="sprint-detail-layout">';
@@ -8089,7 +8082,7 @@ var cargoLabels = {
 };
 
 function taskStatusBadgeHtml(task) {
-  if (task.marcacao) return '<span class="capacity-tarefa-status blocked">Bloqueada</span>';
+  if (task.marcacao) return '<span class="capacity-tarefa-status blocked"><span style="color:#e53e3e">&#9873;</span> Bloqueada</span>';
   var cat = task.status_categoria || '';
   if (cat === 'done') return '<span class="capacity-tarefa-status done">Concluído</span>';
   if (cat === 'indeterminate') return '<span class="capacity-tarefa-status inprogress">Em Andamento</span>';
@@ -9704,6 +9697,8 @@ function initPlanningState(nextData, capacityData) {
       estimativaTempo: estSec,
       tipoDemanda: t.tipo_demanda || null,
       projetoChave: t.projeto_chave,
+      marcacao: t.marcacao,
+      status_categoria: t.status_categoria || null,
       originalResponsavelId: t.responsavel_id || null,
       originalEstimativa: estSec,
       originalTipoDemanda: t.tipo_demanda || null,
@@ -9736,6 +9731,8 @@ function initPlanningState(nextData, capacityData) {
       horasCarryover: ct.horas_carryover,
       responsavelId: ct.responsavel_id,
       projetoChave: ct.projeto_chave,
+      marcacao: ct.marcacao,
+      status_categoria: ct.status_categoria || null,
       isCarryover: true
     };
     state.carryoverTasks.push(task);
@@ -9749,6 +9746,7 @@ function initPlanningState(nextData, capacityData) {
 var PLANNING_STATUS_EXECUTADO = {'Code Review':1,'Teste':1,'Validação do Solicitante':1,'Deploy':1,'Concluído':1};
 var PLANNING_STATUS_AMBOS = {'Teste':1,'Validação do Solicitante':1,'Deploy':1};
 var PLANNING_STATUS_PENDENTE = {'Backlog':1,'Desenvolvimento':1,'Em Desenvolvimento':1,'A Fazer':1};
+var CARRYOVER_STATUS_RESOLVED = {'Concluído':1,'Cancelado':1,'Rejeitada':1,'Code Review':1,'Deploy':1,'Validação do Solicitante':1};
 
 function recalcMemberCapacity(memberId) {
   var s = window.planningState;
@@ -9758,7 +9756,7 @@ function recalcMemberCapacity(memberId) {
   var horasAlocadas = 0, horasExecutadas = 0, horasAmbos = 0;
   member.tarefaIds.forEach(function(tid) {
     var t = s.tasks[tid];
-    if (!t || t.status === 'Cancelado' || t.status === 'Rejeitada' || t.status === 'Concluído') return;
+    if (!t || CARRYOVER_STATUS_RESOLVED[t.status]) return;
     if (s.movedBacklog.indexOf(tid) >= 0 || s.movedNextSprint.indexOf(tid) >= 0) return;
     var horas = (t.estimativaTempo || 0) / 3600;
     if (PLANNING_STATUS_AMBOS[t.status]) {
@@ -9796,7 +9794,7 @@ function calcPlanningStats() {
   Object.keys(s.tasks).forEach(function(tid) {
     var t = s.tasks[tid];
     if (s.movedBacklog.indexOf(tid) >= 0 || s.movedNextSprint.indexOf(tid) >= 0) return;
-    if (t.status === 'Cancelado' || t.status === 'Rejeitada' || t.status === 'Concluído') return;
+    if (CARRYOVER_STATUS_RESOLVED[t.status]) return;
     var h = (t.estimativaTempo || 0) / 3600;
     if (!t.responsavelId) {
       horasNaoAlocadas += h;
@@ -9811,7 +9809,7 @@ function calcPlanningStats() {
   Object.keys(s.tasks).forEach(function(tid) {
     var t = s.tasks[tid];
     if (s.movedBacklog.indexOf(tid) >= 0 || s.movedNextSprint.indexOf(tid) >= 0) return;
-    if (t.status === 'Cancelado' || t.status === 'Rejeitada' || t.status === 'Concluído') return;
+    if (CARRYOVER_STATUS_RESOLVED[t.status]) return;
     qtdeCards++;
   });
 
@@ -9847,14 +9845,25 @@ function renderPlanningTab() {
 
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
   html += '<div><div style="font-size:16px;font-weight:700">Planning: ' + esc(s.sprint.nome) + '</div>';
-  html += '<div style="font-size:13px;color:var(--text-muted)">' + formatSprintDates(s.sprint.dataInicio, s.sprint.dataFim) + ' &bull; ' + s.diasUteis + ' dias uteis</div></div>';
+  html += '<div style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;flex-wrap:wrap;gap:6px">';
+  html += '<span>' + formatSprintDates(s.sprint.dataInicio, s.sprint.dataFim) + ' &bull; ' + s.diasUteis + ' dias &uacute;teis</span>';
+  if (s.feriados && s.feriados.length > 0) {
+    s.feriados.forEach(function(f) {
+      var d = new Date(f.data + 'T12:00:00');
+      var dd = d.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'});
+      html += '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px">&#128197; ' + dd + ' &mdash; ' + esc(f.nome) + '</span>';
+    });
+  }
+  html += '</div></div>';
   html += '<button class="planning-btn-finalizar" onclick="finalizarPlanning()" id="btn-finalizar-planning">Sincronizar JIRA</button>';
   html += '</div>';
 
   html += '<div class="planning-header-stats">';
   html += '<div class="planning-stat hours" title="Capacidade total da equipe na sprint, considerando feriados, ferias e ausencias"><div class="planning-stat-label">Total Horas Sprint</div><div class="planning-stat-value" id="ps-horas-disp">' + stats.horasDisponiveis.toFixed(1) + 'h</div></div>';
   html += '<div class="planning-stat hours" title="Soma das estimativas de tarefas ativas com responsavel (exclui tarefas em Code Review, Teste e Concluido)"><div class="planning-stat-label">Horas Alocadas</div><div class="planning-stat-value" id="ps-horas-aloc">' + stats.horasAlocadas.toFixed(1) + 'h</div></div>';
-  html += '<div class="planning-stat hours" title="Horas de tarefas pendentes da sprint anterior que vao consumir tempo (Teste conta 50%)" style="border-color:#f59e0b"><div class="planning-stat-label">Horas Carryover</div><div class="planning-stat-value" id="ps-horas-carry">' + stats.horasCarryover.toFixed(1) + 'h</div></div>';
+  var carryColor = stats.horasCarryover > 0 ? '#f59e0b' : '#6b7280';
+  var carryBg = stats.horasCarryover > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(107,114,128,0.1)';
+  html += '<div class="planning-stat hours" title="Horas de tarefas da Sprint anterior que serão empurradas para esta Sprint" style="border-color:' + carryColor + ';background:' + carryBg + '"><div class="planning-stat-label" style="color:' + carryColor + '">Horas Carryover</div><div class="planning-stat-value" id="ps-horas-carry" style="color:' + carryColor + '">' + stats.horasCarryover.toFixed(1) + 'h</div></div>';
   html += '<div class="planning-stat hours" title="Soma das estimativas de tarefas na sprint que ainda nao possuem responsavel"><div class="planning-stat-label">Horas Nao Alocadas</div><div class="planning-stat-value' + (stats.horasNaoAlocadas > 0 ? ' stat-danger' : '') + '" id="ps-horas-nao-aloc">' + stats.horasNaoAlocadas.toFixed(1) + 'h</div></div>';
   html += '<div class="planning-stat hours" title="Total Horas Sprint menos Horas Alocadas e Carryover. Negativo indica que a equipe esta sobrecarregada"><div class="planning-stat-label">Horas Restantes p/ Alocacao</div><div class="planning-stat-value' + (stats.horasRestantes < 0 ? ' stat-danger' : '') + '" id="ps-horas-rest">' + stats.horasRestantes.toFixed(1) + 'h</div></div>';
   html += '<div class="planning-stat tasks" title="Quantidade de cards ativos na sprint (exclui cancelados e rejeitados)"><div class="planning-stat-label">Qtde Cards</div><div class="planning-stat-value" id="ps-qtde-cards">' + stats.qtdeCards + '</div></div>';
@@ -9893,28 +9902,6 @@ function renderPlanningTab() {
   });
   html += '</div></div>';
 
-  // Carryover section
-  var activeCarryover = (s.carryoverTasks || []).filter(function(ct) { return s.dismissedCarryover.indexOf(ct.id) < 0; });
-  if (activeCarryover.length > 0) {
-    html += '<div class="planning-card carryover">';
-    html += '<div class="planning-card-header"><div class="planning-card-name">Carryover (' + activeCarryover.length + ' tarefas)<span class="carryover-badge">Sprint Anterior</span></div></div>';
-    html += '<div class="planning-task-list" id="planning-carryover">';
-    activeCarryover.forEach(function(ct) {
-      var horas = ct.horasCarryover.toFixed(1) + 'h';
-      var checked = s.selected.has(ct.id) ? ' checked' : '';
-      var membroNome = s.members[ct.responsavelId] ? s.members[ct.responsavelId].nome.split(' ')[0] : '';
-      html += '<div class="planning-task-row" data-task-id="' + ct.id + '" data-carryover="1">' +
-        '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect(\'' + ct.id + '\')"' + checked + '>' +
-        '<span class="task-icon">' + getTaskTypeIcon(ct.tipo) + '</span>' +
-        '<span class="task-key">' + jiraTicketLink(ct.key) + '</span>' +
-        '<span class="task-resumo" title="' + esc(ct.resumo) + '">' + esc(ct.resumo) + '</span>' +
-        '<span class="carryover-badge">' + esc(ct.status) + '</span>' +
-        '<span style="font-size:11px;color:var(--text-muted);margin-left:4px">' + esc(membroNome) + '</span>' +
-        '<span class="task-horas">' + horas + '</span>' +
-        '</div>';
-    });
-    html += '</div></div>';
-  }
 
   html += '<div class="planning-members-grid">';
   memberList.forEach(function(item) {
@@ -9954,6 +9941,7 @@ function renderPlanningTab() {
         '<span class="task-icon">' + getTaskTypeIcon(ct.tipo) + '</span>' +
         '<span class="task-key">' + jiraTicketLink(ct.key) + '</span>' +
         '<span class="task-resumo" title="' + esc(ct.resumo) + '">' + esc(ct.resumo) + '</span>' +
+        planningStatusBadge(ct) +
         '<span class="carryover-badge">Carryover</span>' +
         '<span class="task-horas">' + horas + '</span>' +
         '</div>';
@@ -10006,16 +9994,27 @@ function findCarryoverTask(tid) {
   return null;
 }
 
+function planningStatusBadge(t) {
+  if (t.marcacao) return '<span class="capacity-tarefa-status blocked"><span style="color:#e53e3e">&#9873;</span> Bloqueada</span>';
+  var cat = t.status_categoria || '';
+  if (cat === 'done') return '<span class="capacity-tarefa-status done">' + esc(t.status) + '</span>';
+  if (cat === 'indeterminate') return '<span class="capacity-tarefa-status inprogress">' + esc(t.status) + '</span>';
+  return '<span class="capacity-tarefa-status todo">' + esc(t.status) + '</span>';
+}
+
 function renderPlanningTaskRow(tid) {
   var t = window.planningState.tasks[tid];
   if (!t) return '';
-  var horas = t.estimativaTempo ? (t.estimativaTempo / 3600).toFixed(1) + 'h' : '—';
+  var isResolved = !!CARRYOVER_STATUS_RESOLVED[t.status];
+  var horas = isResolved ? '-' : (t.estimativaTempo ? (t.estimativaTempo / 3600).toFixed(1) + 'h' : '—');
   var checked = window.planningState.selected.has(tid) ? ' checked' : '';
-  return '<div class="planning-task-row" data-task-id="' + tid + '">' +
+  var rowStyle = isResolved ? ' style="opacity:0.45"' : '';
+  return '<div class="planning-task-row" data-task-id="' + tid + '"' + rowStyle + '>' +
     '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect(\'' + tid + '\')"' + checked + '>' +
     '<span class="task-icon">' + getTaskTypeIcon(t.tipo) + '</span>' +
     '<span class="task-key">' + jiraTicketLink(t.key) + '</span>' +
     '<span class="task-resumo" title="' + esc(t.resumo) + '">' + esc(t.resumo) + '</span>' +
+    planningStatusBadge(t) +
     '<span class="task-horas">' + horas + '</span>' +
     '</div>';
 }
@@ -10051,7 +10050,7 @@ function updatePlanningStats() {
   var el;
   el = document.getElementById('ps-horas-disp'); if (el) el.textContent = stats.horasDisponiveis.toFixed(1) + 'h';
   el = document.getElementById('ps-horas-aloc'); if (el) el.textContent = stats.horasAlocadas.toFixed(1) + 'h';
-  el = document.getElementById('ps-horas-carry'); if (el) el.textContent = stats.horasCarryover.toFixed(1) + 'h';
+  el = document.getElementById('ps-horas-carry'); if (el) { var cc = stats.horasCarryover > 0 ? '#f59e0b' : '#6b7280'; var cb = stats.horasCarryover > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(107,114,128,0.1)'; el.textContent = stats.horasCarryover.toFixed(1) + 'h'; el.style.color = cc; el.parentElement.style.borderColor = cc; el.parentElement.style.background = cb; el.previousElementSibling.style.color = cc; }
   el = document.getElementById('ps-horas-nao-aloc'); if (el) { el.textContent = stats.horasNaoAlocadas.toFixed(1) + 'h'; el.classList.toggle('stat-danger', stats.horasNaoAlocadas > 0); }
   el = document.getElementById('ps-horas-rest'); if (el) { el.textContent = stats.horasRestantes.toFixed(1) + 'h'; el.classList.toggle('stat-danger', stats.horasRestantes < 0); }
   el = document.getElementById('ps-qtde-cards'); if (el) el.textContent = stats.qtdeCards;

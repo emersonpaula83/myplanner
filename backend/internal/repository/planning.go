@@ -54,13 +54,15 @@ type PlanningTarefa struct {
 	ResponsavelID   *uuid.UUID `json:"responsavel_id"`
 	ProjetoID       uuid.UUID  `json:"projeto_id"`
 	ProjetoChave    string     `json:"projeto_chave"`
+	Marcacao        bool       `json:"marcacao"`
+	StatusCategoria *string    `json:"status_categoria"`
 }
 
 func (r *PlanningRepository) GetAllTarefasBySprint(ctx context.Context, sprintID uuid.UUID) ([]PlanningTarefa, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.status, t.prioridade,
 		       t.estimativa_tempo, t.tipo_demanda, t.responsavel_id,
-		       p.id, p.chave
+		       p.id, p.chave, t.marcacao, t.status_categoria
 		FROM tarefas t
 		INNER JOIN projetos p ON p.id = t.projeto_id
 		WHERE t.sprint_id = $1 AND t.removido_em IS NULL
@@ -76,7 +78,7 @@ func (r *PlanningRepository) GetAllTarefasBySprint(ctx context.Context, sprintID
 		var t PlanningTarefa
 		if err := rows.Scan(&t.ID, &t.NumeroTicket, &t.Resumo, &t.Tipo, &t.Status,
 			&t.Prioridade, &t.EstimativaTempo, &t.TipoDemanda, &t.ResponsavelID,
-			&t.ProjetoID, &t.ProjetoChave); err != nil {
+			&t.ProjetoID, &t.ProjetoChave, &t.Marcacao, &t.StatusCategoria); err != nil {
 			return nil, fmt.Errorf("scanning planning tarefa: %w", err)
 		}
 		result = append(result, t)
@@ -88,7 +90,7 @@ func (r *PlanningRepository) GetCarryoverTasks(ctx context.Context, sprintID uui
 	rows, err := r.pool.Query(ctx, `
 		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.status, t.prioridade,
 		       t.estimativa_tempo, t.tipo_demanda, t.responsavel_id,
-		       p.id, p.chave
+		       p.id, p.chave, t.marcacao, t.status_categoria
 		FROM tarefas t
 		INNER JOIN projetos p ON p.id = t.projeto_id
 		WHERE t.sprint_id = $1 AND t.removido_em IS NULL
@@ -106,7 +108,7 @@ func (r *PlanningRepository) GetCarryoverTasks(ctx context.Context, sprintID uui
 		var t PlanningTarefa
 		if err := rows.Scan(&t.ID, &t.NumeroTicket, &t.Resumo, &t.Tipo, &t.Status,
 			&t.Prioridade, &t.EstimativaTempo, &t.TipoDemanda, &t.ResponsavelID,
-			&t.ProjetoID, &t.ProjetoChave); err != nil {
+			&t.ProjetoID, &t.ProjetoChave, &t.Marcacao, &t.StatusCategoria); err != nil {
 			return nil, fmt.Errorf("scanning carryover tarefa: %w", err)
 		}
 		result = append(result, t)

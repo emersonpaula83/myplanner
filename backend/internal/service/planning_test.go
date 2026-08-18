@@ -20,6 +20,7 @@ type mockPlanningRepoStore struct {
 	moveTarefaToSprintFn      func(ctx context.Context, tarefaID uuid.UUID, sprintID uuid.UUID) error
 	removeTarefaFromSprintFn  func(ctx context.Context, tarefaID uuid.UUID) error
 	getSprintJiraIDFn         func(ctx context.Context, sprintID uuid.UUID) (int, error)
+	getCarryoverTasksFn       func(ctx context.Context, sprintID uuid.UUID) ([]repository.PlanningTarefa, error)
 }
 
 func (m *mockPlanningRepoStore) GetNextSprint(ctx context.Context, boardID int, currentDataInicio time.Time) (*domain.Sprint, error) {
@@ -63,6 +64,12 @@ func (m *mockPlanningRepoStore) GetSprintJiraID(ctx context.Context, sprintID uu
 		return m.getSprintJiraIDFn(ctx, sprintID)
 	}
 	return 0, nil
+}
+func (m *mockPlanningRepoStore) GetCarryoverTasks(ctx context.Context, sprintID uuid.UUID) ([]repository.PlanningTarefa, error) {
+	if m.getCarryoverTasksFn != nil {
+		return m.getCarryoverTasksFn(ctx, sprintID)
+	}
+	return nil, nil
 }
 func (m *mockPlanningRepoStore) SearchTarefasByKeys(ctx context.Context, projetoID uuid.UUID, keys []string) ([]repository.SearchTarefaResult, error) {
 	return nil, nil

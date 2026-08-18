@@ -25,6 +25,8 @@ type CarryoverTask struct {
 	HorasCarryover  float64    `json:"horas_carryover"`
 	ResponsavelID   *uuid.UUID `json:"responsavel_id"`
 	ProjetoChave    string     `json:"projeto_chave"`
+	Marcacao        bool       `json:"marcacao"`
+	StatusCategoria *string    `json:"status_categoria"`
 }
 
 type NextSprintResult struct {
@@ -184,6 +186,8 @@ func (s *PlanningService) GetNextSprint(ctx context.Context, currentSprintID uui
 			HorasCarryover: horasCarryover,
 			ResponsavelID:  t.ResponsavelID,
 			ProjetoChave:   t.ProjetoChave,
+			Marcacao:        t.Marcacao,
+			StatusCategoria: t.StatusCategoria,
 		})
 		horasCarryoverTotal += horasCarryover
 	}
