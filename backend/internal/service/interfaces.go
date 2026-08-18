@@ -148,6 +148,7 @@ type SyncScheduleStore interface {
 type PlanningRepoStore interface {
 	GetNextSprint(ctx context.Context, boardID int, currentDataInicio time.Time) (*domain.Sprint, error)
 	GetAllTarefasBySprint(ctx context.Context, sprintID uuid.UUID) ([]repository.PlanningTarefa, error)
+	GetCarryoverTasks(ctx context.Context, sprintID uuid.UUID) ([]repository.PlanningTarefa, error)
 	UpdateTarefaEstimativa(ctx context.Context, tarefaID uuid.UUID, segundos int) error
 	UpdateTarefaTipoDemanda(ctx context.Context, tarefaID uuid.UUID, valor string) error
 	UpdateTarefaResponsavel(ctx context.Context, tarefaID uuid.UUID, responsavelID *uuid.UUID) error

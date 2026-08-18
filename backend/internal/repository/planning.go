@@ -84,6 +84,36 @@ func (r *PlanningRepository) GetAllTarefasBySprint(ctx context.Context, sprintID
 	return result, nil
 }
 
+func (r *PlanningRepository) GetCarryoverTasks(ctx context.Context, sprintID uuid.UUID) ([]PlanningTarefa, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.id, t.numero_ticket, t.resumo, t.tipo, t.status, t.prioridade,
+		       t.estimativa_tempo, t.tipo_demanda, t.responsavel_id,
+		       p.id, p.chave
+		FROM tarefas t
+		INNER JOIN projetos p ON p.id = t.projeto_id
+		WHERE t.sprint_id = $1 AND t.removido_em IS NULL
+		  AND t.responsavel_id IS NOT NULL
+		  AND t.status NOT IN ('Concluído', 'Cancelado', 'Rejeitada', 'Code Review', 'Deploy', 'Validação do Solicitante')
+		ORDER BY t.numero_ticket
+	`, sprintID)
+	if err != nil {
+		return nil, fmt.Errorf("getting carryover tarefas: %w", err)
+	}
+	defer rows.Close()
+
+	var result []PlanningTarefa
+	for rows.Next() {
+		var t PlanningTarefa
+		if err := rows.Scan(&t.ID, &t.NumeroTicket, &t.Resumo, &t.Tipo, &t.Status,
+			&t.Prioridade, &t.EstimativaTempo, &t.TipoDemanda, &t.ResponsavelID,
+			&t.ProjetoID, &t.ProjetoChave); err != nil {
+			return nil, fmt.Errorf("scanning carryover tarefa: %w", err)
+		}
+		result = append(result, t)
+	}
+	return result, nil
+}
+
 func (r *PlanningRepository) UpdateTarefaEstimativa(ctx context.Context, tarefaID uuid.UUID, segundos int) error {
 	_, err := r.pool.Exec(ctx, `UPDATE tarefas SET estimativa_tempo = $2, updated_at = NOW() WHERE id = $1`, tarefaID, segundos)
 	if err != nil {

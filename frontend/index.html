@@ -533,6 +533,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, Roboto, san
 
 .planning-card { border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:12px; background:var(--surface); overflow:hidden; min-width:0; }
 .planning-card.unassigned { border-style:dashed; border-color:var(--text-muted); background:var(--surface-secondary); }
+.planning-card.carryover { border-color:#f59e0b; border-style:dashed; background:rgba(245,158,11,0.06); }
+:root[data-theme="dark"] .planning-card.carryover, @media (prefers-color-scheme:dark) { :root:not([data-theme="light"]) .planning-card.carryover { background:rgba(245,158,11,0.08); } }
+.carryover-badge { display:inline-block; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; background:#f59e0b; color:#000; margin-left:6px; vertical-align:middle; }
 .planning-card-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
 .planning-card-name { font-weight:600; font-size:14px; flex:1; color:var(--text-primary); }
 .planning-card-pct { font-weight:700; font-size:14px; }
@@ -9716,6 +9719,30 @@ function initPlanningState(nextData, capacityData) {
     }
   });
 
+  // index carryover tasks from previous sprint
+  state.carryoverTasks = [];
+  state.carryoverByMember = {};
+  state.dismissedCarryover = [];
+  (nextData.carryover_tasks || []).forEach(function(ct) {
+    if (!ct.responsavel_id || !state.members[ct.responsavel_id]) return;
+    var task = {
+      id: ct.id,
+      key: ct.numero_ticket,
+      resumo: ct.resumo,
+      tipo: ct.tipo,
+      status: ct.status,
+      prioridade: ct.prioridade,
+      horas: ct.horas,
+      horasCarryover: ct.horas_carryover,
+      responsavelId: ct.responsavel_id,
+      projetoChave: ct.projeto_chave,
+      isCarryover: true
+    };
+    state.carryoverTasks.push(task);
+    if (!state.carryoverByMember[ct.responsavel_id]) state.carryoverByMember[ct.responsavel_id] = [];
+    state.carryoverByMember[ct.responsavel_id].push(task);
+  });
+
   window.planningState = state;
 }
 
@@ -9731,7 +9758,7 @@ function recalcMemberCapacity(memberId) {
   var horasAlocadas = 0, horasExecutadas = 0, horasAmbos = 0;
   member.tarefaIds.forEach(function(tid) {
     var t = s.tasks[tid];
-    if (!t || t.status === 'Cancelado' || t.status === 'Rejeitada') return;
+    if (!t || t.status === 'Cancelado' || t.status === 'Rejeitada' || t.status === 'Concluído') return;
     if (s.movedBacklog.indexOf(tid) >= 0 || s.movedNextSprint.indexOf(tid) >= 0) return;
     var horas = (t.estimativaTempo || 0) / 3600;
     if (PLANNING_STATUS_AMBOS[t.status]) {
@@ -9746,8 +9773,15 @@ function recalcMemberCapacity(memberId) {
   });
 
   var horasAlocPura = horasAlocadas - horasAmbos;
-  var pct = member.horasDisponiveis > 0 ? Math.round((horasAlocPura / member.horasDisponiveis) * 1000) / 10 : (horasAlocPura > 0 ? 999.9 : 0);
-  return { horasAlocadas: Math.round(horasAlocPura * 10) / 10, horasExecutadas: Math.round(horasExecutadas * 10) / 10, percentual: pct, overcapacity: pct > 100 };
+  var horasCarryover = 0;
+  (s.carryoverByMember[memberId] || []).forEach(function(ct) {
+    if (s.dismissedCarryover.indexOf(ct.id) >= 0) return;
+    horasCarryover += ct.horasCarryover;
+  });
+  horasCarryover = Math.round(horasCarryover * 10) / 10;
+  var totalAloc = horasAlocPura + horasCarryover;
+  var pct = member.horasDisponiveis > 0 ? Math.round((totalAloc / member.horasDisponiveis) * 1000) / 10 : (totalAloc > 0 ? 999.9 : 0);
+  return { horasAlocadas: Math.round(horasAlocPura * 10) / 10, horasExecutadas: Math.round(horasExecutadas * 10) / 10, horasCarryover: horasCarryover, percentual: pct, overcapacity: pct > 100 };
 }
 
 function calcPlanningStats() {
@@ -9762,17 +9796,38 @@ function calcPlanningStats() {
   Object.keys(s.tasks).forEach(function(tid) {
     var t = s.tasks[tid];
     if (s.movedBacklog.indexOf(tid) >= 0 || s.movedNextSprint.indexOf(tid) >= 0) return;
-    if (t.status === 'Cancelado' || t.status === 'Rejeitada') return;
+    if (t.status === 'Cancelado' || t.status === 'Rejeitada' || t.status === 'Concluído') return;
     var h = (t.estimativaTempo || 0) / 3600;
-    if (t.responsavelId) { horasAlocadas += h; } else { horasNaoAlocadas += h; }
+    if (!t.responsavelId) {
+      horasNaoAlocadas += h;
+    } else if (PLANNING_STATUS_EXECUTADO[t.status]) {
+      // skip — executed/in-review tasks don't count as active allocation
+    } else {
+      horasAlocadas += h;
+    }
+  });
+
+  var qtdeCards = 0;
+  Object.keys(s.tasks).forEach(function(tid) {
+    var t = s.tasks[tid];
+    if (s.movedBacklog.indexOf(tid) >= 0 || s.movedNextSprint.indexOf(tid) >= 0) return;
+    if (t.status === 'Cancelado' || t.status === 'Rejeitada' || t.status === 'Concluído') return;
+    qtdeCards++;
+  });
+
+  var horasCarryover = 0;
+  (s.carryoverTasks || []).forEach(function(ct) {
+    if (s.dismissedCarryover.indexOf(ct.id) >= 0) return;
+    horasCarryover += ct.horasCarryover;
   });
 
   horasDisponiveis = Math.round(horasDisponiveis * 10) / 10;
   horasAlocadas = Math.round(horasAlocadas * 10) / 10;
   horasNaoAlocadas = Math.round(horasNaoAlocadas * 10) / 10;
-  var horasRestantes = Math.round((horasDisponiveis - horasAlocadas) * 10) / 10;
+  horasCarryover = Math.round(horasCarryover * 10) / 10;
+  var horasRestantes = Math.round((horasDisponiveis - horasAlocadas - horasCarryover) * 10) / 10;
 
-  return { horasAlocadas: horasAlocadas, horasNaoAlocadas: horasNaoAlocadas, horasRestantes: horasRestantes, horasDisponiveis: horasDisponiveis, headCount: headCount };
+  return { horasAlocadas: horasAlocadas, horasNaoAlocadas: horasNaoAlocadas, horasRestantes: horasRestantes, horasDisponiveis: horasDisponiveis, headCount: headCount, qtdeCards: qtdeCards, horasCarryover: horasCarryover };
 }
 
 var _prevPlanningStats = null;
@@ -9797,11 +9852,13 @@ function renderPlanningTab() {
   html += '</div>';
 
   html += '<div class="planning-header-stats">';
-  html += '<div class="planning-stat hours"><div class="planning-stat-label">Horas Alocadas</div><div class="planning-stat-value" id="ps-horas-aloc">' + stats.horasAlocadas.toFixed(1) + 'h</div></div>';
-  html += '<div class="planning-stat hours"><div class="planning-stat-label">Horas Nao Alocadas</div><div class="planning-stat-value' + (stats.horasNaoAlocadas > 0 ? ' stat-danger' : '') + '" id="ps-horas-nao-aloc">' + stats.horasNaoAlocadas.toFixed(1) + 'h</div></div>';
-  html += '<div class="planning-stat hours"><div class="planning-stat-label">Horas Restantes</div><div class="planning-stat-value' + (stats.horasRestantes < 0 ? ' stat-danger' : '') + '" id="ps-horas-rest">' + stats.horasRestantes.toFixed(1) + 'h</div></div>';
-  html += '<div class="planning-stat hours"><div class="planning-stat-label">Total Horas Sprint</div><div class="planning-stat-value" id="ps-horas-disp">' + stats.horasDisponiveis.toFixed(1) + 'h</div></div>';
-  html += '<div class="planning-stat tasks"><div class="planning-stat-label">HeadCount</div><div class="planning-stat-value" id="ps-headcount">' + stats.headCount + '</div></div>';
+  html += '<div class="planning-stat hours" title="Capacidade total da equipe na sprint, considerando feriados, ferias e ausencias"><div class="planning-stat-label">Total Horas Sprint</div><div class="planning-stat-value" id="ps-horas-disp">' + stats.horasDisponiveis.toFixed(1) + 'h</div></div>';
+  html += '<div class="planning-stat hours" title="Soma das estimativas de tarefas ativas com responsavel (exclui tarefas em Code Review, Teste e Concluido)"><div class="planning-stat-label">Horas Alocadas</div><div class="planning-stat-value" id="ps-horas-aloc">' + stats.horasAlocadas.toFixed(1) + 'h</div></div>';
+  html += '<div class="planning-stat hours" title="Horas de tarefas pendentes da sprint anterior que vao consumir tempo (Teste conta 50%)" style="border-color:#f59e0b"><div class="planning-stat-label">Horas Carryover</div><div class="planning-stat-value" id="ps-horas-carry">' + stats.horasCarryover.toFixed(1) + 'h</div></div>';
+  html += '<div class="planning-stat hours" title="Soma das estimativas de tarefas na sprint que ainda nao possuem responsavel"><div class="planning-stat-label">Horas Nao Alocadas</div><div class="planning-stat-value' + (stats.horasNaoAlocadas > 0 ? ' stat-danger' : '') + '" id="ps-horas-nao-aloc">' + stats.horasNaoAlocadas.toFixed(1) + 'h</div></div>';
+  html += '<div class="planning-stat hours" title="Total Horas Sprint menos Horas Alocadas e Carryover. Negativo indica que a equipe esta sobrecarregada"><div class="planning-stat-label">Horas Restantes p/ Alocacao</div><div class="planning-stat-value' + (stats.horasRestantes < 0 ? ' stat-danger' : '') + '" id="ps-horas-rest">' + stats.horasRestantes.toFixed(1) + 'h</div></div>';
+  html += '<div class="planning-stat tasks" title="Quantidade de cards ativos na sprint (exclui cancelados e rejeitados)"><div class="planning-stat-label">Qtde Cards</div><div class="planning-stat-value" id="ps-qtde-cards">' + stats.qtdeCards + '</div></div>';
+  html += '<div class="planning-stat tasks" title="Numero de membros da equipe nesta sprint"><div class="planning-stat-label">HeadCount</div><div class="planning-stat-value" id="ps-headcount">' + stats.headCount + '</div></div>';
   html += '</div>';
 
   html += '<div class="planning-team-strip" id="planning-team-strip">';
@@ -9836,6 +9893,29 @@ function renderPlanningTab() {
   });
   html += '</div></div>';
 
+  // Carryover section
+  var activeCarryover = (s.carryoverTasks || []).filter(function(ct) { return s.dismissedCarryover.indexOf(ct.id) < 0; });
+  if (activeCarryover.length > 0) {
+    html += '<div class="planning-card carryover">';
+    html += '<div class="planning-card-header"><div class="planning-card-name">Carryover (' + activeCarryover.length + ' tarefas)<span class="carryover-badge">Sprint Anterior</span></div></div>';
+    html += '<div class="planning-task-list" id="planning-carryover">';
+    activeCarryover.forEach(function(ct) {
+      var horas = ct.horasCarryover.toFixed(1) + 'h';
+      var checked = s.selected.has(ct.id) ? ' checked' : '';
+      var membroNome = s.members[ct.responsavelId] ? s.members[ct.responsavelId].nome.split(' ')[0] : '';
+      html += '<div class="planning-task-row" data-task-id="' + ct.id + '" data-carryover="1">' +
+        '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect('' + ct.id + '')"' + checked + '>' +
+        '<span class="task-icon">' + getTaskTypeIcon(ct.tipo) + '</span>' +
+        '<span class="task-key">' + jiraTicketLink(ct.key) + '</span>' +
+        '<span class="task-resumo" title="' + esc(ct.resumo) + '">' + esc(ct.resumo) + '</span>' +
+        '<span class="carryover-badge">' + esc(ct.status) + '</span>' +
+        '<span style="font-size:11px;color:var(--text-muted);margin-left:4px">' + esc(membroNome) + '</span>' +
+        '<span class="task-horas">' + horas + '</span>' +
+        '</div>';
+    });
+    html += '</div></div>';
+  }
+
   html += '<div class="planning-members-grid">';
   memberList.forEach(function(item) {
     var m = item.member;
@@ -9847,17 +9927,36 @@ function renderPlanningTab() {
 
     html += '<div class="planning-card" data-member-id="' + m.id + '">';
     html += '<div class="planning-card-header">' + avatar;
-    html += '<div class="planning-card-name">' + esc(m.nome) + ' <span style="font-weight:400;font-size:12px;color:var(--text-muted)">(' + m.tarefaIds.length + ' tarefas)</span></div>';
+    html += '<div class="planning-card-name">' + esc(m.nome) + ' <span style="font-weight:400;font-size:12px;color:var(--text-muted)">(' + m.tarefaIds.filter(function(_tid){ var _tk = window.planningState.tasks[_tid]; return _tk && _tk.status !== 'Cancelado' && _tk.status !== 'Rejeitada' && _tk.status !== 'Concluído'; }).length + ' tarefas)</span></div>';
     html += '<div class="planning-card-pct ' + pctClass + '">' + cap.percentual.toFixed(1) + '%</div>';
     if (cap.overcapacity) html += '<span class="capacity-badge overcapacity" style="margin-left:6px">Overcapacity</span>';
     html += '</div>';
     html += '<div class="capacity-bar"><div class="capacity-bar-fill ' + pctClass + '" style="width:' + barW + '%"></div></div>';
-    html += '<div class="planning-card-detail">' + cap.horasAlocadas.toFixed(1) + 'h alocadas / ' + m.horasDisponiveis.toFixed(1) + 'h disponiveis</div>';
+    var detailText = cap.horasAlocadas.toFixed(1) + 'h alocadas';
+    if (cap.horasCarryover > 0) detailText += ' + ' + cap.horasCarryover.toFixed(1) + 'h carryover';
+    detailText += ' / ' + m.horasDisponiveis.toFixed(1) + 'h disponiveis';
+    html += '<div class="planning-card-detail">' + detailText + '</div>';
     html += '<div class="planning-task-list" id="planning-member-' + m.id + '" data-member-id="' + m.id + '">';
     m.tarefaIds.forEach(function(tid) {
+      var _t = window.planningState.tasks[tid];
+      if (!_t || _t.status === 'Cancelado' || _t.status === 'Rejeitada' || _t.status === 'Concluído') return;
       if (window.planningState.movedBacklog.indexOf(tid) < 0 && window.planningState.movedNextSprint.indexOf(tid) < 0) {
         html += renderPlanningTaskRow(tid);
       }
+    });
+    // carryover tasks for this member
+    (window.planningState.carryoverByMember[m.id] || []).forEach(function(ct) {
+      if (window.planningState.dismissedCarryover.indexOf(ct.id) >= 0) return;
+      var horas = ct.horasCarryover.toFixed(1) + 'h';
+      var checked = window.planningState.selected.has(ct.id) ? ' checked' : '';
+      html += '<div class="planning-task-row" data-task-id="' + ct.id + '" data-carryover="1" style="opacity:0.85">' +
+        '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect('' + ct.id + '')"' + checked + '>' +
+        '<span class="task-icon">' + getTaskTypeIcon(ct.tipo) + '</span>' +
+        '<span class="task-key">' + jiraTicketLink(ct.key) + '</span>' +
+        '<span class="task-resumo" title="' + esc(ct.resumo) + '">' + esc(ct.resumo) + '</span>' +
+        '<span class="carryover-badge">Carryover</span>' +
+        '<span class="task-horas">' + horas + '</span>' +
+        '</div>';
     });
     html += '</div></div>';
   });
@@ -9870,10 +9969,12 @@ function renderPlanningTab() {
 
   if (_prevPlanningStats) {
     [
+      ['ps-horas-disp', _prevPlanningStats.horasDisponiveis.toFixed(1) + 'h', stats.horasDisponiveis.toFixed(1) + 'h'],
       ['ps-horas-aloc', _prevPlanningStats.horasAlocadas.toFixed(1) + 'h', stats.horasAlocadas.toFixed(1) + 'h'],
+      ['ps-horas-carry', (_prevPlanningStats.horasCarryover || 0).toFixed(1) + 'h', stats.horasCarryover.toFixed(1) + 'h'],
       ['ps-horas-nao-aloc', _prevPlanningStats.horasNaoAlocadas.toFixed(1) + 'h', stats.horasNaoAlocadas.toFixed(1) + 'h'],
       ['ps-horas-rest', _prevPlanningStats.horasRestantes.toFixed(1) + 'h', stats.horasRestantes.toFixed(1) + 'h'],
-      ['ps-horas-disp', _prevPlanningStats.horasDisponiveis.toFixed(1) + 'h', stats.horasDisponiveis.toFixed(1) + 'h'],
+      ['ps-qtde-cards', '' + _prevPlanningStats.qtdeCards, '' + stats.qtdeCards],
       ['ps-headcount', '' + _prevPlanningStats.headCount, '' + stats.headCount]
     ].forEach(function(f) {
       if (f[1] !== f[2]) {
@@ -9897,6 +9998,12 @@ function renderPlanningTab() {
   _prevPlanningStats = stats;
   _prevMemberPcts = currentMemberPcts;
   updateSyncButton();
+}
+
+function findCarryoverTask(tid) {
+  var cts = (window.planningState.carryoverTasks || []);
+  for (var i = 0; i < cts.length; i++) { if (cts[i].id === tid) return cts[i]; }
+  return null;
 }
 
 function renderPlanningTaskRow(tid) {
@@ -9942,10 +10049,12 @@ function applyTaskMove(taskId, fromMemberId, toMemberId) {
 function updatePlanningStats() {
   var stats = calcPlanningStats();
   var el;
+  el = document.getElementById('ps-horas-disp'); if (el) el.textContent = stats.horasDisponiveis.toFixed(1) + 'h';
   el = document.getElementById('ps-horas-aloc'); if (el) el.textContent = stats.horasAlocadas.toFixed(1) + 'h';
+  el = document.getElementById('ps-horas-carry'); if (el) el.textContent = stats.horasCarryover.toFixed(1) + 'h';
   el = document.getElementById('ps-horas-nao-aloc'); if (el) { el.textContent = stats.horasNaoAlocadas.toFixed(1) + 'h'; el.classList.toggle('stat-danger', stats.horasNaoAlocadas > 0); }
   el = document.getElementById('ps-horas-rest'); if (el) { el.textContent = stats.horasRestantes.toFixed(1) + 'h'; el.classList.toggle('stat-danger', stats.horasRestantes < 0); }
-  el = document.getElementById('ps-horas-disp'); if (el) el.textContent = stats.horasDisponiveis.toFixed(1) + 'h';
+  el = document.getElementById('ps-qtde-cards'); if (el) el.textContent = stats.qtdeCards;
   el = document.getElementById('ps-headcount'); if (el) el.textContent = stats.headCount;
 }
 
@@ -10227,7 +10336,12 @@ function selectBulkMember(el) {
   var horasNovas = 0;
   s.selected.forEach(function(tid) {
     var t = s.tasks[tid];
-    if (t) horasNovas += (t.estimativaTempo || 0) / 3600;
+    if (t) {
+      horasNovas += (t.estimativaTempo || 0) / 3600;
+    } else {
+      var ct = findCarryoverTask(tid);
+      if (ct) horasNovas += ct.horasCarryover;
+    }
   });
   horasNovas = Math.round(horasNovas * 10) / 10;
   var novaAloc = Math.round((cap.horasAlocadas + horasNovas) * 10) / 10;
@@ -10245,9 +10359,10 @@ function confirmBulkAlocar() {
   var s = window.planningState;
   var taskIds = Array.from(s.selected);
 
-  // check required fields
+  // check required fields (skip carryover tasks)
   var needFields = taskIds.filter(function(tid) {
     var t = s.tasks[tid];
+    if (!t) return false; // carryover task — already has fields
     return !t.tipoDemanda || !t.estimativaTempo;
   });
 
@@ -10261,12 +10376,27 @@ function confirmBulkAlocar() {
 }
 
 function applyBulkAlocar(taskIds, memberId) {
+  var s = window.planningState;
   taskIds.forEach(function(tid) {
-    var t = window.planningState.tasks[tid];
-    var fromMemberId = t.responsavelId;
-    applyTaskMove(tid, fromMemberId, memberId);
+    var t = s.tasks[tid];
+    if (t) {
+      applyTaskMove(tid, t.responsavelId, memberId);
+    } else {
+      // carryover task — reassign between members
+      var ct = findCarryoverTask(tid);
+      if (ct) {
+        var oldMid = ct.responsavelId;
+        if (oldMid && s.carryoverByMember[oldMid]) {
+          var idx = s.carryoverByMember[oldMid].indexOf(ct);
+          if (idx >= 0) s.carryoverByMember[oldMid].splice(idx, 1);
+        }
+        ct.responsavelId = memberId;
+        if (!s.carryoverByMember[memberId]) s.carryoverByMember[memberId] = [];
+        s.carryoverByMember[memberId].push(ct);
+      }
+    }
   });
-  window.planningState.selected.clear();
+  s.selected.clear();
   renderPlanningTab();
 }
 
@@ -10281,14 +10411,19 @@ function bulkMoverProximaSprint() {
     var msg = 'Mover ' + taskIds.length + ' tarefa' + (taskIds.length > 1 ? 's' : '') + ' para ' + data.sprint.nome + '?';
     if (confirm(msg)) {
       taskIds.forEach(function(tid) {
-        s.movedNextSprint.push(tid);
         var t = s.tasks[tid];
-        if (t.responsavelId && s.members[t.responsavelId]) {
-          var idx = s.members[t.responsavelId].tarefaIds.indexOf(tid);
-          if (idx >= 0) s.members[t.responsavelId].tarefaIds.splice(idx, 1);
+        if (t) {
+          s.movedNextSprint.push(tid);
+          if (t.responsavelId && s.members[t.responsavelId]) {
+            var idx = s.members[t.responsavelId].tarefaIds.indexOf(tid);
+            if (idx >= 0) s.members[t.responsavelId].tarefaIds.splice(idx, 1);
+          } else {
+            var idx = s.unassigned.indexOf(tid);
+            if (idx >= 0) s.unassigned.splice(idx, 1);
+          }
         } else {
-          var idx = s.unassigned.indexOf(tid);
-          if (idx >= 0) s.unassigned.splice(idx, 1);
+          // carryover task — dismiss (already in previous sprint)
+          s.dismissedCarryover.push(tid);
         }
       });
       s.selected.clear();
@@ -10309,14 +10444,19 @@ function bulkVoltarBacklog() {
   if (!confirm('Remover ' + taskIds.length + ' tarefa' + (taskIds.length > 1 ? 's' : '') + ' da sprint?')) return;
 
   taskIds.forEach(function(tid) {
-    s.movedBacklog.push(tid);
     var t = s.tasks[tid];
-    if (t.responsavelId && s.members[t.responsavelId]) {
-      var idx = s.members[t.responsavelId].tarefaIds.indexOf(tid);
-      if (idx >= 0) s.members[t.responsavelId].tarefaIds.splice(idx, 1);
+    if (t) {
+      s.movedBacklog.push(tid);
+      if (t.responsavelId && s.members[t.responsavelId]) {
+        var idx = s.members[t.responsavelId].tarefaIds.indexOf(tid);
+        if (idx >= 0) s.members[t.responsavelId].tarefaIds.splice(idx, 1);
+      } else {
+        var idx = s.unassigned.indexOf(tid);
+        if (idx >= 0) s.unassigned.splice(idx, 1);
+      }
     } else {
-      var idx = s.unassigned.indexOf(tid);
-      if (idx >= 0) s.unassigned.splice(idx, 1);
+      // carryover task — dismiss from carryover
+      s.dismissedCarryover.push(tid);
     }
   });
   s.selected.clear();

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -13,9 +14,24 @@ import (
 	"go.uber.org/zap"
 )
 
+type CarryoverTask struct {
+	ID              uuid.UUID  `json:"id"`
+	NumeroTicket    string     `json:"numero_ticket"`
+	Resumo          string     `json:"resumo"`
+	Tipo            string     `json:"tipo"`
+	Status          string     `json:"status"`
+	Prioridade      *string    `json:"prioridade"`
+	Horas           float64    `json:"horas"`
+	HorasCarryover  float64    `json:"horas_carryover"`
+	ResponsavelID   *uuid.UUID `json:"responsavel_id"`
+	ProjetoChave    string     `json:"projeto_chave"`
+}
+
 type NextSprintResult struct {
-	Sprint  domain.Sprint               `json:"sprint"`
-	Tarefas []repository.PlanningTarefa `json:"tarefas"`
+	Sprint              domain.Sprint               `json:"sprint"`
+	Tarefas             []repository.PlanningTarefa `json:"tarefas"`
+	CarryoverTasks      []CarryoverTask             `json:"carryover_tasks"`
+	HorasCarryoverTotal float64                     `json:"horas_carryover_total"`
 }
 
 type ReassignChange struct {
@@ -140,9 +156,47 @@ func (s *PlanningService) GetNextSprint(ctx context.Context, currentSprintID uui
 		tarefas = []repository.PlanningTarefa{}
 	}
 
+	carryoverRaw, err := s.planRepo.GetCarryoverTasks(ctx, currentSprintID)
+	if err != nil {
+		return nil, fmt.Errorf("getting carryover tasks: %w", err)
+	}
+
+	var carryoverTasks []CarryoverTask
+	var horasCarryoverTotal float64
+	for _, t := range carryoverRaw {
+		horas := 0.0
+		if t.EstimativaTempo != nil {
+			horas = float64(*t.EstimativaTempo) / 3600.0
+		}
+		horasCarryover := horas
+		if t.Status == "Teste" {
+			horasCarryover = horas * 0.5
+		}
+		horasCarryover = math.Round(horasCarryover*10) / 10
+		carryoverTasks = append(carryoverTasks, CarryoverTask{
+			ID:             t.ID,
+			NumeroTicket:   t.NumeroTicket,
+			Resumo:         t.Resumo,
+			Tipo:           t.Tipo,
+			Status:         t.Status,
+			Prioridade:     t.Prioridade,
+			Horas:          math.Round(horas*10) / 10,
+			HorasCarryover: horasCarryover,
+			ResponsavelID:  t.ResponsavelID,
+			ProjetoChave:   t.ProjetoChave,
+		})
+		horasCarryoverTotal += horasCarryover
+	}
+	if carryoverTasks == nil {
+		carryoverTasks = []CarryoverTask{}
+	}
+	horasCarryoverTotal = math.Round(horasCarryoverTotal*10) / 10
+
 	return &NextSprintResult{
-		Sprint:  *nextSprint,
-		Tarefas: tarefas,
+		Sprint:              *nextSprint,
+		Tarefas:             tarefas,
+		CarryoverTasks:      carryoverTasks,
+		HorasCarryoverTotal: horasCarryoverTotal,
 	}, nil
 }
 
