@@ -22,9 +22,7 @@ func sprintTimelineItemDeTeste(nome, estado string, inicio, fim time.Time) repos
 	}
 }
 
-// Sprint concluída não entra na timeline: o relatório existe para planejar o
-// que vem, e sprint fechada só empurra o que importa para fora da tela.
-func TestGetSprintsTimeline_ExcluiSprintsConcluidas(t *testing.T) {
+func TestGetSprintsTimeline_IncluiSprintsConcluidas(t *testing.T) {
 	dia := func(mes, d int) time.Time { return time.Date(2026, time.Month(mes), d, 0, 0, 0, 0, time.UTC) }
 	sprints := []repository.SprintListItem{
 		sprintTimelineItemDeTeste("Sprint fechada", "closed", dia(1, 5), dia(1, 19)),
@@ -57,17 +55,12 @@ func TestGetSprintsTimeline_ExcluiSprintsConcluidas(t *testing.T) {
 		t.Fatalf("GetSprintsTimeline: %v", err)
 	}
 
-	nomes := make([]string, len(itens))
-	for i, it := range itens {
-		nomes[i] = it.SprintNome
-	}
-	if len(itens) != 2 {
-		t.Fatalf("esperava 2 sprints na timeline, veio %d: %v", len(itens), nomes)
-	}
-	for _, n := range nomes {
-		if n == "Sprint fechada" {
-			t.Errorf("sprint concluída apareceu na timeline: %v", nomes)
+	if len(itens) != 3 {
+		nomes := make([]string, len(itens))
+		for i, it := range itens {
+			nomes[i] = it.SprintNome
 		}
+		t.Fatalf("esperava 3 sprints na timeline (incluindo closed), veio %d: %v", len(itens), nomes)
 	}
 }
 

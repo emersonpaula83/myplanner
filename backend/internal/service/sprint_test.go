@@ -922,15 +922,15 @@ func TestGetSprintsTimeline(t *testing.T) {
 			t.Errorf("expected projetoChave 'PROJ', got %q", item.ProjetoChave)
 		}
 		// membroDesligado excluded entirely; membroA has full 5 dias uteis
-		// (30h capacidade), membroB loses 1 dia to ausencia (4 dias => 24h).
+		// (40h capacidade), membroB loses 1 dia to ausencia (4 dias => 32h).
 		if item.Headcount != 2 {
 			t.Errorf("expected headcount 2, got %d", item.Headcount)
 		}
-		if !floatsClose(item.HorasCapacidade, 54.0) {
-			t.Errorf("expected HorasCapacidade 54.0, got %v", item.HorasCapacidade)
+		if !floatsClose(item.HorasCapacidade, 72.0) {
+			t.Errorf("expected HorasCapacidade 72.0, got %v", item.HorasCapacidade)
 		}
-		if !floatsClose(item.HorasMaximoTeorico, 60.0) {
-			t.Errorf("expected HorasMaximoTeorico 60.0, got %v", item.HorasMaximoTeorico)
+		if !floatsClose(item.HorasMaximoTeorico, 80.0) {
+			t.Errorf("expected HorasMaximoTeorico 80.0, got %v", item.HorasMaximoTeorico)
 		}
 		if !floatsClose(item.HorasAlocadas, 45.3) {
 			t.Errorf("expected HorasAlocadas 45.3, got %v", item.HorasAlocadas)
