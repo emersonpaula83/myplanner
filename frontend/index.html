@@ -9904,7 +9904,7 @@ function renderPlanningTab() {
       var checked = s.selected.has(ct.id) ? ' checked' : '';
       var membroNome = s.members[ct.responsavelId] ? s.members[ct.responsavelId].nome.split(' ')[0] : '';
       html += '<div class="planning-task-row" data-task-id="' + ct.id + '" data-carryover="1">' +
-        '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect('' + ct.id + '')"' + checked + '>' +
+        '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect(\'' + ct.id + '\')"' + checked + '>' +
         '<span class="task-icon">' + getTaskTypeIcon(ct.tipo) + '</span>' +
         '<span class="task-key">' + jiraTicketLink(ct.key) + '</span>' +
         '<span class="task-resumo" title="' + esc(ct.resumo) + '">' + esc(ct.resumo) + '</span>' +
@@ -9950,7 +9950,7 @@ function renderPlanningTab() {
       var horas = ct.horasCarryover.toFixed(1) + 'h';
       var checked = window.planningState.selected.has(ct.id) ? ' checked' : '';
       html += '<div class="planning-task-row" data-task-id="' + ct.id + '" data-carryover="1" style="opacity:0.85">' +
-        '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect('' + ct.id + '')"' + checked + '>' +
+        '<input type="checkbox" class="task-checkbox" onclick="event.stopPropagation();togglePlanningSelect(\'' + ct.id + '\')"' + checked + '>' +
         '<span class="task-icon">' + getTaskTypeIcon(ct.tipo) + '</span>' +
         '<span class="task-key">' + jiraTicketLink(ct.key) + '</span>' +
         '<span class="task-resumo" title="' + esc(ct.resumo) + '">' + esc(ct.resumo) + '</span>' +
