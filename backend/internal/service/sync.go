@@ -262,7 +262,7 @@ func (s *SyncService) SyncAll(ctx context.Context) ([]domain.SyncLog, error) {
 
 // GetStatus returns the latest sync log for a fonte de dados.
 func (s *SyncService) GetStatus(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error) {
-	return s.repo.GetLatestSyncLog(ctx, fonteDadosID)
+	return s.repo.GetAggregatedSyncStatus(ctx, fonteDadosID)
 }
 
 // ListLogs returns the sync history for a fonte de dados.

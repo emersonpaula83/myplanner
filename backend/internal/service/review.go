@@ -3,13 +3,11 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/emersonpaula83/myplanner/backend/internal/repository"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
@@ -375,16 +373,23 @@ Responda APENAS com JSON válido (sem markdown fences) no formato:
 }
 
 func (s *ReviewService) GenerateAnalise(ctx context.Context, sprintID, equipeID uuid.UUID, produtoIDs []uuid.UUID) (*repository.ReviewAnalise, error) {
-	apiKey, err := s.configRepo.GetConfig(ctx, "openrouter_api_key")
+	apiKey, err := s.configRepo.GetConfig(ctx, "ai_api_key")
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("openrouter API key not configured: %w", err)
+		apiKey, err = s.configRepo.GetConfig(ctx, "openrouter_api_key")
+		if err != nil {
+			return nil, fmt.Errorf("AI API key not configured: %w", err)
 		}
-		return nil, err
 	}
 
-	model := "openai/gpt-oss-20b:free"
-	if m, err := s.configRepo.GetConfig(ctx, "openrouter_model"); err == nil && m != "" {
+	baseURL := "https://openrouter.ai/api/v1"
+	if u, err := s.configRepo.GetConfig(ctx, "ai_base_url"); err == nil && u != "" {
+		baseURL = u
+	}
+
+	model := "openai/gpt-4o-mini"
+	if m, err := s.configRepo.GetConfig(ctx, "ai_model"); err == nil && m != "" {
+		model = m
+	} else if m, err := s.configRepo.GetConfig(ctx, "openrouter_model"); err == nil && m != "" {
 		model = m
 	}
 
@@ -395,7 +400,7 @@ func (s *ReviewService) GenerateAnalise(ctx context.Context, sprintID, equipeID 
 
 	systemPrompt, userPrompt := buildReviewAnalisePrompt(reviewData.Tarefas)
 
-	client := NewOpenRouterClient(apiKey, model)
+	client := NewAIClient(apiKey, model, baseURL)
 	rawResponse, err := client.ChatCompletion(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("AI analysis failed: %w", err)

@@ -60,6 +60,7 @@ type SyncRepoStore interface {
 	UpdateSyncLog(ctx context.Context, id uuid.UUID, status string, finalizadoEm time.Time, totals repository.SyncTotals, erros json.RawMessage, mensagem *string) error
 	GetFonteDadosAtivas(ctx context.Context) ([]domain.FonteDados, error)
 	GetLatestSyncLog(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error)
+	GetAggregatedSyncStatus(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error)
 	ListSyncLogs(ctx context.Context, fonteDadosID uuid.UUID, limit int) ([]domain.SyncLog, error)
 	HasRunningSync(ctx context.Context, fonteDadosID uuid.UUID) (bool, error)
 	UpdateSyncLogTotals(ctx context.Context, id uuid.UUID, totals repository.SyncTotals) error
@@ -140,4 +141,22 @@ type DestinatarioStore interface {
 // Consumed by: SchedulerService.
 type SyncScheduleStore interface {
 	GetDueSchedules(ctx context.Context, horaMinuto string) ([]domain.SyncSchedule, error)
+}
+
+// PlanningRepoStore abstracts *repository.PlanningRepository for testing.
+// Consumed by: PlanningService.
+type PlanningRepoStore interface {
+	GetNextSprint(ctx context.Context, boardID int, currentDataInicio time.Time) (*domain.Sprint, error)
+	GetAllTarefasBySprint(ctx context.Context, sprintID uuid.UUID) ([]repository.PlanningTarefa, error)
+	UpdateTarefaEstimativa(ctx context.Context, tarefaID uuid.UUID, segundos int) error
+	UpdateTarefaTipoDemanda(ctx context.Context, tarefaID uuid.UUID, valor string) error
+	UpdateTarefaResponsavel(ctx context.Context, tarefaID uuid.UUID, responsavelID *uuid.UUID) error
+	MoveTarefaToSprint(ctx context.Context, tarefaID uuid.UUID, sprintID uuid.UUID) error
+	RemoveTarefaFromSprint(ctx context.Context, tarefaID uuid.UUID) error
+	GetSprintJiraID(ctx context.Context, sprintID uuid.UUID) (int, error)
+	SearchTarefasByKeys(ctx context.Context, projetoID uuid.UUID, keys []string) ([]repository.SearchTarefaResult, error)
+	UpsertTarefaFromJira(ctx context.Context, t *repository.UpsertTarefaParams) (uuid.UUID, error)
+	MoveTarefasToSprint(ctx context.Context, sprintID uuid.UUID, tarefaIDs []uuid.UUID) error
+	GetTarefasByIDs(ctx context.Context, ids []uuid.UUID) ([]repository.PlanningTarefa, error)
+	GetProjetoChaveByID(ctx context.Context, projetoID uuid.UUID) (string, uuid.UUID, error)
 }

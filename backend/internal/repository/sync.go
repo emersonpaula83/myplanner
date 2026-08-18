@@ -334,7 +334,7 @@ func (r *SyncRepository) captureSnapshotCapacity(ctx context.Context, sprintID u
 		}
 	}
 
-	horasPorDia := 6.0
+	horasPorDia := 8.0
 	horasTotalSprint := float64(diasUteis) * horasPorDia * float64(len(membrosMap))
 
 	membros := make([]SnapshotMembroCapacity, 0, len(membrosMap))
@@ -742,6 +742,54 @@ func (r *SyncRepository) GetLatestSyncLog(ctx context.Context, fonteDadosID uuid
 	}
 	if err != nil {
 		return nil, fmt.Errorf("getting latest sync log: %w", err)
+	}
+	return &log, nil
+}
+
+
+func (r *SyncRepository) GetAggregatedSyncStatus(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error) {
+	var log domain.SyncLog
+	var runningCount int
+	err := r.pool.QueryRow(ctx, `
+		WITH batch AS (
+			SELECT min(iniciado_em) FILTER (WHERE status = 'running') AS earliest,
+			       count(*) FILTER (WHERE status = 'running') AS running_count
+			FROM sync_logs
+			WHERE fonte_dados_id = $1
+		)
+		SELECT COALESCE(sum(s.total_projetos), 0)::int,
+		       COALESCE(sum(s.total_tarefas), 0)::int,
+		       COALESCE(sum(s.total_membros), 0)::int,
+		       COALESCE(sum(s.total_sprints), 0)::int,
+		       b.earliest,
+		       b.running_count
+		FROM batch b
+		LEFT JOIN sync_logs s ON s.fonte_dados_id = $1
+		     AND b.running_count > 0
+		     AND s.iniciado_em >= b.earliest - INTERVAL '1 minute'
+		GROUP BY b.earliest, b.running_count
+	`, fonteDadosID).Scan(
+		&log.TotalProjetos,
+		&log.TotalTarefas,
+		&log.TotalMembros,
+		&log.TotalSprints,
+		&log.FinalizadoEm,
+		&runningCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("aggregating sync status: %w", err)
+	}
+
+	if runningCount == 0 {
+		return r.GetLatestSyncLog(ctx, fonteDadosID)
+	}
+
+	log.FonteDadosID = fonteDadosID
+	log.Status = "running"
+	log.Tipo = "aggregated"
+	if log.FinalizadoEm != nil {
+		log.IniciadoEm = *log.FinalizadoEm
+		log.FinalizadoEm = nil
 	}
 	return &log, nil
 }

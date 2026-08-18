@@ -146,6 +146,7 @@ type mockSyncRepoStore struct {
 	updateSyncLogFn            func(ctx context.Context, id uuid.UUID, status string, finalizadoEm time.Time, totals repository.SyncTotals, erros json.RawMessage, mensagem *string) error
 	getFonteDadosAtivasFn      func(ctx context.Context) ([]domain.FonteDados, error)
 	getLatestSyncLogFn         func(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error)
+	getAggregatedSyncStatusFn  func(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error)
 	listSyncLogsFn             func(ctx context.Context, fonteDadosID uuid.UUID, limit int) ([]domain.SyncLog, error)
 	hasRunningSyncFn            func(ctx context.Context, fonteDadosID uuid.UUID) (bool, error)
 	updateSyncLogTotalsFn      func(ctx context.Context, id uuid.UUID, totals repository.SyncTotals) error
@@ -178,6 +179,12 @@ func (m *mockSyncRepoStore) GetFonteDadosAtivas(ctx context.Context) ([]domain.F
 	return m.getFonteDadosAtivasFn(ctx)
 }
 func (m *mockSyncRepoStore) GetLatestSyncLog(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error) {
+	return m.getLatestSyncLogFn(ctx, fonteDadosID)
+}
+func (m *mockSyncRepoStore) GetAggregatedSyncStatus(ctx context.Context, fonteDadosID uuid.UUID) (*domain.SyncLog, error) {
+	if m.getAggregatedSyncStatusFn != nil {
+		return m.getAggregatedSyncStatusFn(ctx, fonteDadosID)
+	}
 	return m.getLatestSyncLogFn(ctx, fonteDadosID)
 }
 func (m *mockSyncRepoStore) ListSyncLogs(ctx context.Context, fonteDadosID uuid.UUID, limit int) ([]domain.SyncLog, error) {

@@ -144,7 +144,7 @@ func (h *TimelineHandler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 			Status:             e.Status,
 			DataInicioExecucao: e.DataInicioExecucao,
 			DataLimite:         dataLimite,
-			TotalDiasEstimados: float64(e.TotalSegundosEquipe) / 3600.0 / 6.0,
+			TotalDiasEstimados: float64(e.TotalSegundosEquipe) / 3600.0 / 8.0,
 			ProjetoCI:          e.ProjetoCI,
 			ProjetoCITicket:    e.ProjetoCITicket,
 		}

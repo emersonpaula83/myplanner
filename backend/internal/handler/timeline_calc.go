@@ -37,7 +37,7 @@ func CalcularCapacidadeMensal(
 		mesFim := mesInicio.AddDate(0, 1, -1)
 		diasUteis := ContarDiasUteisComFeriadosSet(mesInicio, mesFim, feriadoSet)
 
-		horasMaximas := float64(membrosAtivos) * float64(diasUteis) * 6.0
+		horasMaximas := float64(membrosAtivos) * float64(diasUteis) * 8.0
 
 		totalDiasAusencia := 0
 		membrosAusentes := make([]domain.MembroAusente, 0)
@@ -51,7 +51,7 @@ func CalcularCapacidadeMensal(
 				})
 			}
 		}
-		horasDisponiveis := horasMaximas - float64(totalDiasAusencia)*6.0
+		horasDisponiveis := horasMaximas - float64(totalDiasAusencia)*8.0
 		if horasDisponiveis < 0 {
 			horasDisponiveis = 0
 		}

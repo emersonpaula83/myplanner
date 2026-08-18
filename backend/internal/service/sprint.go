@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const horasPorDia = 6.0
+const horasPorDia = 8.0
 
 type SprintStore interface {
 	ListByProjeto(ctx context.Context, projetoID uuid.UUID, estado *string) ([]repository.SprintListItem, error)

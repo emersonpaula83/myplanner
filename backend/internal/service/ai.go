@@ -10,31 +10,31 @@ import (
 	"time"
 )
 
-type OpenRouterClient struct {
+type AIClient struct {
 	apiKey  string
 	model   string
 	baseURL string
 }
 
-func NewOpenRouterClient(apiKey, model string) *OpenRouterClient {
-	return &OpenRouterClient{
+func NewAIClient(apiKey, model, baseURL string) *AIClient {
+	return &AIClient{
 		apiKey:  apiKey,
 		model:   model,
-		baseURL: "https://openrouter.ai/api/v1",
+		baseURL: baseURL,
 	}
 }
 
-type openRouterRequest struct {
-	Model    string              `json:"model"`
-	Messages []openRouterMessage `json:"messages"`
+type aiRequest struct {
+	Model    string      `json:"model"`
+	Messages []aiMessage `json:"messages"`
 }
 
-type openRouterMessage struct {
+type aiMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-type openRouterResponse struct {
+type aiResponse struct {
 	Choices []struct {
 		Message struct {
 			Content string `json:"content"`
@@ -46,21 +46,21 @@ type openRouterResponse struct {
 	} `json:"error"`
 }
 
-func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+func (c *AIClient) ChatCompletion(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	result, err := c.callAPI(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		result, err = c.callAPI(ctx, systemPrompt, userPrompt)
 		if err != nil {
-			return "", fmt.Errorf("openrouter failed after retry: %w", err)
+			return "", fmt.Errorf("AI provider failed after retry: %w", err)
 		}
 	}
 	return result, nil
 }
 
-func (c *OpenRouterClient) callAPI(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	reqBody := openRouterRequest{
+func (c *AIClient) callAPI(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	reqBody := aiRequest{
 		Model: c.model,
-		Messages: []openRouterMessage{
+		Messages: []aiMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
@@ -83,7 +83,7 @@ func (c *OpenRouterClient) callAPI(ctx context.Context, systemPrompt, userPrompt
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("calling openrouter: %w", err)
+		return "", fmt.Errorf("calling AI provider: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -93,21 +93,21 @@ func (c *OpenRouterClient) callAPI(ctx context.Context, systemPrompt, userPrompt
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("openrouter returned %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("AI provider returned %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var orResp openRouterResponse
-	if err := json.Unmarshal(respBody, &orResp); err != nil {
+	var aiResp aiResponse
+	if err := json.Unmarshal(respBody, &aiResp); err != nil {
 		return "", fmt.Errorf("decoding response: %w", err)
 	}
 
-	if orResp.Error != nil {
-		return "", fmt.Errorf("openrouter error: %s", orResp.Error.Message)
+	if aiResp.Error != nil {
+		return "", fmt.Errorf("AI provider error: %s", aiResp.Error.Message)
 	}
 
-	if len(orResp.Choices) == 0 || orResp.Choices[0].Message.Content == "" {
-		return "", fmt.Errorf("empty response from openrouter")
+	if len(aiResp.Choices) == 0 || aiResp.Choices[0].Message.Content == "" {
+		return "", fmt.Errorf("empty response from AI provider")
 	}
 
-	return orResp.Choices[0].Message.Content, nil
+	return aiResp.Choices[0].Message.Content, nil
 }

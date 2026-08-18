@@ -36,6 +36,9 @@ type ConfigStore interface {
 var configWhitelist = map[string]bool{
 	"openrouter_api_key": true,
 	"openrouter_model":   true,
+	"ai_api_key":         true,
+	"ai_model":           true,
+	"ai_base_url":        true,
 	"smtp_host":          true,
 	"smtp_port":          true,
 	"smtp_user":          true,
@@ -268,7 +271,7 @@ func (h *ReviewHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if chave == "openrouter_api_key" || chave == "smtp_password" || chave == "evolution_api_key" {
+	if chave == "openrouter_api_key" || chave == "ai_api_key" || chave == "smtp_password" || chave == "evolution_api_key" {
 		exists, err := h.configStore.ConfigExists(r.Context(), chave)
 		if err != nil {
 			h.logger.Error("checking config", zap.Error(err))
@@ -320,6 +323,34 @@ func (h *ReviewHandler) SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+type testAIRequest struct {
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key"`
+	Model   string `json:"model"`
+}
+
+func (h *ReviewHandler) TestAIConnection(w http.ResponseWriter, r *http.Request) {
+	var req testAIRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.BaseURL == "" || req.Model == "" {
+		respondError(w, http.StatusBadRequest, "base_url and model are required")
+		return
+	}
+
+	client := service.NewAIClient(req.APIKey, req.Model, req.BaseURL)
+	_, err := client.ChatCompletion(r.Context(), "You are a test assistant.", "Say OK")
+	if err != nil {
+		respondJSON(w, http.StatusOK, map[string]string{"status": "error", "error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok", "model": req.Model})
 }
 
 func (h *ReviewHandler) GetReviewAnalise(w http.ResponseWriter, r *http.Request) {
@@ -410,7 +441,7 @@ func (h *ReviewHandler) PostReviewAnalise(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		h.logger.Error("generating review analysis", zap.Error(err))
 		if strings.Contains(err.Error(), "not configured") {
-			respondError(w, http.StatusServiceUnavailable, "OpenRouter API key not configured")
+			respondError(w, http.StatusServiceUnavailable, "AI API key not configured")
 			return
 		}
 		respondError(w, http.StatusInternalServerError, "error generating analysis")

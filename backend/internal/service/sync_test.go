@@ -31,6 +31,7 @@ type mockJiraClient struct {
 	addCommentFn           func(ctx context.Context, issueKey, body string) error
 	moveToSprintFn         func(ctx context.Context, sprintJiraID int, issueKey string) error
 	updateTimeEstimateFn   func(ctx context.Context, issueKey string, seconds int) error
+	removeFromSprintFn     func(ctx context.Context, issueKey string) error
 }
 
 func (m *mockJiraClient) GetProjects(ctx context.Context) ([]jira.JiraProject, error) {
@@ -81,6 +82,16 @@ func (m *mockJiraClient) MoveToSprint(ctx context.Context, sprintJiraID int, iss
 }
 func (m *mockJiraClient) UpdateTimeEstimate(ctx context.Context, issueKey string, seconds int) error {
 	return m.updateTimeEstimateFn(ctx, issueKey, seconds)
+}
+func (m *mockJiraClient) RemoveFromSprint(ctx context.Context, issueKey string) error {
+	if m.removeFromSprintFn != nil {
+		return m.removeFromSprintFn(ctx, issueKey)
+	}
+	return nil
+}
+
+func (m *mockJiraClient) SearchIssuesByKeys(ctx context.Context, projectKey string, issueKeys []string) ([]jira.JiraIssue, error) {
+	return nil, nil
 }
 
 func newDefaultMockJiraClient() *mockJiraClient {

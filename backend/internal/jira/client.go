@@ -47,6 +47,8 @@ type Client interface {
 	AddComment(ctx context.Context, issueKey, body string) error
 	MoveToSprint(ctx context.Context, sprintJiraID int, issueKey string) error
 	UpdateTimeEstimate(ctx context.Context, issueKey string, seconds int) error
+	RemoveFromSprint(ctx context.Context, issueKey string) error
+	SearchIssuesByKeys(ctx context.Context, projectKey string, issueKeys []string) ([]JiraIssue, error)
 }
 
 type HTTPClient struct {
@@ -248,6 +250,77 @@ func (c *HTTPClient) GetProjectIssues(ctx context.Context, projectKey string, up
 		nextPageToken = rawResult.NextPageToken
 	}
 	c.logger.Debug("fetched issues", zap.String("project", projectKey), zap.Int("count", len(all)))
+	return all, nil
+}
+
+func (c *HTTPClient) SearchIssuesByKeys(ctx context.Context, projectKey string, issueKeys []string) ([]JiraIssue, error) {
+	if len(issueKeys) == 0 {
+		return nil, nil
+	}
+
+	quoted := make([]string, len(issueKeys))
+	for i, k := range issueKeys {
+		quoted[i] = fmt.Sprintf("%q", k)
+	}
+	jql := fmt.Sprintf("project = %s AND key IN (%s)", projectKey, strings.Join(quoted, ","))
+
+	fields := []string{"summary", "issuetype", "status", "priority", "assignee", "reporter",
+		"project", "created", "updated", "duedate", "resolutiondate", "timetracking",
+		"sprint", "parent", "labels", "components"}
+	if c.sprintFieldID != "" && c.sprintFieldID != "sprint" {
+		fields = append(fields, c.sprintFieldID)
+	}
+	fields = append(fields, c.customFieldIDs...)
+
+	all := make([]JiraIssue, 0)
+	var nextPageToken string
+	for {
+		payload := map[string]any{
+			"jql":        jql,
+			"maxResults": 100,
+			"fields":     fields,
+		}
+		if nextPageToken != "" {
+			payload["nextPageToken"] = nextPageToken
+		}
+		body, err := c.doPost(ctx, "/rest/api/3/search/jql", payload)
+		if err != nil {
+			return nil, err
+		}
+
+		var rawResult struct {
+			NextPageToken string            `json:"nextPageToken"`
+			IsLast        bool              `json:"isLast"`
+			Issues        []json.RawMessage `json:"issues"`
+		}
+		if err := json.Unmarshal(body, &rawResult); err != nil {
+			return nil, fmt.Errorf("decoding issues: %w", err)
+		}
+
+		for _, rawIssue := range rawResult.Issues {
+			var issue JiraIssue
+			if err := json.Unmarshal(rawIssue, &issue); err != nil {
+				c.logger.Warn("skipping unparseable issue", zap.Error(err))
+				continue
+			}
+			var issueMap map[string]json.RawMessage
+			if err := json.Unmarshal(rawIssue, &issueMap); err == nil {
+				if fieldsRaw, ok := issueMap["fields"]; ok {
+					issue.Fields.CustomFields = extractCustomFields(fieldsRaw)
+					if issue.Fields.Sprint == nil {
+						issue.Fields.Sprint = c.extractSprintField(fieldsRaw)
+					}
+				}
+			}
+			all = append(all, issue)
+		}
+
+		if rawResult.IsLast || len(rawResult.Issues) == 0 || rawResult.NextPageToken == "" {
+			break
+		}
+		nextPageToken = rawResult.NextPageToken
+	}
+	c.logger.Debug("searched issues by keys", zap.String("project", projectKey), zap.Int("count", len(all)))
 	return all, nil
 }
 
@@ -651,6 +724,15 @@ func (c *HTTPClient) UpdateTimeEstimate(ctx context.Context, issueKey string, se
 	_, err := c.doPut(ctx, "/rest/api/3/issue/"+issueKey, payload)
 	if err != nil {
 		return fmt.Errorf("updating time estimate for %q: %w", issueKey, err)
+	}
+	return nil
+}
+
+func (c *HTTPClient) RemoveFromSprint(ctx context.Context, issueKey string) error {
+	payload := map[string]any{"issues": []string{issueKey}}
+	_, err := c.doPost(ctx, "/rest/agile/1.0/backlog/issue", payload)
+	if err != nil {
+		return fmt.Errorf("removing issue %q from sprint: %w", issueKey, err)
 	}
 	return nil
 }

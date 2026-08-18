@@ -68,6 +68,7 @@ func main() {
 	tokenService := auth.NewTokenService(cfg.Auth.JWTSecret, cfg.Auth.JWTExpirationHours)
 
 	fonteDadosRepo := repository.NewFonteDadosRepository(pool)
+	favoritosRepo := repository.NewFavoritosRepository(pool)
 	usuarioRepo := repository.NewUsuarioRepository(pool)
 	equipeRepo := repository.NewEquipeRepository(pool)
 
@@ -146,6 +147,7 @@ func main() {
 
 	syncService := service.NewSyncService(syncRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	syncHandler := handler.NewSyncHandler(syncService, logger)
+	favoritosHandler := handler.NewFavoritosHandler(favoritosRepo, syncService, logger)
 
 	scheduleRepo := repository.NewSyncScheduleRepository(pool)
 	scheduleHandler := handler.NewSyncScheduleHandler(scheduleRepo, logger)
@@ -185,6 +187,10 @@ func main() {
 	allocRepo := repository.NewAllocationRepository(pool)
 	allocSvc := service.NewAllocationService(allocRepo, sprintService, sprintRepo, fonteDadosRepo, syncService, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
 	allocHandler := handler.NewAllocationHandler(allocSvc, logger)
+
+	planningRepo := repository.NewPlanningRepository(pool)
+	planningSvc := service.NewPlanningService(planningRepo, sprintRepo, fonteDadosRepo, clientFactory, oauthClientFactory, oauthSvc, cfg.Sync.RateLimitPerSec, logger)
+	planningHandler := handler.NewPlanningHandler(planningSvc, logger)
 
 	tarefaRepo := repository.NewTarefaRepository(pool)
 	tarefaHandler := handler.NewTarefaHandler(tarefaRepo, logger)
@@ -236,6 +242,9 @@ func main() {
 			r.Get("/fontes/{id}", fonteDadosHandler.GetByID)
 			r.Put("/fontes/{id}", fonteDadosHandler.Update)
 			r.Delete("/fontes/{id}", fonteDadosHandler.Delete)
+
+			r.Get("/fontes/{id}/favoritos", favoritosHandler.List)
+			r.Put("/fontes/{id}/favoritos", favoritosHandler.Replace)
 
 			r.Get("/usuarios", usuarioHandler.List)
 			r.Post("/usuarios", usuarioHandler.Create)
@@ -332,6 +341,11 @@ func main() {
 			r.Get("/sprints/{id}/timeline-detail", sprintHandler.GetTimelineDetail)
 			r.Get("/sprints/{id}/equalizer", equalizerHandler.GetSuggestions)
 			r.Post("/sprints/{id}/equalizer/apply", equalizerHandler.ApplyTransfers)
+			r.Get("/sprints/{id}/next", planningHandler.GetNextSprint)
+			r.Post("/sprints/{id}/planning/apply", planningHandler.Apply)
+			r.Get("/sprints/{id}/planning/progress", planningHandler.GetProgress)
+			r.Post("/sprints/{id}/search-tasks", planningHandler.SearchTasks)
+			r.Post("/sprints/{id}/include-tasks", planningHandler.IncludeTasks)
 
 			r.Get("/sprints/{id}/review", reviewHandler.GetReviewData)
 			r.Get("/sprints/{sprintId}/review/destaques", reviewHandler.ListDestaques)
@@ -350,11 +364,13 @@ func main() {
 
 			r.Get("/config/{chave}", reviewHandler.GetConfig)
 			r.Post("/config", reviewHandler.SetConfig)
+			r.Post("/config/ai/test", reviewHandler.TestAIConnection)
 
 			r.Post("/sync/trigger", syncHandler.TriggerSync)
 			r.Get("/sync/status", syncHandler.GetSyncStatus)
 			r.Get("/sync/logs", syncHandler.ListSyncLogs)
 			r.Get("/sync/projects", syncHandler.ListJiraProjects)
+			r.Post("/sync/trigger-batch", favoritosHandler.TriggerBatch)
 
 			r.Get("/sync/schedules", scheduleHandler.Get)
 			r.Put("/sync/schedules", scheduleHandler.Upsert)

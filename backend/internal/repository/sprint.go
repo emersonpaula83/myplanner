@@ -24,16 +24,17 @@ func (r *SprintRepository) Pool() *pgxpool.Pool {
 }
 
 type SprintListItem struct {
-	ID           uuid.UUID  `json:"id"`
-	Nome         string     `json:"nome"`
-	Estado       *string    `json:"estado"`
-	DataInicio   *time.Time `json:"data_inicio"`
-	DataFim      *time.Time `json:"data_fim"`
-	TotalTarefas int        `json:"total_tarefas"`
-	ProjetoChave *string    `json:"projeto_chave,omitempty"`
-	ProjetoNome  *string    `json:"projeto_nome,omitempty"`
-	FonteDadosID *uuid.UUID `json:"fonte_dados_id,omitempty"`
-	ProjetoID    *uuid.UUID `json:"projeto_id,omitempty"`
+	ID            uuid.UUID  `json:"id"`
+	Nome          string     `json:"nome"`
+	Estado        *string    `json:"estado"`
+	DataInicio    *time.Time `json:"data_inicio"`
+	DataFim       *time.Time `json:"data_fim"`
+	DataConclusao *time.Time `json:"data_conclusao"`
+	TotalTarefas  int        `json:"total_tarefas"`
+	ProjetoChave  *string    `json:"projeto_chave,omitempty"`
+	ProjetoNome   *string    `json:"projeto_nome,omitempty"`
+	FonteDadosID  *uuid.UUID `json:"fonte_dados_id,omitempty"`
+	ProjetoID     *uuid.UUID `json:"projeto_id,omitempty"`
 }
 
 type ProjetoComSprints struct {
@@ -131,7 +132,7 @@ func (r *SprintRepository) ListSprintsIncludeEmpty(ctx context.Context, equipeID
 
 func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID, estado *string, includeEmpty bool, boardID *int) ([]SprintListItem, error) {
 	query := `
-		SELECT s.id, s.nome, s.estado, s.data_inicio, s.data_fim,
+		SELECT s.id, s.nome, s.estado, s.data_inicio, s.data_fim, s.data_conclusao,
 		       (SELECT COUNT(*) FROM tarefas t WHERE t.sprint_id = s.id) AS total_tarefas,
 		       p.chave, p.nome, s.fonte_dados_id, s.projeto_id
 		FROM sprints s
@@ -197,7 +198,7 @@ func (r *SprintRepository) listSprints(ctx context.Context, equipeID *uuid.UUID,
 	result := make([]SprintListItem, 0)
 	for rows.Next() {
 		var item SprintListItem
-		if err := rows.Scan(&item.ID, &item.Nome, &item.Estado, &item.DataInicio, &item.DataFim, &item.TotalTarefas, &item.ProjetoChave, &item.ProjetoNome, &item.FonteDadosID, &item.ProjetoID); err != nil {
+		if err := rows.Scan(&item.ID, &item.Nome, &item.Estado, &item.DataInicio, &item.DataFim, &item.DataConclusao, &item.TotalTarefas, &item.ProjetoChave, &item.ProjetoNome, &item.FonteDadosID, &item.ProjetoID); err != nil {
 			return nil, fmt.Errorf("scanning sprint: %w", err)
 		}
 		result = append(result, item)

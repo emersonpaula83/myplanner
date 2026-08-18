@@ -214,7 +214,7 @@ type aiSugestaoOutput struct {
 	Justificativa string `json:"justificativa"`
 }
 
-type aiResponse struct {
+type equalizerAIResponse struct {
 	Sugestoes    []aiSugestaoOutput `json:"sugestoes"`
 	Analise      string             `json:"analise"`
 	DesvioAntes  float64            `json:"desvio_antes"`
@@ -375,21 +375,31 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 	stdDevAntes := math.Round(calcStdDev(pcts)*10) / 10
 
 	// AI is not configured: nothing to suggest, but still report the metric.
-	apiKey, err := s.configRepo.GetConfig(ctx, "openrouter_api_key")
+	apiKey, err := s.configRepo.GetConfig(ctx, "ai_api_key")
 	if err != nil || apiKey == "" {
-		s.logger.Warn("openrouter API key not configured, no equalizer suggestions")
+		apiKey, err = s.configRepo.GetConfig(ctx, "openrouter_api_key")
+	}
+	if err != nil || apiKey == "" {
+		s.logger.Warn("AI API key not configured, no equalizer suggestions")
 		result := s.nadaASugerir(cap, states, "Serviço de IA não configurado")
 		result.DesvioPadraoAntes = stdDevAntes
 		result.DesvioPadraoDepois = stdDevAntes
 		return result, nil
 	}
-	model := "openai/gpt-oss-20b:free"
-	if m, err := s.configRepo.GetConfig(ctx, "openrouter_model"); err == nil && m != "" {
+	model := "openai/gpt-4o-mini"
+	if m, err := s.configRepo.GetConfig(ctx, "ai_model"); err == nil && m != "" {
+		model = m
+	} else if m, err := s.configRepo.GetConfig(ctx, "openrouter_model"); err == nil && m != "" {
 		model = m
 	}
 
+	baseURL := "https://openrouter.ai/api/v1"
+	if u, err := s.configRepo.GetConfig(ctx, "ai_base_url"); err == nil && u != "" {
+		baseURL = u
+	}
+
 	systemPrompt, userPrompt := buildEqualizerPrompt(activeMembros, allTarefas)
-	client := NewOpenRouterClient(apiKey, model)
+	client := NewAIClient(apiKey, model, baseURL)
 	rawResponse, err := client.ChatCompletion(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		s.logger.Error("AI equalizer call failed", zap.Error(err))
@@ -415,7 +425,7 @@ func (s *EqualizerService) Calculate(ctx context.Context, sprintID uuid.UUID, eq
 		cleaned = strings.TrimSpace(strings.Join(lines, "\n"))
 	}
 
-	var aiResp aiResponse
+	var aiResp equalizerAIResponse
 	if err := json.Unmarshal([]byte(cleaned), &aiResp); err != nil {
 		s.logger.Error("AI returned invalid JSON", zap.Error(err), zap.String("raw", cleaned))
 		result := s.nadaASugerir(cap, states, "Resposta da IA inválida")
